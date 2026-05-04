@@ -4,14 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:prisma": "prisma generate && next dev",
+    "dev:prisma": "next dev",
     "build": "next build",
-    "postbuild": "node scripts/copy-out-to-dist.cjs",
-    "export": "node scripts/copy-out-to-dist.cjs",
-    "build:next": "next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:sync": "prisma db push && prisma generate",
     "android:live": "npx cap run android -l --host=localhost --port=3000 --forwardPorts 3000:3000"

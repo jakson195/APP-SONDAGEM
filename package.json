@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:prisma": "prisma generate && next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "next build",
     "postbuild": "node scripts/copy-out-to-dist.cjs",
     "export": "node scripts/copy-out-to-dist.cjs",
     "build:next": "next build",

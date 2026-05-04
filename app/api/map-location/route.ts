@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 /**
  * Gera imagem PNG do mapa (Google Static Maps) para o ponto WGS84.

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { CAMPO_TIPO, isCampoTipo, type CampoTipo } from "@/lib/campo-sondagem-tipo";
 import { NextResponse } from "next/server";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 function parseTipoCampo(v: unknown): CampoTipo {
   if (typeof v !== "string" || !isCampoTipo(v)) return CAMPO_TIPO.spt;

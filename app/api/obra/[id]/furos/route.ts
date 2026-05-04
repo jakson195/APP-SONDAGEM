@@ -3,7 +3,7 @@ import { isCampoTipo } from "@/lib/campo-sondagem-tipo";
 import { ssgObraIdParams } from "@/lib/ssg-static-params-from-db";
 import { NextResponse } from "next/server";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 export async function generateStaticParams() {
   return ssgObraIdParams();

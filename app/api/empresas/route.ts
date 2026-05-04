@@ -1,15 +1,20 @@
+import { nextResponseDbFailure } from "@/lib/db-route-error";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 /** Lista empresas (para escolher na Nova obra). */
 export async function GET() {
-  const empresas = await prisma.empresa.findMany({
-    orderBy: { id: "asc" },
-    select: { id: true, nome: true },
-  });
-  return NextResponse.json(empresas);
+  try {
+    const empresas = await prisma.empresa.findMany({
+      orderBy: { id: "asc" },
+      select: { id: true, nome: true },
+    });
+    return NextResponse.json(empresas);
+  } catch (e) {
+    return nextResponseDbFailure(e);
+  }
 }
 
 /**
@@ -29,19 +34,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "nome é obrigatório" }, { status: 400 });
   }
 
-  let user = await prisma.user.findFirst();
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email: `demo-${Date.now()}@soilsul.local`,
-        password: "-",
-      },
+  try {
+    let user = await prisma.user.findFirst();
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email: `demo-${Date.now()}@soilsul.local`,
+          password: "-",
+        },
+      });
+    }
+
+    const empresa = await prisma.empresa.create({
+      data: { nome, userId: user.id },
     });
+
+    return NextResponse.json(empresa);
+  } catch (e) {
+    return nextResponseDbFailure(e);
   }
-
-  const empresa = await prisma.empresa.create({
-    data: { nome, userId: user.id },
-  });
-
-  return NextResponse.json(empresa);
 }

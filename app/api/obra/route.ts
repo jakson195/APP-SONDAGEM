@@ -1,2 +1,2 @@
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 export { GET, POST } from "../obras/route";

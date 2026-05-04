@@ -1,25 +1,30 @@
+import { nextResponseDbFailure } from "@/lib/db-route-error";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const raw = searchParams.get("empresaId");
-  const empresaId =
-    raw === null || raw === "" ? null : Number(raw);
+  try {
+    const { searchParams } = new URL(req.url);
+    const raw = searchParams.get("empresaId");
+    const empresaId =
+      raw === null || raw === "" ? null : Number(raw);
 
-  const where =
-    empresaId !== null && Number.isFinite(empresaId)
-      ? { empresaId }
-      : {};
+    const where =
+      empresaId !== null && Number.isFinite(empresaId)
+        ? { empresaId }
+        : {};
 
-  const obras = await prisma.obra.findMany({
-    where,
-    orderBy: { id: "desc" },
-  });
+    const obras = await prisma.obra.findMany({
+      where,
+      orderBy: { id: "desc" },
+    });
 
-  return NextResponse.json(obras);
+    return NextResponse.json(obras);
+  } catch (e) {
+    return nextResponseDbFailure(e);
+  }
 }
 
 export async function POST(req: Request) {
@@ -49,22 +54,26 @@ export async function POST(req: Request) {
     );
   }
 
-  const empresa = await prisma.empresa.findUnique({
-    where: { id: empresaId },
-  });
+  try {
+    const empresa = await prisma.empresa.findUnique({
+      where: { id: empresaId },
+    });
 
-  if (!empresa) {
-    return NextResponse.json({ error: "Empresa não encontrada" }, { status: 404 });
+    if (!empresa) {
+      return NextResponse.json({ error: "Empresa não encontrada" }, { status: 404 });
+    }
+
+    const obra = await prisma.obra.create({
+      data: {
+        nome,
+        cliente,
+        local,
+        empresaId,
+      },
+    });
+
+    return NextResponse.json(obra);
+  } catch (e) {
+    return nextResponseDbFailure(e);
   }
-
-  const obra = await prisma.obra.create({
-    data: {
-      nome,
-      cliente,
-      local,
-      empresaId,
-    },
-  });
-
-  return NextResponse.json(obra);
 }

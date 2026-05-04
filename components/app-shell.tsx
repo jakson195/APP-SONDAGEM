@@ -7,6 +7,7 @@ import { useState } from "react";
 
 const nav = [
   { href: "/geo", label: "🧭 GEO" },
+  { href: "/geofisica", label: "⚡ Geofísica" },
   { href: "/obras", label: "📁 Obras · mapas" },
   { href: "/obra", label: "🏗️ Nova obra" },
   { href: "/spt", label: "📊 Sondagem SPT" },

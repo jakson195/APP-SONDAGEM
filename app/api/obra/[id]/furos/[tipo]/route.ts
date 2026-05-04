@@ -1,13 +1,8 @@
 import { isCampoTipo } from "@/lib/campo-sondagem-tipo";
 import { prisma } from "@/lib/prisma";
-import { ssgObraIdCampoTipoParams } from "@/lib/ssg-static-params-from-db";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
-
-export async function generateStaticParams() {
-  return ssgObraIdCampoTipoParams();
-}
 
 type Ctx = { params: Promise<{ id: string; tipo: string }> };
 

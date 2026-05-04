@@ -1,13 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { ssgObraIdParams } from "@/lib/ssg-static-params-from-db";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
-
-export async function generateStaticParams() {
-  return ssgObraIdParams();
-}
 
 type Ctx = { params: Promise<{ id: string }> };
 

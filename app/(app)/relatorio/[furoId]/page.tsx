@@ -1,9 +1,6 @@
 import { redirect } from "next/navigation";
-import { ssgFuroIdSegmentParams } from "@/lib/ssg-static-params-from-db";
 
-export async function generateStaticParams() {
-  return ssgFuroIdSegmentParams();
-}
+export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ furoId: string }>;

@@ -1,9 +1,6 @@
 import type { ReactNode } from "react";
-import { ssgFuroIdSegmentParams } from "@/lib/ssg-static-params-from-db";
 
-export async function generateStaticParams() {
-  return ssgFuroIdSegmentParams();
-}
+export const dynamic = "force-dynamic";
 
 export default function TradoFuroLayout({ children }: { children: ReactNode }) {
   return children;

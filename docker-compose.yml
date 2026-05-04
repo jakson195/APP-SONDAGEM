@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sondagem
+      POSTGRES_PASSWORD: sondagem
+      POSTGRES_DB: sondagem
+    ports:
+      - "5432:5432"
+    volumes:
+      - sondagem_pg:/var/lib/postgresql/data
+
+volumes:
+  sondagem_pg:

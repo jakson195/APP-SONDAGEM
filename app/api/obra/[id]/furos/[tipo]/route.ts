@@ -1,19 +1,12 @@
-import { CAMPO_TIPO, isCampoTipo } from "@/lib/campo-sondagem-tipo";
+import { isCampoTipo } from "@/lib/campo-sondagem-tipo";
 import { prisma } from "@/lib/prisma";
+import { ssgObraIdCampoTipoParams } from "@/lib/ssg-static-params-from-db";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-static";
 
 export async function generateStaticParams() {
-  const rows = await prisma.obra.findMany({
-    select: { id: true },
-    take: 5000,
-    orderBy: { id: "asc" },
-  });
-  const tipos = Object.values(CAMPO_TIPO);
-  return rows.flatMap((r: { id: number }) =>
-    tipos.map((tipo) => ({ id: String(r.id), tipo })),
-  );
+  return ssgObraIdCampoTipoParams();
 }
 
 type Ctx = { params: Promise<{ id: string; tipo: string }> };

@@ -1,15 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { ssgSptRowIdParams } from "@/lib/ssg-static-params-from-db";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-static";
 
 export async function generateStaticParams() {
-  const rows = await prisma.sPT.findMany({
-    select: { id: true },
-    take: 5000,
-    orderBy: { id: "asc" },
-  });
-  return rows.map((r: { id: number }) => ({ id: String(r.id) }));
+  return ssgSptRowIdParams();
 }
 
 type Ctx = { params: Promise<{ id: string }> };

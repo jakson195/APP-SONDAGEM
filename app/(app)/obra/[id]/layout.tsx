@@ -1,13 +1,8 @@
 import type { ReactNode } from "react";
-import { prisma } from "@/lib/prisma";
+import { ssgObraIdParams } from "@/lib/ssg-static-params-from-db";
 
 export async function generateStaticParams() {
-  const rows = await prisma.obra.findMany({
-    select: { id: true },
-    take: 5000,
-    orderBy: { id: "asc" },
-  });
-  return rows.map((r: { id: number }) => ({ id: String(r.id) }));
+  return ssgObraIdParams();
 }
 
 export default function ObraIdLayout({ children }: { children: ReactNode }) {

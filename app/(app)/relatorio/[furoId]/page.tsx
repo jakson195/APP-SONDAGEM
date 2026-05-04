@@ -1,13 +1,8 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { ssgFuroIdSegmentParams } from "@/lib/ssg-static-params-from-db";
 
 export async function generateStaticParams() {
-  const rows = await prisma.furo.findMany({
-    select: { id: true },
-    take: 5000,
-    orderBy: { id: "asc" },
-  });
-  return rows.map((r: { id: number }) => ({ furoId: String(r.id) }));
+  return ssgFuroIdSegmentParams();
 }
 
 type Props = {

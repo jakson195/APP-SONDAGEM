@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite" // depois trocamos pra postgres
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  /** Local: ver `docker-compose.yml`. Produção (Vercel): URL do Neon ou outro Postgres. */
+  url      = env("DATABASE_URL")
 }
 
 model User {

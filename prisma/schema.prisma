@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // depois trocamos pra postgres
+  url      = "file:./dev.db"
+}
+
+model User {
+  id       Int       @id @default(autoincrement())
+  email    String    @unique
+  password String
+  empresas Empresa[]
+}
+
+model Empresa {
+  id     Int    @id @default(autoincrement())
+  nome   String
+  userId Int
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  obras Obra[]
+}
+
+model Obra {
+  id         Int     @id @default(autoincrement())
+  nome       String
+  cliente    String
+  local      String
+  /** WGS84 graus decimais (opcional), para Google Maps */
+  latitude   Float?
+  longitude  Float?
+  empresaId  Int
+  empresa    Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  furos Furo[]
+}
+
+model Furo {
+  id     Int    @id @default(autoincrement())
+  codigo String
+  /** spt | rotativa | trado | piezo — coluna SQLite: `tipoCampo` (@map). */
+  tipo      String @default("spt") @map("tipoCampo")
+  obraId    Int
+  latitude  Float?
+  longitude Float?
+
+  obra Obra @relation(fields: [obraId], references: [id], onDelete: Cascade)
+
+  /** Grelhas, meta de PDF, fotos, etc. (módulos que não usam só a tabela `SPT`). */
+  dadosCampo Json?
+
+  spt SPT[]
+}
+
+model SPT {
+  id     Int   @id @default(autoincrement())
+  prof   Float
+  g1     Int
+  g2     Int
+  g3     Int
+  /** Penetração observada no intervalo (cm), ex.: 2 golpes / 17 cm. */
+  cm1    Int   @default(15)
+  cm2    Int   @default(15)
+  cm3    Int   @default(15)
+  solo   String
+  furoId Int
+  furo   Furo  @relation(fields: [furoId], references: [id])
+}

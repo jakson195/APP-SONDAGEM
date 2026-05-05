@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:prisma": "prisma generate && next dev",
-    "build": "next build --no-lint",
+    "build": "prisma generate && next build --no-lint",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",

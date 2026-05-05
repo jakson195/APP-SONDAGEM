@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  /** Local: ver `docker-compose.yml`. Produção (Vercel): URL do Neon ou outro Postgres. */
+  /** Local: `docker-compose.yml` (postgres/soilsul_db). Produção (Vercel): Neon ou outro Postgres. */
   url      = env("DATABASE_URL")
 }
 

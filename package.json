@@ -9,8 +9,11 @@
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
-    "db:push": "prisma db push",
-    "db:sync": "prisma db push && prisma generate",
+    "db:up": "docker compose up -d",
+    "db:push": "dotenv -e .env.local -e .env -- prisma db push",
+    "db:studio": "dotenv -e .env.local -e .env -- prisma studio",
+    "db:validate": "dotenv -e .env.local -e .env -- prisma validate",
+    "db:sync": "npm run db:push && prisma generate",
     "android:live": "npx cap run android -l --host=localhost --port=3000 --forwardPorts 3000:3000"
   },
   "dependencies": {
@@ -52,6 +55,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "typescript": "^5"

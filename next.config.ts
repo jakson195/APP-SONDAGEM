@@ -1,10 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /** Leaflet + Prisma */
   serverExternalPackages: ["leaflet", "@prisma/client"],
 
-  /** 🔥 Ignorar erros de ESLint no build (Vercel) */
+  // 🔥 liberar deploy na Vercel
   eslint: {
     ignoreDuringBuilds: true,
   },

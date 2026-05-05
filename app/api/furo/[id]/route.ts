@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
@@ -51,13 +51,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Furo não encontrado" }, { status: 404 });
   }
 
-  const data: {
-    codigo?: string;
-    latitude?: number | null;
-    longitude?: number | null;
-    dadosCampo?: Prisma.InputJsonValue | null;
-  } = {};
+  const data: Prisma.FuroUpdateInput = {};
 
+  // ========================
+  // CODIGO
+  // ========================
   if (typeof body.codigo === "string") {
     const codigo = body.codigo.trim();
     if (!codigo) {
@@ -69,7 +67,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
     data.codigo = codigo;
   }
 
+  // ========================
+  // COORDENADAS
+  // ========================
   const hasCoords = "latitude" in body && "longitude" in body;
+
   if (hasCoords) {
     const clear =
       body.latitude === null ||
@@ -83,42 +85,52 @@ export async function PATCH(req: Request, ctx: Ctx) {
     } else {
       const lat = Number(body.latitude);
       const lng = Number(body.longitude);
+
       if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
         return NextResponse.json(
-          { error: "latitude deve ser um número entre -90 e 90" },
+          { error: "latitude deve ser entre -90 e 90" },
           { status: 400 },
         );
       }
+
       if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
         return NextResponse.json(
-          { error: "longitude deve ser um número entre -180 e 180" },
+          { error: "longitude deve ser entre -180 e 180" },
           { status: 400 },
         );
       }
+
       data.latitude = lat;
       data.longitude = lng;
     }
   }
 
+  // ========================
+  // JSON (CORRIGIDO)
+  // ========================
   if ("dadosCampo" in body && body.dadosCampo !== undefined) {
     const dc = body.dadosCampo;
+
     if (dc === null) {
-      data.dadosCampo = null;
+      data.dadosCampo = Prisma.JsonNull; // ✅ CORRETO
     } else if (typeof dc === "object") {
       data.dadosCampo = dc as Prisma.InputJsonValue;
     } else {
       return NextResponse.json(
-        { error: "dadosCampo deve ser um objeto JSON ou null" },
+        { error: "dadosCampo deve ser objeto JSON ou null" },
         { status: 400 },
       );
     }
   }
 
+  // ========================
+  // VALIDAÇÃO FINAL
+  // ========================
   if (Object.keys(data).length === 0) {
     return NextResponse.json(
       {
         error:
-          "Forneça codigo, dadosCampo ou latitude e longitude para atualizar",
+          "Forneça codigo, dadosCampo ou latitude/longitude para atualizar",
       },
       { status: 400 },
     );
@@ -146,5 +158,6 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   }
 
   await prisma.furo.delete({ where: { id } });
+
   return NextResponse.json({ ok: true });
 }

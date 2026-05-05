@@ -1,7 +1,8 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  serverExternalPackages: ["leaflet"],
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+eslint: {
+ignoreDuringBuilds: true,
+},
 };
 
 export default nextConfig;

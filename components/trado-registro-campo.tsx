@@ -6,9 +6,6 @@ useEffect(() => {
     await carregarFuro();
   };
 
-  run();
-}, [comFuro, carregarFuro]);
-
 useEffect(() => {
   if (comFuro) return;
 

@@ -1,4 +1,7 @@
-/** Uma leitura de campo (SEV Wenner): meio-espalhamento AB/2 e resistividade aparente. */
+/**
+ * Leitura de campo (SEV Wenner ou Schlumberger): meio-espalhamento corrente AB/2 (= s)
+ * e resistividade aparente. Em Schlumberger, MN/2 (b) é fixo na série (definido na UI).
+ */
 export type LeituraCampoVES = {
   /** Metade da distância entre eléctrodos de corrente AB (m), como em folhas de campo. */
   abHalfM: number;

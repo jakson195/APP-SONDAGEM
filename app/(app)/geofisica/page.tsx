@@ -2,10 +2,22 @@ import Link from "next/link";
 
 const cards = [
   {
-    href: "/geofisica/ves",
-    title: "SEV Wenner",
+    href: "/geofisica/ves?metodo=wenner",
+    title: "SEV — Wenner",
     desc:
-      "Wenner (AB/2, ρa) ou dipolo-dipolo (a, n, ρa): perfil aparente e inversão 1D em duas camadas.",
+      "Meio-espalhamento AB/2 e ρa: perfil aparente e inversão 1D em duas camadas.",
+  },
+  {
+    href: "/geofisica/ves?metodo=schlumberger",
+    title: "SEV — Schlumberger",
+    desc:
+      "AB/2 (s), MN/2 (b) fixo na série e ρa (s > b): perfil aparente e inversão 1D.",
+  },
+  {
+    href: "/geofisica/ves?metodo=dipolo",
+    title: "SEV — Dipolo-dipolo",
+    desc:
+      "Comprimento de dipolo a (m), separação n (inteiro ≥ 1) e ρa: perfil e inversão 1D.",
   },
 ] as const;
 

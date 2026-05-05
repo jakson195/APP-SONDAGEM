@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -25,12 +26,20 @@ import {
   forwardFromModel,
   invertWennerTwoLayerGrid,
 } from "@/lib/geofisica/invert-wenner-2layer";
+import {
+  forwardSchlumbergerFromModel,
+  invertSchlumbergerTwoLayerGrid,
+} from "@/lib/geofisica/invert-schlumberger-2layer";
 
 const STORAGE_KEY = "soilsul-geofisica-ves-leituras-v1";
+const STORAGE_SCHLUM_ROWS = "soilsul-geofisica-ves-schlum-leituras-v1";
+const STORAGE_SCHLUM_MN = "soilsul-geofisica-ves-schlum-mnhalf-v1";
 const STORAGE_DIPOLO_ROWS = "soilsul-geofisica-ves-dipolo-rows-v1";
 const STORAGE_DIPOLO_A = "soilsul-geofisica-ves-dipolo-a-v1";
 const STORAGE_METODO = "soilsul-geofisica-ves-metodo-v1";
 const STORAGE_MODEL = "soilsul-geofisica-ves-modelo-v1";
+
+type MetodoVES = "wenner" | "schlumberger" | "dipolo";
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -86,10 +95,13 @@ function sortedDipoloLeituras(
 }
 
 export function VesGeofisicaClient() {
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<"dados" | "perfil" | "inversao">("dados");
-  const [metodo, setMetodo] = useState<"wenner" | "dipolo">("wenner");
+  const [metodo, setMetodo] = useState<MetodoVES>("wenner");
   const [rowsW, setRowsW] = useState<RowW[]>([]);
+  const [rowsSchlum, setRowsSchlum] = useState<RowW[]>([]);
   const [rowsD, setRowsD] = useState<RowD[]>([]);
+  const [schlumbergerMnHalf, setSchlumbergerMnHalf] = useState("0.5");
   const [dipoloAM, setDipoloAM] = useState("25");
   const [rho1Input, setRho1Input] = useState("100");
   const [modH1, setModH1] = useState("5");
@@ -101,6 +113,36 @@ export function VesGeofisicaClient() {
   } | null>(null);
 
   const dipoloAVal = Number(dipoloAM.replace(",", "."));
+  const schlumbergerBVal = Number(schlumbergerMnHalf.replace(",", "."));
+
+  useEffect(() => {
+    const q =
+      searchParams.get("metodo") ?? searchParams.get("m") ?? "";
+    if (
+      q === "wenner" ||
+      q === "schlumberger" ||
+      q === "dipolo"
+    ) {
+      setMetodo(q);
+      try {
+        localStorage.setItem(STORAGE_METODO, q);
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    try {
+      const mSt = localStorage.getItem(STORAGE_METODO);
+      if (
+        mSt === "dipolo" ||
+        mSt === "wenner" ||
+        mSt === "schlumberger"
+      )
+        setMetodo(mSt);
+    } catch {
+      /* ignore */
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     try {
@@ -110,6 +152,14 @@ export function VesGeofisicaClient() {
         if (Array.isArray(p) && p.length)
           setRowsW(toRowsW(p.filter((x) => x && x.abHalfM > 0)));
       }
+      const rawSchlum = localStorage.getItem(STORAGE_SCHLUM_ROWS);
+      if (rawSchlum) {
+        const p = JSON.parse(rawSchlum) as LeituraCampoVES[];
+        if (Array.isArray(p) && p.length)
+          setRowsSchlum(toRowsW(p.filter((x) => x && x.abHalfM > 0)));
+      }
+      const mnSt = localStorage.getItem(STORAGE_SCHLUM_MN);
+      if (mnSt) setSchlumbergerMnHalf(mnSt);
       const rawD = localStorage.getItem(STORAGE_DIPOLO_ROWS);
       if (rawD) {
         const arr = JSON.parse(rawD) as { n?: number; rhoApparentOhmM?: number }[];
@@ -127,8 +177,6 @@ export function VesGeofisicaClient() {
       }
       const aSt = localStorage.getItem(STORAGE_DIPOLO_A);
       if (aSt) setDipoloAM(aSt);
-      const mSt = localStorage.getItem(STORAGE_METODO);
-      if (mSt === "dipolo" || mSt === "wenner") setMetodo(mSt);
     } catch {
       /* ignore */
     }
@@ -156,9 +204,18 @@ export function VesGeofisicaClient() {
     }
   }, []);
 
-  const persistMetodo = useCallback((m: "wenner" | "dipolo") => {
+  const persistMetodo = useCallback((m: MetodoVES) => {
     try {
       localStorage.setItem(STORAGE_METODO, m);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const persistSchlum = useCallback((r: RowW[], mn: string) => {
+    try {
+      localStorage.setItem(STORAGE_SCHLUM_ROWS, JSON.stringify(fromRowsW(r)));
+      localStorage.setItem(STORAGE_SCHLUM_MN, mn);
     } catch {
       /* ignore */
     }
@@ -188,6 +245,19 @@ export function VesGeofisicaClient() {
     return sortedDipoloLeituras(rowsD, dipoloAVal);
   }, [rowsD, dipoloAVal]);
 
+  const sortedLeiturasSchlum = useMemo(() => {
+    const b = schlumbergerBVal;
+    if (!(b > 0)) return [];
+    const L = fromRowsW(rowsSchlum).filter(
+      (x) =>
+        x.abHalfM > b &&
+        x.rhoApparentOhmM > 0 &&
+        Number.isFinite(x.abHalfM) &&
+        Number.isFinite(x.rhoApparentOhmM),
+    );
+    return [...L].sort((a, b2) => a.abHalfM - b2.abHalfM);
+  }, [rowsSchlum, schlumbergerBVal]);
+
   const chartDataAparenteW = useMemo(
     () =>
       sortedLeiturasW.map((L) => ({
@@ -206,11 +276,28 @@ export function VesGeofisicaClient() {
     [sortedLeiturasD],
   );
 
+  const chartDataAparenteSchlum = useMemo(
+    () =>
+      sortedLeiturasSchlum.map((L) => ({
+        x: L.abHalfM,
+        rhoA: L.rhoApparentOhmM,
+      })),
+    [sortedLeiturasSchlum],
+  );
+
   const chartDataInversao = useMemo(() => {
     if (!inversao) return [];
     if (metodo === "wenner") {
       if (sortedLeiturasW.length === 0) return [];
       return sortedLeiturasW.map((L, i) => ({
+        x: L.abHalfM,
+        medido: L.rhoApparentOhmM,
+        modelo: inversao.syntheticRho[i] ?? Number.NaN,
+      }));
+    }
+    if (metodo === "schlumberger") {
+      if (sortedLeiturasSchlum.length === 0) return [];
+      return sortedLeiturasSchlum.map((L, i) => ({
         x: L.abHalfM,
         medido: L.rhoApparentOhmM,
         modelo: inversao.syntheticRho[i] ?? Number.NaN,
@@ -222,7 +309,13 @@ export function VesGeofisicaClient() {
       medido: L.rhoApparentOhmM,
       modelo: inversao.syntheticRho[i] ?? Number.NaN,
     }));
-  }, [inversao, metodo, sortedLeiturasW, sortedLeiturasD]);
+  }, [
+    inversao,
+    metodo,
+    sortedLeiturasW,
+    sortedLeiturasSchlum,
+    sortedLeiturasD,
+  ]);
 
   const chartDataProfundidade = useMemo(() => {
     if (!inversao) return [];
@@ -236,7 +329,7 @@ export function VesGeofisicaClient() {
     ];
   }, [inversao]);
 
-  const setMetodoComPersist = (m: "wenner" | "dipolo") => {
+  const setMetodoComPersist = (m: MetodoVES) => {
     setMetodo(m);
     persistMetodo(m);
     setInversao(null);
@@ -281,9 +374,11 @@ export function VesGeofisicaClient() {
 
   const clearAll = () => {
     setRowsW([]);
+    setRowsSchlum([]);
     setRowsD([]);
     setInversao(null);
     persistWenner([]);
+    persistSchlum([], schlumbergerMnHalf);
     persistDipolo([], dipoloAM);
     persistInversao(null);
   };
@@ -324,6 +419,49 @@ export function VesGeofisicaClient() {
     });
   };
 
+  const addRowSchlum = () => {
+    setRowsSchlum((r) => {
+      const n = [...r, { id: uid(), abHalfM: 1, rhoApparentOhmM: 50 }];
+      persistSchlum(n, schlumbergerMnHalf);
+      return n;
+    });
+  };
+
+  const loadDemoSchlum = () => {
+    const n = toRowsW(DEMO_WENNER);
+    setRowsSchlum(n);
+    persistSchlum(n, schlumbergerMnHalf);
+    setInversao(null);
+    persistInversao(null);
+  };
+
+  const updateRowSchlum = (id: string, patch: Partial<LeituraCampoVES>) => {
+    setRowsSchlum((prev) => {
+      const n = prev.map((row) =>
+        row.id === id ? { ...row, ...patch } : row,
+      );
+      persistSchlum(n, schlumbergerMnHalf);
+      return n;
+    });
+  };
+
+  const removeRowSchlum = (id: string) => {
+    setRowsSchlum((prev) => {
+      const n = prev.filter((x) => x.id !== id);
+      persistSchlum(n, schlumbergerMnHalf);
+      return n;
+    });
+  };
+
+  const onSchlumMnChange = (v: string) => {
+    setSchlumbergerMnHalf(v);
+    try {
+      localStorage.setItem(STORAGE_SCHLUM_MN, v);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const onDipoloAChange = (v: string) => {
     setDipoloAM(v);
     try {
@@ -337,6 +475,15 @@ export function VesGeofisicaClient() {
     const rho1 = Number(rho1Input.replace(",", "."));
     if (metodo === "wenner") {
       const inv = invertWennerTwoLayerGrid(sortedLeiturasW, rho1);
+      setInversao(inv);
+      persistInversao(inv);
+    } else if (metodo === "schlumberger") {
+      if (!(schlumbergerBVal > 0)) return;
+      const inv = invertSchlumbergerTwoLayerGrid(
+        sortedLeiturasSchlum,
+        schlumbergerBVal,
+        rho1,
+      );
       setInversao(inv);
       persistInversao(inv);
     } else {
@@ -364,13 +511,23 @@ export function VesGeofisicaClient() {
     const syn =
       metodo === "wenner"
         ? forwardFromModel(sortedLeiturasW, model)
-        : dipoloAVal > 0
-          ? forwardDipoloFromModel(sortedLeiturasD, dipoloAVal, model)
-          : [];
+        : metodo === "schlumberger"
+          ? schlumbergerBVal > 0
+            ? forwardSchlumbergerFromModel(
+                sortedLeiturasSchlum,
+                schlumbergerBVal,
+                model,
+              )
+            : []
+          : dipoloAVal > 0
+            ? forwardDipoloFromModel(sortedLeiturasD, dipoloAVal, model)
+            : [];
     const leiturasRho =
       metodo === "wenner"
         ? sortedLeiturasW.map((l) => l.rhoApparentOhmM)
-        : sortedLeiturasD.map((l) => l.rhoApparentOhmM);
+        : metodo === "schlumberger"
+          ? sortedLeiturasSchlum.map((l) => l.rhoApparentOhmM)
+          : sortedLeiturasD.map((l) => l.rhoApparentOhmM);
     const err =
       leiturasRho.length > 0
         ? Math.sqrt(
@@ -401,13 +558,24 @@ export function VesGeofisicaClient() {
   );
 
   const nOkWenner = sortedLeiturasW.length >= 3;
+  const nOkSchlum =
+    sortedLeiturasSchlum.length >= 3 &&
+    schlumbergerBVal > 0 &&
+    Number.isFinite(schlumbergerBVal);
   const nOkDipolo =
     sortedLeiturasD.length >= 3 && dipoloAVal > 0 && Number.isFinite(dipoloAVal);
-  const nOkInv = metodo === "wenner" ? nOkWenner : nOkDipolo;
+  const nOkInv =
+    metodo === "wenner"
+      ? nOkWenner
+      : metodo === "schlumberger"
+        ? nOkSchlum
+        : nOkDipolo;
 
   const xAxisLabelInv =
-    metodo === "wenner" ? "AB/2 (m)" : "n (separação dipolo-dipolo)";
-  const xAxisLabelAp = metodo === "wenner" ? "AB/2 (m)" : "n";
+    metodo === "dipolo"
+      ? "n (separação dipolo-dipolo)"
+      : "AB/2 (m)";
+  const xAxisLabelAp = metodo === "dipolo" ? "n" : "AB/2 (m)";
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -419,13 +587,13 @@ export function VesGeofisicaClient() {
             </Link>
           </p>
           <h1 className="mt-1 text-2xl font-bold text-[var(--text)]">
-            SEV — Wenner e dipolo-dipolo
+            SEV — Wenner, Schlumberger e dipolo-dipolo
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">
-            <strong>Wenner:</strong> AB/2 e ρa. <strong>Dipolo-dipolo:</strong> comprimento
-            de dipolo <em>a</em> (m) comum a todas as leituras, separação <em>n</em> (inteiro
-            ≥ 1) e ρa. Modelo directo: 2 camadas (imagens). Inversão: grelha + refinamento
-            com ρ₁ fixa.
+            <strong>Wenner:</strong> AB/2 e ρa. <strong>Schlumberger:</strong> AB/2 (s), MN/2
+            (b) fixo na série e ρa (exige s &gt; b). <strong>Dipolo-dipolo:</strong>{" "}
+            <em>a</em> (m), <em>n</em> ≥ 1 e ρa. Modelo: 2 camadas (imagens). Inversão: grelha
+            + refinamento com ρ₁ fixa.
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -440,6 +608,17 @@ export function VesGeofisicaClient() {
               }`}
             >
               Wenner
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetodoComPersist("schlumberger")}
+              className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                metodo === "schlumberger"
+                  ? "bg-gray-800 text-white dark:bg-gray-700"
+                  : "border border-[var(--border)] bg-[var(--surface)] text-[var(--text)]"
+              }`}
+            >
+              Schlumberger
             </button>
             <button
               type="button"
@@ -543,6 +722,107 @@ export function VesGeofisicaClient() {
               {rowsW.length === 0 && (
                 <p className="text-sm text-[var(--muted)]">
                   Sem linhas. Adicione leituras ou carregue o exemplo.
+                </p>
+              )}
+            </>
+          ) : metodo === "schlumberger" ? (
+            <>
+              <div className="flex flex-wrap items-end gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-[var(--muted)]">
+                    MN/2 (m) — meio-espalhamento potencial, constante na série
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min={0}
+                    className="mt-1 w-32 rounded border border-[var(--border)] bg-white px-2 py-2 dark:bg-gray-900"
+                    value={schlumbergerMnHalf}
+                    onChange={(e) => onSchlumMnChange(e.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-[var(--muted)]">
+                Em cada linha: AB/2 = s (m) e ρa. Requer s &gt; MN/2 em todas as leituras válidas.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={addRowSchlum}
+                  className="rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700"
+                >
+                  + Linha
+                </button>
+                <button
+                  type="button"
+                  onClick={loadDemoSchlum}
+                  className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm hover:bg-[var(--muted)]/10"
+                >
+                  Carregar exemplo
+                </button>
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/30"
+                >
+                  Limpar
+                </button>
+              </div>
+              <table className="min-w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-[var(--muted)]">
+                    <th className="py-2 pr-4 font-medium">AB/2 = s (m)</th>
+                    <th className="py-2 pr-4 font-medium">ρa (Ω·m)</th>
+                    <th className="py-2 font-medium" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rowsSchlum.map((row) => (
+                    <tr key={row.id} className="border-b border-[var(--border)]/60">
+                      <td className="py-2 pr-4">
+                        <input
+                          type="number"
+                          step="any"
+                          min={0}
+                          className="w-28 rounded border border-[var(--border)] bg-white px-2 py-1 dark:bg-gray-900"
+                          value={row.abHalfM || ""}
+                          onChange={(e) =>
+                            updateRowSchlum(row.id, {
+                              abHalfM: Number(e.target.value),
+                            })
+                          }
+                        />
+                      </td>
+                      <td className="py-2 pr-4">
+                        <input
+                          type="number"
+                          step="any"
+                          min={0}
+                          className="w-28 rounded border border-[var(--border)] bg-white px-2 py-1 dark:bg-gray-900"
+                          value={row.rhoApparentOhmM || ""}
+                          onChange={(e) =>
+                            updateRowSchlum(row.id, {
+                              rhoApparentOhmM: Number(e.target.value),
+                            })
+                          }
+                        />
+                      </td>
+                      <td className="py-2">
+                        <button
+                          type="button"
+                          onClick={() => removeRowSchlum(row.id)}
+                          className="text-red-600 text-xs hover:underline"
+                        >
+                          remover
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {rowsSchlum.length === 0 && (
+                <p className="text-sm text-[var(--muted)]">
+                  Sem linhas. Defina MN/2, adicione s e ρa ou carregue o exemplo.
                 </p>
               )}
             </>
@@ -660,6 +940,10 @@ export function VesGeofisicaClient() {
             <p className="text-sm text-[var(--muted)]">
               Introduza pelo menos duas leituras Wenner válidas.
             </p>
+          ) : metodo === "schlumberger" && chartDataAparenteSchlum.length < 2 ? (
+            <p className="text-sm text-[var(--muted)]">
+              Schlumberger: MN/2 &gt; 0 e pelo menos duas leituras com AB/2 &gt; MN/2.
+            </p>
           ) : metodo === "dipolo" && chartDataAparenteD.length < 2 ? (
             <p className="text-sm text-[var(--muted)]">
               Introduza pelo menos duas leituras dipolo-dipolo válidas (n ≥ 1, a &gt; 0).
@@ -668,14 +952,20 @@ export function VesGeofisicaClient() {
             <div className="h-[360px] w-full min-h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
-                  data={metodo === "wenner" ? chartDataAparenteW : chartDataAparenteD}
+                  data={
+                    metodo === "wenner"
+                      ? chartDataAparenteW
+                      : metodo === "schlumberger"
+                        ? chartDataAparenteSchlum
+                        : chartDataAparenteD
+                  }
                   margin={{ top: 8, right: 16, bottom: 8, left: 8 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" className="opacity-40" />
                   <XAxis
                     dataKey="x"
                     type="number"
-                    scale={metodo === "wenner" ? "log" : "linear"}
+                    scale={metodo === "dipolo" ? "linear" : "log"}
                     domain={["auto", "auto"]}
                     label={{
                       value: xAxisLabelAp,
@@ -701,7 +991,7 @@ export function VesGeofisicaClient() {
                       return [s, "ρa"];
                     }}
                     labelFormatter={(l) =>
-                      metodo === "wenner" ? `AB/2 = ${l} m` : `n = ${l}`
+                      metodo === "dipolo" ? `n = ${l}` : `AB/2 = ${l} m`
                     }
                   />
                   <Legend />
@@ -821,7 +1111,7 @@ export function VesGeofisicaClient() {
                       <XAxis
                         dataKey="x"
                         type="number"
-                        scale={metodo === "wenner" ? "log" : "linear"}
+                        scale={metodo === "dipolo" ? "linear" : "log"}
                         domain={["auto", "auto"]}
                         label={{
                           value: xAxisLabelInv,
@@ -912,7 +1202,9 @@ export function VesGeofisicaClient() {
             <p className="text-sm text-[var(--muted)]">
               {metodo === "wenner"
                 ? "São necessárias pelo menos 3 leituras Wenner válidas."
-                : "Dipolo-dipolo: defina a > 0 e pelo menos 3 leituras com n ≥ 1."}
+                : metodo === "schlumberger"
+                  ? "Schlumberger: MN/2 > 0 e pelo menos 3 leituras com AB/2 > MN/2."
+                  : "Dipolo-dipolo: defina a > 0 e pelo menos 3 leituras com n ≥ 1."}
             </p>
           )}
         </div>

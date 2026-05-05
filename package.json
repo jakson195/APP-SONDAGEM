@@ -14,7 +14,11 @@
     "db:studio": "dotenv -e .env.local -e .env -- prisma studio",
     "db:validate": "dotenv -e .env.local -e .env -- prisma validate",
     "db:sync": "npm run db:push && prisma generate",
-    "android:live": "npx cap run android -l --host=localhost --port=3000 --forwardPorts 3000:3000"
+    "android:live": "npx cap run android -l --host=localhost --port=3000 --forwardPorts 3000:3000",
+    "vercel": "vercel",
+    "verce": "vercel",
+    "vercel:prod": "vercel --prod",
+    "vercel:pull": "vercel env pull .env.local"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",
@@ -58,6 +62,7 @@
     "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vercel": "^53.1.1"
   }
 }

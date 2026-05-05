@@ -229,7 +229,7 @@ export default function RotativaPerfilGeologicoPage() {
     () =>
       ligacoes.map((l) => {
         const ov = corrOverride[l.key];
-        let rightTopoM = l.rightTopoM + (ov?.topDeltaM ?? 0);
+        const rightTopoM = l.rightTopoM + (ov?.topDeltaM ?? 0);
         let rightBaseM = l.rightBaseM + (ov?.baseDeltaM ?? 0);
         if (rightBaseM - rightTopoM < MIN_THICK_M) {
           rightBaseM = rightTopoM + MIN_THICK_M;

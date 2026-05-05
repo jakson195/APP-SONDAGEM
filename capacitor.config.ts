@@ -6,11 +6,11 @@ const config: CapacitorConfig = {
   appId: "com.soilsul.app",
   appName: "SOILSUL",
 
-  webDir: "out",
+  webDir: ".next",
 
   ...(isDev && {
     server: {
-      url: "http://10.1.1163:3000", // 👈 seu IP
+      url: "http://10.1.1.163:3000", // 👈 seu IP
       cleartext: true
     }
   })

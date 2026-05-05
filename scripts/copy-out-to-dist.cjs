@@ -5,7 +5,7 @@
  * Na Vercel não há `output: "export"` por omissão — não existe `out/` e a cópia
  * não faz sentido; evita qualquer excepção no fim do pipeline de build.
  */
-const fs = require("fs");
+import fs from 'fs';
 const path = require("path");
 
 if (process.env.VERCEL === "1") {

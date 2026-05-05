@@ -274,12 +274,16 @@ export function TradoRegistroCampo({ furoId }: TradoRegistroCampoProps) {
     }
   }, [comFuro, furoId]);
 
-  useEffect(() => {
-    if (comFuro) {
-      setNomePersistReady(true);
-      void carregarFuro();
-      return;
-    }
+ useEffect(() => {
+  if (!comFuro) return;
+
+  const run = async () => {
+    setNomePersistReady(true);
+    await carregarFuro();
+  };
+
+  run();
+}, [comFuro]);
     setCampoMapaReady(true);
     const v = localStorage.getItem(LS_TRADO_NOME);
     if (v !== null) setCodigoFuro(v);

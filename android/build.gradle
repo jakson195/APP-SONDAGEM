@@ -25,6 +25,25 @@ allprojects {
     }
 }
 
+// Force Java 17 across every Android module/subproject.
+subprojects { subproject ->
+    afterEvaluate {
+        if (subproject.hasProperty("android")) {
+            subproject.android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+            }
+        }
+    }
+    tasks.withType(JavaCompile).configureEach {
+        sourceCompatibility = JavaVersion.VERSION_17.toString()
+        targetCompatibility = JavaVersion.VERSION_17.toString()
+        options.release = 17
+    }
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }

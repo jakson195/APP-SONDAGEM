@@ -1,13 +1,12 @@
 import { prisma } from "@/lib/prisma";
+import { authCookieName, authCookieOptions, signAuthToken } from "@/lib/server-auth";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
+  if (!process.env.JWT_SECRET) {
     console.error("JWT_SECRET não definido");
     return NextResponse.json(
       { error: "Configuração do servidor incompleta" },
@@ -44,7 +43,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Senha inválida" }, { status: 401 });
   }
 
-  const token = jwt.sign({ userId: user.id }, secret, { expiresIn: "7d" });
+  const token = signAuthToken({
+    userId: user.id,
+    systemRole: user.systemRole,
+  });
 
-  return NextResponse.json({ token });
+  const res = NextResponse.json({
+    token,
+    systemRole: user.systemRole,
+    email: user.email,
+    name: user.name,
+  });
+  res.cookies.set(authCookieName(), token, authCookieOptions());
+  return res;
 }

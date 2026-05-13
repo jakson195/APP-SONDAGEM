@@ -17,6 +17,15 @@ import {
 } from "@/lib/field-export-kml-gpx";
 import { CAMPO_TIPO } from "@/lib/campo-sondagem-tipo";
 import { apiUrl } from "@/lib/api-url";
+import { OBRA_STATUS_LABEL } from "@/lib/obra-status";
+import type { ObraStatus } from "@prisma/client";
+import {
+  defaultModulosProjetoTodosAtivos,
+  MODULOS_PROJETO,
+  MODULO_PROJETO_META,
+  type ModuloProjetoChave,
+} from "@/lib/modulos-projeto";
+import { useObraModulos } from "@/components/obra-context";
 import {
   FIELD_GPS_OPTIONS,
   readStoredUserLatLng,
@@ -54,18 +63,51 @@ type ObraDetalhe = {
   nome: string;
   cliente: string;
   local: string;
+  description: string | null;
+  status: ObraStatus;
+  companyId: number;
   empresaId: number;
+  company?: { id: number; name: string };
   latitude: number | null;
   longitude: number | null;
+  modules?: Record<ModuloProjetoChave, boolean>;
+};
+type ResumoObraApi = {
+  contadores: {
+    furos: number;
+    sptExecutados: number;
+    rotativa: number;
+    pocos: number;
+    resistividade: number;
+    mapas: number;
+    equipe: number;
+  };
+  mapas: {
+    referenciaObra: boolean;
+    pontosFuro: number;
+    totalPontos: number;
+  };
+  progresso: {
+    concluido: number;
+    total: number;
+    percent: number;
+  };
 };
 
 export default function ObraDetalhe() {
   const params = useParams();
   const idParam = params.id as string;
   const obraId = Number(idParam);
+  const { setObraContext, refreshObraModules } = useObraModulos();
 
   const [obra, setObra] = useState<ObraDetalhe | null>(null);
+  const [modulosEdit, setModulosEdit] = useState<Record<
+    ModuloProjetoChave,
+    boolean
+  > | null>(null);
+  const [aGuardarModulos, setAGuardarModulos] = useState(false);
   const [furos, setFuros] = useState<FuroRow[]>([]);
+  const [resumoObra, setResumoObra] = useState<ResumoObraApi | null>(null);
   const [codigo, setCodigo] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [coordX, setCoordX] = useState("");
@@ -121,6 +163,27 @@ export default function ObraDetalhe() {
     }
   }, [obraId]);
 
+  useEffect(() => {
+    if (obra && Number.isFinite(obraId)) {
+      setObraContext(obraId);
+    }
+  }, [obra, obraId, setObraContext]);
+
+  useEffect(() => {
+    if (!obra) {
+      setModulosEdit(null);
+      return;
+    }
+    const m = obra.modules;
+    const base = defaultModulosProjetoTodosAtivos();
+    if (m && typeof m === "object") {
+      for (const k of MODULOS_PROJETO) {
+        if (typeof m[k] === "boolean") base[k] = m[k];
+      }
+    }
+    setModulosEdit(base);
+  }, [obra]);
+
   const carregarFuros = useCallback(async () => {
     if (!Number.isFinite(obraId)) {
       setFuros([]);
@@ -139,6 +202,26 @@ export default function ObraDetalhe() {
     }
   }, [obraId]);
 
+  const carregarResumoObra = useCallback(async () => {
+    if (!Number.isFinite(obraId)) {
+      setResumoObra(null);
+      return;
+    }
+    try {
+      const r = await fetch(apiUrl(`/api/obra/${obraId}/resumo`), {
+        cache: "no-store",
+      });
+      const data = (await r.json().catch(() => ({}))) as ResumoObraApi;
+      if (!r.ok) {
+        setResumoObra(null);
+        return;
+      }
+      setResumoObra(data);
+    } catch {
+      setResumoObra(null);
+    }
+  }, [obraId]);
+
   useEffect(() => {
     void carregarObra();
   }, [carregarObra]);
@@ -146,6 +229,10 @@ export default function ObraDetalhe() {
   useEffect(() => {
     void carregarFuros();
   }, [carregarFuros]);
+
+  useEffect(() => {
+    void carregarResumoObra();
+  }, [carregarResumoObra]);
 
   useEffect(() => {
     const p = readStoredUserLatLng();
@@ -177,8 +264,37 @@ export default function ObraDetalhe() {
       }
       setCodigo("");
       await carregarFuros();
+      await carregarResumoObra();
     } catch {
       setErro("Falha de rede");
+    }
+  }
+
+  async function guardarModulosObra() {
+    if (!obra || !modulosEdit) return;
+    setErro(null);
+    setAGuardarModulos(true);
+    try {
+      const r = await fetch(apiUrl(`/api/obra/${obra.id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modules: modulosEdit }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setErro(
+          typeof data.error === "string"
+            ? data.error
+            : "Erro ao guardar módulos",
+        );
+        return;
+      }
+      setObra(data as ObraDetalhe);
+      await refreshObraModules();
+    } catch {
+      setErro("Falha de rede ao guardar módulos");
+    } finally {
+      setAGuardarModulos(false);
     }
   }
 
@@ -468,22 +584,161 @@ export default function ObraDetalhe() {
   return (
     <div className="max-w-3xl text-[var(--text)]">
       <div className="mb-4">
-        <Link
-          href="/obras"
-          className="text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400"
-        >
-          ← Obras
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/obras"
+            className="text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400"
+          >
+            ← Obras
+          </Link>
+          <Link
+            href={`/dashboard?obraId=${obraId}`}
+            className="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+          >
+            Dashboard desta obra
+          </Link>
+        </div>
       </div>
 
       {obra && (
-        <div className="mb-6 rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 text-sm">
-          <h1 className="text-xl font-bold">{obra.nome}</h1>
-          <p className="mt-1 text-[var(--muted)]">
-            <span className="text-[var(--text)]">{obra.cliente}</span>
-          </p>
-          <p className="mt-1 text-[var(--muted)]">{obra.local}</p>
+        <div className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-sm shadow-sm sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="text-xl font-bold">{obra.nome}</h1>
+              <p className="mt-1 text-[var(--muted)]">
+                Cliente:{" "}
+                <span className="text-[var(--text)]">{obra.cliente}</span>
+              </p>
+              <p className="mt-1 text-[var(--muted)]">{obra.local}</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-teal-500/15 px-3 py-1 text-xs font-semibold text-teal-700 dark:text-teal-300">
+              {OBRA_STATUS_LABEL[obra.status]}
+            </span>
+          </div>
+          {obra.company && (
+            <p className="mt-3 border-t border-[var(--border)] pt-3 text-xs text-[var(--muted)]">
+              Empresa:{" "}
+              <Link
+                href={`/empresa/${obra.company.id}/gestao`}
+                className="font-medium text-teal-600 hover:underline dark:text-teal-400"
+              >
+                {obra.company.name}
+              </Link>
+            </p>
+          )}
+          {obra.description?.trim() && (
+            <p className="mt-2 rounded-lg bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text)]">
+              {obra.description}
+            </p>
+          )}
+          {modulosEdit && (
+            <div className="mt-4 border-t border-[var(--border)] pt-4">
+              <h2 className="text-sm font-semibold text-[var(--text)]">
+                Módulos ativos
+              </h2>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                Estes módulos aparecem no menu quando esta obra está no contexto da
+                aplicação.
+              </p>
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                {MODULOS_PROJETO.map((chave) => (
+                  <li key={chave} className="flex items-center gap-2">
+                    <input
+                      id={`obra-mod-${chave}`}
+                      type="checkbox"
+                      checked={modulosEdit[chave]}
+                      onChange={(e) =>
+                        setModulosEdit((prev) =>
+                          prev
+                            ? { ...prev, [chave]: e.target.checked }
+                            : prev,
+                        )
+                      }
+                      className="h-4 w-4 rounded border-[var(--border)]"
+                    />
+                    <label
+                      htmlFor={`obra-mod-${chave}`}
+                      className="cursor-pointer text-sm text-[var(--text)]"
+                    >
+                      {MODULO_PROJETO_META[chave].shortLabel}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() => void guardarModulosObra()}
+                disabled={aGuardarModulos}
+                className="mt-3 rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+              >
+                {aGuardarModulos ? "A guardar…" : "Guardar módulos"}
+              </button>
+            </div>
+          )}
         </div>
+      )}
+
+      {resumoObra && (
+        <section className="mb-6 rounded-2xl border border-[var(--border)] bg-gradient-to-br from-[var(--card)] to-[var(--surface)] p-4 shadow-sm sm:p-5">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">
+              Dashboard técnico da obra
+            </h2>
+            <p className="text-xs text-[var(--muted)]">
+              Progresso: {resumoObra.progresso.concluido}/{resumoObra.progresso.total} frentes
+            </p>
+          </div>
+
+          <div className="mb-4 h-2 w-full overflow-hidden rounded-full bg-[var(--surface)]">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-teal-500 to-indigo-500 transition-all"
+              style={{ width: `${Math.max(0, Math.min(100, resumoObra.progresso.percent))}%` }}
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+              <p className="text-xs text-[var(--muted)]">Quantidade de furos</p>
+              <p className="mt-1 text-2xl font-semibold">{resumoObra.contadores.furos}</p>
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+              <p className="text-xs text-[var(--muted)]">SPT executados</p>
+              <p className="mt-1 text-2xl font-semibold">
+                {resumoObra.contadores.sptExecutados}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+              <p className="text-xs text-[var(--muted)]">Sondagens rotativas</p>
+              <p className="mt-1 text-2xl font-semibold">{resumoObra.contadores.rotativa}</p>
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+              <p className="text-xs text-[var(--muted)]">Piezômetros</p>
+              <p className="mt-1 text-2xl font-semibold">{resumoObra.contadores.pocos}</p>
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+              <p className="text-xs text-[var(--muted)]">Resistividade</p>
+              <p className="mt-1 text-2xl font-semibold">
+                {resumoObra.contadores.resistividade}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+              <p className="text-xs text-[var(--muted)]">Mapas</p>
+              <p className="mt-1 text-2xl font-semibold">{resumoObra.contadores.mapas}</p>
+              <p className="mt-1 text-[10px] text-[var(--muted)]">
+                {resumoObra.mapas.referenciaObra ? "com" : "sem"} referência da obra,{" "}
+                {resumoObra.mapas.pontosFuro} pontos de furos
+              </p>
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+              <p className="text-xs text-[var(--muted)]">Equipe</p>
+              <p className="mt-1 text-2xl font-semibold">{resumoObra.contadores.equipe}</p>
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+              <p className="text-xs text-[var(--muted)]">Progresso</p>
+              <p className="mt-1 text-2xl font-semibold">{resumoObra.progresso.percent}%</p>
+            </div>
+          </div>
+        </section>
       )}
 
       <h2

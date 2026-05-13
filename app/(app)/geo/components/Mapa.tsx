@@ -10,9 +10,11 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
+  Circle,
   ImageOverlay,
   MapContainer,
   Marker,
+  Popup,
   Polyline,
   TileLayer,
   useMap,
@@ -26,6 +28,8 @@ import Toolbar from "./Toolbar";
 type MapaProps = {
   furos: FuroMapa[];
   onAddFuro: (furo: FuroMapa) => void;
+  onUpdateFuroPosition: (id: string, lat: number, lng: number) => void;
+  onUpdateFuroInfo: (id: string, nome: string, descricao: string) => void;
 };
 
 /** Vista 2D estilo «Google Earth»: imagem aérea (Esri) ± nomes de lugares. */
@@ -71,6 +75,23 @@ const ESRI_TOPO = {
   maxNativeZoom: 19,
 } as const;
 
+const userLocationIcon = L.divIcon({
+  className: "geo-user-location-icon",
+  html: `
+    <span style="
+      display:block;
+      width:14px;
+      height:14px;
+      border-radius:9999px;
+      background:#1a73e8;
+      border:2px solid #ffffff;
+      box-shadow:0 0 0 5px rgba(26,115,232,0.28);
+    "></span>
+  `,
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
+});
+
 function FixLeafletIcons() {
   useEffect(() => {
     delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })
@@ -82,6 +103,22 @@ function FixLeafletIcons() {
       shadowUrl:
         "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
     });
+    const styleId = "geo-user-location-pulse-style";
+    if (!document.getElementById(styleId)) {
+      const st = document.createElement("style");
+      st.id = styleId;
+      st.textContent = `
+        .geo-user-location-icon span {
+          animation: geo-user-location-pulse 1.6s ease-out infinite;
+        }
+        @keyframes geo-user-location-pulse {
+          0% { box-shadow: 0 0 0 0 rgba(26,115,232,0.38); }
+          70% { box-shadow: 0 0 0 8px rgba(26,115,232,0); }
+          100% { box-shadow: 0 0 0 0 rgba(26,115,232,0); }
+        }
+      `;
+      document.head.appendChild(st);
+    }
   }, []);
   return null;
 }
@@ -104,6 +141,60 @@ function haversineM(a: { lat: number; lng: number }, b: { lat: number; lng: numb
   return s;
 }
 
+function parseKmlPoints(kmlText: string): Array<{ lat: number; lng: number }> {
+  const xml = new DOMParser().parseFromString(kmlText, "application/xml");
+  if (xml.getElementsByTagName("parsererror").length > 0) return [];
+
+  const points: Array<{ lat: number; lng: number }> = [];
+  const placemarks = Array.from(xml.getElementsByTagName("Placemark"));
+  for (const placemark of placemarks) {
+    const point = placemark.getElementsByTagName("Point")[0];
+    const coordNode = point?.getElementsByTagName("coordinates")[0];
+    const raw = coordNode?.textContent?.trim();
+    if (!raw) continue;
+    const [lngRaw, latRaw] = raw.split(",").map(Number);
+    if (Number.isFinite(latRaw) && Number.isFinite(lngRaw)) {
+      points.push({ lat: latRaw!, lng: lngRaw! });
+    }
+  }
+  return points;
+}
+
+async function extractKmlFromKmz(file: File): Promise<string | null> {
+  const { unzipSync, strFromU8 } = await import("fflate");
+  const zip = unzipSync(new Uint8Array(await file.arrayBuffer()));
+  const kmlEntry = Object.keys(zip).find((name) => /(^|\/)doc\.kml$/i.test(name))
+    ?? Object.keys(zip).find((name) => /\.kml$/i.test(name));
+  if (!kmlEntry) return null;
+  return strFromU8(zip[kmlEntry]!, true);
+}
+
+function buildKmlFromFuros(furos: FuroMapa[]): string {
+  const placemarks = furos
+    .map((f) => {
+      const nome = (f.nome || "Furo").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      const descricao = (f.descricao || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;");
+      return `
+    <Placemark>
+      <name>${nome}</name>
+      <description>${descricao}</description>
+      <TimeStamp><when>${f.createdAtIso}</when></TimeStamp>
+      <Point><coordinates>${f.lng},${f.lat},0</coordinates></Point>
+    </Placemark>`;
+    })
+    .join("\n");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Pontos GEO</name>
+${placemarks}
+  </Document>
+</kml>`;
+}
+
 function MapResizeOnMount() {
   const map = useMap();
   useEffect(() => {
@@ -124,6 +215,19 @@ function FitMapToImport({
     if (!fitTarget) return;
     map.fitBounds(fitTarget.corners, { padding: [28, 28], maxZoom: 19 });
   }, [fitTarget?.key, map, fitTarget]);
+  return null;
+}
+
+function FlyToPoint({
+  target,
+}: {
+  target: { key: number; lat: number; lng: number; zoom?: number } | null;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    if (!target) return;
+    map.flyTo([target.lat, target.lng], target.zoom ?? 16, { duration: 0.7 });
+  }, [map, target]);
   return null;
 }
 
@@ -158,7 +262,12 @@ function ClickHandler({
   return null;
 }
 
-export default function Mapa({ furos, onAddFuro }: MapaProps) {
+export default function Mapa({
+  furos,
+  onAddFuro,
+  onUpdateFuroPosition,
+  onUpdateFuroInfo,
+}: MapaProps) {
   const mapImportInputRef = useRef<HTMLInputElement | null>(null);
   const [basemap, setBasemap] = useState<BasemapId>("hybrid");
   const [placementMode, setPlacementMode] = useState(false);
@@ -176,6 +285,15 @@ export default function Mapa({ furos, onAddFuro }: MapaProps) {
   const [fitTarget, setFitTarget] = useState<{
     key: number;
     corners: [[number, number], [number, number]];
+  } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(
+    null,
+  );
+  const [flyTarget, setFlyTarget] = useState<{
+    key: number;
+    lat: number;
+    lng: number;
+    zoom?: number;
   } | null>(null);
 
   const addRasterFromBounds = useCallback(
@@ -217,15 +335,30 @@ export default function Mapa({ furos, onAddFuro }: MapaProps) {
 
   const onPlaceFuro = useCallback(
     (lat: number, lng: number) => {
+      const nome =
+        window.prompt("Nome do furo:", `Furo ${furos.length + 1}`)?.trim() || "";
+      if (!nome) {
+        setImportMsg("Criação de furo cancelada (nome é obrigatório).");
+        setPlacementMode(false);
+        return;
+      }
+      const descricao = window.prompt("Descrição do furo (opcional):", "")?.trim() || "";
+      const createdAtIso = new Date().toISOString();
       onAddFuro({
         id: Date.now().toString(),
         lat,
         lng,
         camadas: [],
+        nome,
+        descricao,
+        createdAtIso,
       });
+      setImportMsg(
+        `Furo «${nome}» criado em ${lat.toFixed(6)}, ${lng.toFixed(6)}.`,
+      );
       setPlacementMode(false);
     },
-    [onAddFuro],
+    [furos.length, onAddFuro],
   );
 
   const onMeasureA = useCallback((p: { lat: number; lng: number }) => {
@@ -249,9 +382,16 @@ export default function Mapa({ furos, onAddFuro }: MapaProps) {
 
   const onNovoFuro = useCallback(() => {
     resetMeasure();
+    if (userLocation) {
+      onPlaceFuro(userLocation.lat, userLocation.lng);
+      setImportMsg(
+        "Furo criado na sua localização atual. Arraste o marcador para ajustar manualmente.",
+      );
+      return;
+    }
     setPlacementMode((v) => !v);
-    setImportMsg(null);
-  }, [resetMeasure]);
+    setImportMsg("Sem localização ativa: clique no mapa para posicionar o furo.");
+  }, [onPlaceFuro, resetMeasure, userLocation]);
 
   const onMedir = useCallback(() => {
     setPlacementMode(false);
@@ -268,13 +408,106 @@ export default function Mapa({ furos, onAddFuro }: MapaProps) {
     mapImportInputRef.current?.click();
   }, [resetMeasure]);
 
+  const onLocalizacao = useCallback(() => {
+    setPlacementMode(false);
+    resetMeasure();
+    setImportMsg("A obter localização atual…");
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setImportMsg("Geolocalização não suportada neste navegador.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserLocation(loc);
+        setFlyTarget({ key: Date.now(), ...loc, zoom: 17 });
+        setImportMsg(
+          `Localização: ${loc.lat.toFixed(6)}, ${loc.lng.toFixed(6)}.`,
+        );
+      },
+      (err) => {
+        setImportMsg(`Não foi possível obter localização (${err.message}).`);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  }, [resetMeasure]);
+
+  const onExportarPontos = useCallback(async () => {
+    if (furos.length === 0) {
+      setImportMsg("Não há pontos para exportar.");
+      return;
+    }
+    const dateFilter = window.prompt(
+      "Filtrar por data (AAAA-MM-DD). Deixe vazio para todos:",
+      "",
+    )?.trim();
+    const filtered = dateFilter
+      ? furos.filter((f) => f.createdAtIso.startsWith(dateFilter))
+      : furos;
+    if (filtered.length === 0) {
+      setImportMsg("Nenhum ponto para a data informada.");
+      return;
+    }
+
+    const formato =
+      window.prompt("Formato de exportação: KML ou KMZ?", "KMZ")?.trim().toUpperCase() ||
+      "KMZ";
+    const safeDate = dateFilter || new Date().toISOString().slice(0, 10);
+    const kml = buildKmlFromFuros(filtered);
+
+    let blob: Blob;
+    let ext: "kml" | "kmz";
+    if (formato === "KML") {
+      blob = new Blob([kml], {
+        type: "application/vnd.google-earth.kml+xml;charset=utf-8",
+      });
+      ext = "kml";
+    } else {
+      const { zipSync, strToU8 } = await import("fflate");
+      const zipped = zipSync({ "doc.kml": strToU8(kml) }, { level: 6 });
+      const kmzBytes = new Uint8Array([...zipped]);
+      blob = new Blob([kmzBytes], { type: "application/vnd.google-earth.kmz" });
+      ext = "kmz";
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pontos-geo-${safeDate}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setImportMsg(`${filtered.length} ponto(s) exportado(s) em ${ext.toUpperCase()}.`);
+  }, [furos]);
+
+  const onEditarFuroInfo = useCallback(
+    (furo: FuroMapa) => {
+      const nome = window.prompt("Editar nome do furo:", furo.nome)?.trim() || "";
+      if (!nome) {
+        setImportMsg("Edição cancelada (nome é obrigatório).");
+        return;
+      }
+      const descricao =
+        window.prompt("Editar descrição do furo:", furo.descricao)?.trim() || "";
+      onUpdateFuroInfo(furo.id, nome, descricao);
+      setImportMsg(`Furo «${nome}» atualizado.`);
+    },
+    [onUpdateFuroInfo],
+  );
+
   const onMapImportFileSelected = useCallback(
     async (e: ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       e.target.value = "";
       if (!file) return;
+      const lowerName = file.name.toLowerCase();
       const isPdf =
-        file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+        file.type === "application/pdf" || lowerName.endsWith(".pdf");
+      const isKml =
+        file.type === "application/vnd.google-earth.kml+xml" || lowerName.endsWith(".kml");
+      const isKmz =
+        file.type === "application/vnd.google-earth.kmz" || lowerName.endsWith(".kmz");
       setImportBusy(true);
       setImportMsg(null);
       try {
@@ -295,6 +528,33 @@ export default function Mapa({ furos, onAddFuro }: MapaProps) {
               "Este PDF não tem limites WGS84 detetáveis (GeoPDF). No QGIS exporte com georreferência embutida ou use um GeoTIFF em EPSG:4326.",
             );
           }
+        } else if (isKml || isKmz) {
+          const kmlText = isKmz
+            ? await extractKmlFromKmz(file)
+            : await file.text();
+          if (!kmlText) {
+            setImportMsg("KMZ sem ficheiro KML interno.");
+            return;
+          }
+          const points = parseKmlPoints(kmlText);
+          if (points.length === 0) {
+            setImportMsg("Nenhum ponto encontrado no KML/KMZ.");
+            return;
+          }
+          points.forEach((p, idx) => {
+            onAddFuro({
+              id: `${Date.now()}-${idx}`,
+              lat: p.lat,
+              lng: p.lng,
+              camadas: [],
+              nome: `Importado ${idx + 1}`,
+              descricao: `Importado de ${file.name}`,
+              createdAtIso: new Date().toISOString(),
+            });
+          });
+          const first = points[0]!;
+          setFlyTarget({ key: Date.now(), lat: first.lat, lng: first.lng, zoom: 15 });
+          setImportMsg(`${points.length} ponto(s) importado(s) de «${file.name}».`);
         } else {
           const { dataUrl, bounds } = await geotiffToPngDataUrlAndBounds(file);
           addRasterFromBounds(
@@ -312,7 +572,7 @@ export default function Mapa({ furos, onAddFuro }: MapaProps) {
         setImportBusy(false);
       }
     },
-    [addRasterFromBounds],
+    [addRasterFromBounds, onAddFuro],
   );
 
   return (
@@ -320,7 +580,7 @@ export default function Mapa({ furos, onAddFuro }: MapaProps) {
       <input
         ref={mapImportInputRef}
         type="file"
-        accept="application/pdf,.pdf,image/tiff,.tif,.tiff,image/geotiff"
+        accept="application/pdf,.pdf,image/tiff,.tif,.tiff,image/geotiff,.kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz"
         className="hidden"
         onChange={(ev) => void onMapImportFileSelected(ev)}
       />
@@ -328,7 +588,9 @@ export default function Mapa({ furos, onAddFuro }: MapaProps) {
       <Toolbar
         onNovoFuro={onNovoFuro}
         onMedir={onMedir}
+        onLocalizacao={onLocalizacao}
         onImportarMapa={onImportarMapa}
+        onExportarPontos={() => void onExportarPontos()}
       />
 
       <div
@@ -385,7 +647,7 @@ export default function Mapa({ furos, onAddFuro }: MapaProps) {
 
       {(placementMode || importBusy || importMsg || measureLabelM != null) && (
         <div className="absolute bottom-3 left-1/2 z-[1000] max-w-[min(90vw,28rem)] -translate-x-1/2 rounded-lg border border-[var(--border)] bg-white/95 px-3 py-2 text-center text-xs text-[var(--text)] shadow-md backdrop-blur-sm dark:bg-gray-900/90">
-          {importBusy && <p>A ler GeoTIFF…</p>}
+          {importBusy && <p>A processar ficheiro geográfico…</p>}
           {!importBusy && placementMode && (
             <p>
               <strong>Modo novo furo:</strong> clique no mapa para colocar o marcador.
@@ -418,6 +680,7 @@ export default function Mapa({ furos, onAddFuro }: MapaProps) {
         <FixLeafletIcons />
         <MapResizeOnMount />
         <FitMapToImport fitTarget={fitTarget} />
+        <FlyToPoint target={flyTarget} />
         {basemap === "osm" && (
           <TileLayer
             key="osm"
@@ -486,8 +749,63 @@ export default function Mapa({ furos, onAddFuro }: MapaProps) {
         )}
 
         {furos.map((f) => (
-          <Marker key={f.id} position={[f.lat, f.lng]} />
+          <Marker
+            key={f.id}
+            position={[f.lat, f.lng]}
+            draggable
+            eventHandlers={{
+              dragend: (e) => {
+                const marker = e.target as L.Marker;
+                const pos = marker.getLatLng();
+                onUpdateFuroPosition(f.id, pos.lat, pos.lng);
+                setImportMsg(
+                  `Furo «${f.nome}» ajustado para ${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}.`,
+                );
+              },
+            }}
+          >
+            <Popup>
+              <div className="text-xs">
+                <p className="font-semibold">{f.nome || "Furo"}</p>
+                {f.descricao ? <p>{f.descricao}</p> : null}
+                <p className="font-mono">
+                  {f.lat.toFixed(6)}, {f.lng.toFixed(6)}
+                </p>
+                <p className="text-[var(--muted)]">Arraste para ajustar posição.</p>
+                <p className="text-[var(--muted)]">
+                  {new Date(f.createdAtIso).toLocaleString("pt-BR")}
+                </p>
+                <button
+                  type="button"
+                  className="mt-2 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs transition hover:bg-[var(--muted)]/20"
+                  onClick={() => onEditarFuroInfo(f)}
+                >
+                  Editar nome e descrição
+                </button>
+              </div>
+            </Popup>
+          </Marker>
         ))}
+        {userLocation && (
+          <>
+            <Circle
+              center={[userLocation.lat, userLocation.lng]}
+              radius={18}
+              interactive={false}
+              pathOptions={{
+                color: "#60a5fa",
+                weight: 1,
+                fillColor: "#93c5fd",
+                fillOpacity: 0.25,
+              }}
+            />
+            <Marker
+              position={[userLocation.lat, userLocation.lng]}
+              icon={userLocationIcon}
+              interactive={false}
+            />
+          </>
+        )}
       </MapContainer>
     </div>
   );

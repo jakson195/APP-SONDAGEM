@@ -1,4 +1,8 @@
-import type { Prisma } from "@prisma/client";
+import type { ObraStatus, Prisma } from "@prisma/client";
+import { serializeObraApi } from "@/lib/obra-api-serialize";
+import { modulosProjetoFromUnknown } from "@/lib/modulos-projeto";
+import { parseObraStatus } from "@/lib/obra-status";
+import { syncProjectModules } from "@/lib/project-modules-db";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
@@ -14,13 +18,19 @@ export async function GET(_req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "id inválido" }, { status: 400 });
   }
 
-  const obra = await prisma.obra.findUnique({ where: { id } });
+  const obra = await prisma.obra.findUnique({
+    where: { id },
+    include: {
+      company: { select: { id: true, name: true } },
+      projectModules: { select: { module: true, active: true } },
+    },
+  });
 
   if (!obra) {
     return NextResponse.json({ error: "Obra não encontrada" }, { status: 404 });
   }
 
-  return NextResponse.json(obra);
+  return NextResponse.json(serializeObraApi(obra));
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
@@ -43,10 +53,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Obra não encontrada" }, { status: 404 });
   }
 
+  const modulesPayload = modulosProjetoFromUnknown(body.modules);
+
   const data: {
     nome?: string;
+    cliente?: string;
+    local?: string;
+    description?: string | null;
+    status?: ObraStatus;
     latitude?: number | null;
     longitude?: number | null;
+    company?: { connect: { id: number } };
   } = {};
 
   if ("nome" in body && body.nome !== undefined) {
@@ -57,6 +74,63 @@ export async function PATCH(req: Request, ctx: Ctx) {
       );
     }
     data.nome = body.nome.trim();
+  }
+
+  if ("cliente" in body && body.cliente !== undefined) {
+    if (typeof body.cliente !== "string" || !body.cliente.trim()) {
+      return NextResponse.json(
+        { error: "cliente deve ser texto não vazio" },
+        { status: 400 },
+      );
+    }
+    data.cliente = body.cliente.trim();
+  }
+
+  if ("local" in body && body.local !== undefined) {
+    if (typeof body.local !== "string" || !body.local.trim()) {
+      return NextResponse.json(
+        { error: "local deve ser texto não vazio" },
+        { status: 400 },
+      );
+    }
+    data.local = body.local.trim();
+  }
+
+  if ("description" in body) {
+    if (body.description === null || body.description === "") {
+      data.description = null;
+    } else if (typeof body.description === "string") {
+      data.description = body.description.trim() || null;
+    } else {
+      return NextResponse.json({ error: "description inválida" }, { status: 400 });
+    }
+  }
+
+  if ("status" in body && body.status !== undefined) {
+    const st = parseObraStatus(
+      typeof body.status === "string" ? body.status : null,
+    );
+    if (!st) {
+      return NextResponse.json({ error: "status inválido" }, { status: 400 });
+    }
+    data.status = st;
+  }
+
+  const rawCid =
+    body.companyId !== undefined ? body.companyId : body.empresaId;
+  if (rawCid !== undefined) {
+    const cid = Number(rawCid);
+    if (!Number.isFinite(cid)) {
+      return NextResponse.json({ error: "companyId inválido" }, { status: 400 });
+    }
+    const c = await prisma.company.findUnique({
+      where: { id: cid },
+      select: { id: true },
+    });
+    if (!c) {
+      return NextResponse.json({ error: "Empresa não encontrada" }, { status: 404 });
+    }
+    data.company = { connect: { id: Number(cid) } };
   }
 
   const hasCoords = "latitude" in body || "longitude" in body;
@@ -100,19 +174,37 @@ export async function PATCH(req: Request, ctx: Ctx) {
     }
   }
 
-  if (Object.keys(data).length === 0) {
+  if (Object.keys(data).length === 0 && !modulesPayload) {
     return NextResponse.json(
-      { error: "Forneça nome e/ou latitude/longitude para atualizar" },
+      { error: "Nada para atualizar" },
       { status: 400 },
     );
   }
 
-  const obra = await prisma.obra.update({
+  if (Object.keys(data).length > 0) {
+    await prisma.obra.update({
+      where: { id },
+      data,
+    });
+  }
+
+  if (modulesPayload) {
+    await syncProjectModules(id, modulesPayload);
+  }
+
+  const obra = await prisma.obra.findUnique({
     where: { id },
-    data,
+    include: {
+      company: { select: { id: true, name: true } },
+      projectModules: { select: { module: true, active: true } },
+    },
   });
 
-  return NextResponse.json(obra);
+  if (!obra) {
+    return NextResponse.json({ error: "Obra não encontrada" }, { status: 404 });
+  }
+
+  return NextResponse.json(serializeObraApi(obra));
 }
 
 export async function DELETE(_req: Request, ctx: Ctx) {

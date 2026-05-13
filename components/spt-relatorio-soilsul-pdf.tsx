@@ -4,6 +4,10 @@ import type { CSSProperties, ReactNode } from "react";
 import { forwardRef, useMemo } from "react";
 import { RelatorioFotosPdfSection } from "@/components/relatorio-fotos-pdf-section";
 import { SptPdfStaticMap } from "@/components/spt-pdf-static-map";
+import {
+  avancoPadraoParaProfSpt,
+  numeroAmostraSpt,
+} from "@/lib/spt-profundidade-tabela";
 import { corSoloSpt } from "@/lib/spt-solo-cor";
 
 export type SptLinhaPdf = {
@@ -708,6 +712,9 @@ export const SptRelatorioSoilsulPdf = forwardRef<HTMLDivElement, Props>(
             {ord.map((l, i) => {
               const s12 = l.g1 + l.g2;
               const s23 = l.g2 + l.g3;
+              const avEfetivo =
+                (l.avanco ?? "").trim() || avancoPadraoParaProfSpt(l.prof);
+              const ocultarSoma30cm = avEfetivo === "BT";
               const prev = i > 0 ? ord[i - 1] : null;
               const mudouCamada =
                 i === 0 ||
@@ -741,17 +748,19 @@ export const SptRelatorioSoilsulPdf = forwardRef<HTMLDivElement, Props>(
                       }}
                     />
                   </td>
-                  <td style={cell}>{(l.avanco ?? "").trim() || "—"}</td>
+                  <td style={cell}>{avEfetivo || "—"}</td>
                   <td style={cell}>{(l.reves ?? "").trim() || ""}</td>
                   <td style={{ ...cell, fontWeight: 600 }}>
                     {l.prof.toFixed(2).replace(".", ",")}
                   </td>
-                  <td style={cell}>{i}</td>
+                  <td style={cell}>{numeroAmostraSpt(l.prof)}</td>
                   {celGolpesCm(cell, l.g1, cmIntervalo(l, 1))}
                   {celGolpesCm(cell, l.g2, cmIntervalo(l, 2))}
                   {celGolpesCm(cell, l.g3, cmIntervalo(l, 3))}
-                  <td style={cell}>{s12}</td>
-                  <td style={{ ...cell, fontWeight: 700 }}>{s23}</td>
+                  <td style={cell}>{ocultarSoma30cm ? "" : s12}</td>
+                  <td style={{ ...cell, fontWeight: 700 }}>
+                    {ocultarSoma30cm ? "" : s23}
+                  </td>
                   {i === 0 ? (
                     <td
                       rowSpan={nLin}

@@ -18,6 +18,14 @@ import { LS_SPT_LOCAL_DRAFT, LS_SPT_NOME } from "@/lib/sondagem-nome-storage";
 import { waitReportImagesLoaded } from "@/lib/wait-report-images";
 import { apiUrl } from "@/lib/api-url";
 import {
+  avancoPadraoParaProfSpt,
+  inferNumeroCliquesSptDeContagemLinhas,
+  parProfundidadesSptParaClique,
+  profDesdeMetroESuplemento,
+  profParaMetroESuplemento,
+  round2ProfSpt,
+} from "@/lib/spt-profundidade-tabela";
+import {
   FIELD_GPS_OPTIONS,
   readStoredUserLatLng,
   writeStoredUserLatLng,
@@ -89,7 +97,7 @@ function mapApiToLinha(s: ApiSptRow): Linha {
   const solo = s.solo ?? "";
   return {
     id: typeof s.id === "number" && Number.isFinite(s.id) ? s.id : undefined,
-    prof: s.prof,
+    prof: round2ProfSpt(s.prof),
     g1: s.g1,
     g2: s.g2,
     g3: s.g3,
@@ -100,7 +108,27 @@ function mapApiToLinha(s: ApiSptRow): Linha {
     cor: corSoloSpt(solo),
     soloDetalhe: "",
     obs: "",
-    avanco: "",
+    avanco: avancoPadraoParaProfSpt(round2ProfSpt(s.prof)),
+    reves: "",
+    consistencia: "",
+  };
+}
+
+function novaLinhaSptVazia(prof: number): Linha {
+  const p = round2ProfSpt(prof);
+  return {
+    prof: p,
+    g1: 0,
+    g2: 0,
+    g3: 0,
+    cm1: 15,
+    cm2: 15,
+    cm3: 15,
+    solo: "",
+    cor: COR_SOLO_PADRAO,
+    soloDetalhe: "",
+    obs: "",
+    avanco: avancoPadraoParaProfSpt(p),
     reves: "",
     consistencia: "",
   };
@@ -119,7 +147,8 @@ function mergeSptLinhasFromApi(anterior: Linha[], apiRows: ApiSptRow[]): Linha[]
       ...m,
       soloDetalhe: old.soloDetalhe,
       obs: old.obs,
-      avanco: old.avanco,
+      avanco:
+        String(old.avanco ?? "").trim() !== "" ? old.avanco : m.avanco,
       reves: old.reves,
       consistencia: old.consistencia,
       cor: m.solo === old.solo ? old.cor : m.cor,
@@ -162,6 +191,8 @@ export type SptRegistroCampoProps = {
 
 export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
   const [dados, setDados] = useState<Linha[]>([]);
+  /** Nº de vezes que se usou "Adicionar metro" (cada vez = par 0,00/0,05 ou n,00/n,45). */
+  const [sptMetrosClicks, setSptMetrosClicks] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfErro, setPdfErro] = useState<string | null>(null);
@@ -216,10 +247,19 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
   } | null>(null);
   const rascunhoLocalCarregado = useRef(false);
 
-  const mapCoordsForPdf = useMemo(
-    () => wgsPairFromInputs(mapaRelLatStr, mapaRelLngStr),
-    [mapaRelLatStr, mapaRelLngStr],
-  );
+  const mapCoordsForPdf = useMemo(() => {
+    const manual = wgsPairFromInputs(mapaRelLatStr, mapaRelLngStr);
+    if (manual) return manual;
+    if (obraRefMapa) return { lat: obraRefMapa.lat, lng: obraRefMapa.lng };
+    if (userGpsSpt) return { lat: userGpsSpt.lat, lng: userGpsSpt.lng };
+    return null;
+  }, [mapaRelLatStr, mapaRelLngStr, obraRefMapa, userGpsSpt]);
+  const mapCoordsSourceForPdf = useMemo(() => {
+    if (wgsPairFromInputs(mapaRelLatStr, mapaRelLngStr)) return "manual";
+    if (obraRefMapa) return "obra";
+    if (userGpsSpt) return "gps";
+    return null;
+  }, [mapaRelLatStr, mapaRelLngStr, obraRefMapa, userGpsSpt]);
 
   useEffect(() => {
     const p = readStoredUserLatLng();
@@ -418,9 +458,13 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
           typeof json.error === "string" ? json.error : "Erro ao carregar SPT",
         );
         setDados([]);
+        setSptMetrosClicks(0);
         return;
       }
       if (Array.isArray(json)) {
+        setSptMetrosClicks(
+          inferNumeroCliquesSptDeContagemLinhas(json.length),
+        );
         setDados((prev) =>
           mergeSptLinhasFromApi(prev, json as ApiSptRow[]),
         );
@@ -428,6 +472,7 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
     } catch {
       setLoadError("Falha de rede");
       setDados([]);
+      setSptMetrosClicks(0);
     }
   }, [furoId]);
 
@@ -575,11 +620,17 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
       if (typeof j.codigoFuro === "string" && j.codigoFuro.trim())
         setCodigoFuro(j.codigoFuro);
       if (Array.isArray(j.dados) && j.dados.length > 0) {
-        setDados(
-          j.dados.map((row) => {
-            const { id: _id, ...rest } = row;
-            return { ...rest } as Linha;
-          }),
+        const rows = j.dados.map((row) => {
+          const { id: _id, ...rest } = row;
+          const r = { ...rest } as Linha;
+          if (!String(r.avanco ?? "").trim()) {
+            r.avanco = avancoPadraoParaProfSpt(round2ProfSpt(r.prof));
+          }
+          return r;
+        });
+        setDados(rows);
+        setSptMetrosClicks(
+          inferNumeroCliquesSptDeContagemLinhas(rows.length),
         );
       }
     } catch {
@@ -688,53 +739,40 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
   }
 
   async function adicionar() {
-    const nextProf =
-      dados.length === 0
-        ? 1
-        : Math.max(...dados.map((d) => d.prof)) + 1;
-
-    const nova: Linha = {
-      prof: nextProf,
-      g1: 0,
-      g2: 0,
-      g3: 0,
-      cm1: 15,
-      cm2: 15,
-      cm3: 15,
-      solo: "",
-      cor: COR_SOLO_PADRAO,
-      soloDetalhe: "",
-      obs: "",
-      avanco: "",
-      reves: "",
-      consistencia: "",
-    };
+    const nextClick = sptMetrosClicks + 1;
+    const [p1, p2] = parProfundidadesSptParaClique(nextClick);
+    const nova1 = novaLinhaSptVazia(p1);
+    const nova2 = novaLinhaSptVazia(p2);
 
     if (furoId !== undefined && Number.isFinite(furoId)) {
       const snapshot = dados;
       try {
         await sincronizarLinhasSptNoServidor(snapshot);
-        const r = await fetch(apiUrl("/api/spt"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prof: nova.prof,
-            g1: nova.g1,
-            g2: nova.g2,
-            g3: nova.g3,
-            cm1: nova.cm1,
-            cm2: nova.cm2,
-            cm3: nova.cm3,
-            solo: nova.solo,
-            furoId,
-          }),
-        });
-        if (!r.ok) {
-          const err = await r.json().catch(() => ({}));
-          setLoadError(
-            typeof err.error === "string" ? err.error : "Erro ao criar linha",
-          );
-          return;
+        for (const nova of [nova1, nova2]) {
+          const r = await fetch(apiUrl("/api/spt"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prof: nova.prof,
+              g1: nova.g1,
+              g2: nova.g2,
+              g3: nova.g3,
+              cm1: nova.cm1,
+              cm2: nova.cm2,
+              cm3: nova.cm3,
+              solo: nova.solo,
+              furoId,
+            }),
+          });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            setLoadError(
+              typeof err.error === "string"
+                ? err.error
+                : "Erro ao criar linha SPT",
+            );
+            return;
+          }
         }
         const listR = await fetch(apiUrl(`/api/spt?furoId=${furoId}`));
         const listJson = await listR.json();
@@ -742,6 +780,9 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
           setLoadError("Erro ao atualizar lista SPT");
           return;
         }
+        setSptMetrosClicks(
+          inferNumeroCliquesSptDeContagemLinhas(listJson.length),
+        );
         setDados(mergeSptLinhasFromApi(snapshot, listJson as ApiSptRow[]));
         setLoadError(null);
       } catch (e) {
@@ -752,7 +793,8 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
       return;
     }
 
-    setDados((prev) => [...prev, nova]);
+    setSptMetrosClicks(nextClick);
+    setDados((prev) => [...prev, nova1, nova2]);
   }
 
   function atualizar<K extends keyof Linha>(
@@ -773,6 +815,36 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
       } else {
         novo[index] = { ...cur, [campo]: valor };
       }
+      return novo;
+    });
+  }
+
+  function atualizarProfMetroOuSuplemento(
+    index: number,
+    parte: "metro" | "suplemento",
+    valorBruto: string,
+  ) {
+    const parseFlex = (raw: string): number | null => {
+      const t = raw.trim().replace(",", ".");
+      if (t === "") return null;
+      const v = parseFloat(t);
+      if (!Number.isFinite(v) || v < 0) return null;
+      return parte === "metro" ? Math.round(v) : round2ProfSpt(v);
+    };
+
+    setDados((prev) => {
+      const novo = [...prev];
+      const cur = novo[index];
+      const { metro: m0, suplemento: s0 } = profParaMetroESuplemento(cur.prof);
+      const parsed = parseFlex(valorBruto);
+      const m = parte === "metro" ? (parsed ?? m0) : m0;
+      const s = parte === "suplemento" ? (parsed ?? s0) : s0;
+      const p = profDesdeMetroESuplemento(m, s);
+      novo[index] = {
+        ...cur,
+        prof: p,
+        avanco: avancoPadraoParaProfSpt(p),
+      };
       return novo;
     });
   }
@@ -1019,9 +1091,10 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
         <button
           type="button"
           onClick={() => void adicionar()}
+          title="1.º clique: 0,00 e 0,05 m. Seguintes: 1,00/1,45; 2,00/2,45; …"
           className="rounded bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
         >
-          + Adicionar Metro
+          + Adicionar profundidades
         </button>
         <button
           type="button"
@@ -1050,7 +1123,16 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
           <thead className="bg-[var(--surface)]">
             <tr className="text-[var(--text)]">
               <th className="border border-[var(--border)] p-2 font-semibold">
-                Prof. (m)
+                <span className="block">Metro (m)</span>
+                <span className="block text-[10px] font-normal text-[var(--muted)]">
+                  Parte inteira (0, 1, 2…)
+                </span>
+              </th>
+              <th className="border border-[var(--border)] p-2 font-semibold">
+                <span className="block">+ (m)</span>
+                <span className="block text-[10px] font-normal text-[var(--muted)]">
+                  Complemento: 0; 0,05; 0,45…
+                </span>
               </th>
               <th className="border border-[var(--border)] p-2 font-semibold">
                 Avanço
@@ -1090,9 +1172,45 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
           </thead>
 
           <tbody>
-            {dados.map((l, i) => (
-              <tr key={`${l.prof}-${i}`} className="text-center text-[var(--text)]">
-                <td className="border border-[var(--border)] p-2">{l.prof}</td>
+            {dados.map((l, i) => {
+              const { metro, suplemento } = profParaMetroESuplemento(l.prof);
+              return (
+              <tr
+                key={l.id != null ? `spt-${l.id}` : `spt-row-${i}`}
+                className="text-center text-[var(--text)]"
+              >
+                <td className="border border-[var(--border)] p-1">
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={metro}
+                    onChange={(e) =>
+                      atualizarProfMetroOuSuplemento(i, "metro", e.target.value)
+                    }
+                    className="w-full min-w-[3rem] rounded border border-[var(--border)] bg-[var(--surface)] p-1 text-center text-sm"
+                    title="Parte inteira da profundidade (m)"
+                    aria-label={`Linha ${i + 1}: metro (m)`}
+                  />
+                </td>
+                <td className="border border-[var(--border)] p-1">
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={Number.isFinite(suplemento) ? suplemento : 0}
+                    onChange={(e) =>
+                      atualizarProfMetroOuSuplemento(
+                        i,
+                        "suplemento",
+                        e.target.value,
+                      )
+                    }
+                    className="w-full min-w-[3.5rem] rounded border border-[var(--border)] bg-[var(--surface)] p-1 text-center text-sm"
+                    title="Complemento em metros (ex.: 0,05 ou 0,45)"
+                    aria-label={`Linha ${i + 1}: complemento (m)`}
+                  />
+                </td>
 
                 <td className="border border-[var(--border)] p-2">
                   <select
@@ -1269,7 +1387,8 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
                   />
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>
@@ -1438,6 +1557,15 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
               contrário, indique manualmente ou defina a localização na página da
               obra.
             </p>
+            {mapCoordsForPdf && mapCoordsSourceForPdf !== "manual" && (
+              <p className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800 sm:col-span-2 print:hidden dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-200">
+                Mapa será gerado com fallback de{" "}
+                {mapCoordsSourceForPdf === "obra"
+                  ? "coordenadas da obra"
+                  : "posição GPS disponível"}
+                .
+              </p>
+            )}
             <input
               placeholder="Fuso"
               value={fuso}

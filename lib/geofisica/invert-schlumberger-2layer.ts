@@ -1,8 +1,12 @@
-import type { LeituraCampoVES, ModeloDuasCamadas } from "./types";
+import type {
+  LeituraCampoSchlumberger,
+  LeituraCampoVES,
+  ModeloDuasCamadas,
+} from "./types";
 import { rmseLogRho } from "./wenner-two-layer";
 import {
   apparentResistivitySchlumbergerTwoLayer,
-  syntheticCurveSchlumberger,
+  syntheticCurveSchlumbergerByReading,
 } from "./schlumberger-two-layer";
 
 export type InversaoResultado = {
@@ -15,18 +19,17 @@ export type InversaoResultado = {
  * Inversão 2 camadas para SEV Schlumberger (s = AB/2, MN/2 fixo em todas as leituras).
  */
 export function invertSchlumbergerTwoLayerGrid(
-  leituras: LeituraCampoVES[],
-  mnHalfM: number,
+  leituras: LeituraCampoSchlumberger[],
   rho1Fixed: number,
 ): InversaoResultado | null {
-  if (!(mnHalfM > 0)) return null;
-
   const valid = leituras
     .filter(
       (L) =>
-        L.abHalfM > mnHalfM &&
+        L.abHalfM > L.mnHalfM &&
+        L.mnHalfM > 0 &&
         L.rhoApparentOhmM > 0 &&
         Number.isFinite(L.abHalfM) &&
+        Number.isFinite(L.mnHalfM) &&
         Number.isFinite(L.rhoApparentOhmM),
     )
     .sort((a, b) => a.abHalfM - b.abHalfM);
@@ -58,7 +61,7 @@ export function invertSchlumbergerTwoLayerGrid(
         h1M: h1,
         rho2OhmM: rho2,
       };
-      const syn = syntheticCurveSchlumberger(ab, mnHalfM, model);
+      const syn = syntheticCurveSchlumbergerByReading(valid, model);
       const err = rmseLogRho(valid, syn);
       if (err < bestScore && Number.isFinite(err)) {
         bestScore = err;
@@ -83,7 +86,7 @@ export function invertSchlumbergerTwoLayerGrid(
           h1M: Math.max(1e-4, hTry),
           rho2OhmM: Math.max(1e-6, rTry),
         };
-        const s2 = syntheticCurveSchlumberger(ab, mnHalfM, trial);
+        const s2 = syntheticCurveSchlumbergerByReading(valid, trial);
         const e2 = rmseLogRho(valid, s2);
         if (e2 < err) {
           err = e2;
@@ -98,11 +101,10 @@ export function invertSchlumbergerTwoLayerGrid(
 }
 
 export function forwardSchlumbergerFromModel(
-  leituras: LeituraCampoVES[],
-  mnHalfM: number,
+  leituras: LeituraCampoSchlumberger[],
   model: ModeloDuasCamadas,
 ): number[] {
   return leituras.map((l) =>
-    apparentResistivitySchlumbergerTwoLayer(l.abHalfM, mnHalfM, model),
+    apparentResistivitySchlumbergerTwoLayer(l.abHalfM, l.mnHalfM, model),
   );
 }

@@ -9,11 +9,24 @@ export type LeituraCampoVES = {
   rhoApparentOhmM: number;
 };
 
+/** Leitura SEV Schlumberger com arranjo explícito por linha (AB/2, MN/2 e ρa). */
+export type LeituraCampoSchlumberger = {
+  abHalfM: number;
+  mnHalfM: number;
+  rhoApparentOhmM: number;
+};
+
 /** Modelo invertido (2 camadas + substrato). */
 export type ModeloDuasCamadas = {
   rho1OhmM: number;
   h1M: number;
   rho2OhmM: number;
+};
+
+/** Meio em camadas horizontais para SEV Schlumberger (última camada = semi-espaço). */
+export type ModeloSchlumbergerCamadas = {
+  rhoOhmM: number[];
+  hM: number[];
 };
 
 /**

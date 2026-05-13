@@ -14,10 +14,12 @@ export function html2canvasReportOptions(
   return {
     scale: 2,
     useCORS: true,
+    allowTaint: true,
     backgroundColor: "#ffffff",
     logging: false,
     imageTimeout: 20000,
-    foreignObjectRendering: true,
+    /** false: com true, mapas e outras <img> por vezes saem em branco no PDF. */
+    foreignObjectRendering: false,
     onclone: (_doc, cloned) => {
       const node = cloned as HTMLElement;
       node.style.width = w;

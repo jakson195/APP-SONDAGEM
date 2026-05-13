@@ -1,58 +1,30 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { GeoJsonObject } from "geojson";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  DrawingManagerF,
-  GoogleMap,
+  Circle,
+  GeoJSON as LeafletGeoJSON,
+  MapContainer,
   Marker,
-  PolylineF,
-  useJsApiLoader,
-} from "@react-google-maps/api";
-import { GOOGLE_MAPS_JS_LOADER_ID } from "@/lib/google-maps-js-loader-id";
-import { GOOGLE_MAPS_LIBRARIES } from "@/lib/google-maps-libraries";
+  Polyline,
+  TileLayer,
+  Tooltip,
+  useMapEvents,
+} from "react-leaflet";
 
 const MAP_HEIGHT = 380;
 const PAD = 56;
-
-const mapContainerStyle: CSSProperties = {
-  width: "100%",
-  height: `${MAP_HEIGHT}px`,
-};
-
-const mapOptions: google.maps.MapOptions = {
-  streetViewControl: false,
-  mapTypeControl: true,
-  fullscreenControl: true,
-  zoomControl: true,
-};
-
-const DEFAULT_CENTER: google.maps.LatLngLiteral = {
-  lat: -14.235004,
-  lng: -51.92528,
-};
+const DEFAULT_CENTER = { lat: -14.235004, lng: -51.92528 };
 
 type ToolbarTool = "nav" | "measure" | "draw";
 
 function formatDistanceMeters(m: number): string {
   if (m < 1000) return `${Math.round(m)} m`;
   return `${(m / 1000).toFixed(2)} km`;
-}
-
-function clearSketchOverlays(
-  overlays: (google.maps.MVCObject | google.maps.OverlayView)[],
-) {
-  for (const o of overlays) {
-    if ("setMap" in o && typeof o.setMap === "function") {
-      o.setMap(null);
-    }
-  }
 }
 
 export type FieldFuroPin = {
@@ -74,11 +46,11 @@ type Props = {
    * fundo branco — como o layout clássico em HTML/CSS.
    */
   fullViewport?: boolean;
-  obraPosition: google.maps.LatLngLiteral | null;
+  obraPosition: { lat: number; lng: number } | null;
   furos: FieldFuroPin[];
   mapMode: FieldMapMode;
   selectedFuroId: number | null;
-  userPosition: google.maps.LatLngLiteral | null;
+  userPosition: { lat: number; lng: number } | null;
   /** Tooltip do marcador azul (ex.: última posição guardada no dispositivo). */
   userPositionTitle?: string;
   /** Incrementar para recentrar / ajustar zoom a todos os pontos. */
@@ -87,29 +59,12 @@ type Props = {
   onFuroMapClick: (furoId: number, lng: number, lat: number) => void;
 };
 
-function MapMissingKeyMessage({ className }: { className: string }) {
-  return (
-    <div
-      className={`rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)] px-4 py-6 text-sm text-[var(--muted)] ${className}`}
-    >
-      <p className="font-medium text-[var(--text)]">Mapa indisponível</p>
-      <p className="mt-1">
-        Defina{" "}
-        <code className="rounded bg-black/5 px-1 font-mono text-xs dark:bg-white/10">
-          NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-        </code>{" "}
-        em <code className="font-mono text-xs">.env.local</code> e reinicie o servidor.
-      </p>
-    </div>
-  );
-}
-
 function collectPoints(
-  obraPosition: google.maps.LatLngLiteral | null,
+  obraPosition: { lat: number; lng: number } | null,
   furos: FieldFuroPin[],
-  userPosition: google.maps.LatLngLiteral | null,
-): google.maps.LatLngLiteral[] {
-  const pts: google.maps.LatLngLiteral[] = [];
+  userPosition: { lat: number; lng: number } | null,
+): Array<{ lat: number; lng: number }> {
+  const pts: Array<{ lat: number; lng: number }> = [];
   if (obraPosition) pts.push(obraPosition);
   for (const f of furos) {
     if (
@@ -125,8 +80,49 @@ function collectPoints(
   return pts;
 }
 
-function FieldCampaignMapWithKey({
-  apiKey,
+function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 6371000;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function measureLengthMeters(path: Array<{ lat: number; lng: number }>): number {
+  if (path.length < 2) return 0;
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    total += distanceMeters(path[i - 1]!, path[i]!);
+  }
+  return total;
+}
+
+function ClickCapture({
+  mapTool,
+  mapMode,
+  selectedFuroId,
+  onMapClick,
+}: {
+  mapTool: ToolbarTool;
+  mapMode: FieldMapMode;
+  selectedFuroId: number | null;
+  onMapClick: (lat: number, lng: number) => void;
+}) {
+  useMapEvents({
+    click(e) {
+      if (mapTool !== "nav" && mapTool !== "measure" && mapTool !== "draw") return;
+      if (mapTool === "nav" && mapMode === "furo" && selectedFuroId == null) return;
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
+export function FieldCampaignMap({
   className = "",
   hint,
   showToolbar = true,
@@ -140,24 +136,14 @@ function FieldCampaignMapWithKey({
   recenterKey,
   onObraMapClick,
   onFuroMapClick,
-}: Props & { apiKey: string }) {
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: GOOGLE_MAPS_JS_LOADER_ID,
-    googleMapsApiKey: apiKey,
-    libraries: [...GOOGLE_MAPS_LIBRARIES],
-  });
-
+}: Props) {
   const [mapTool, setMapTool] = useState<ToolbarTool>("nav");
-  const [measurePath, setMeasurePath] = useState<google.maps.LatLngLiteral[]>(
-    [],
-  );
+  const [measurePath, setMeasurePath] = useState<Array<{ lat: number; lng: number }>>([]);
+  const [drawPath, setDrawPath] = useState<Array<{ lat: number; lng: number }>>([]);
+  const [importedGeoJson, setImportedGeoJson] = useState<GeoJsonObject | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
-
-  const mapRef = useRef<google.maps.Map | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
-  const sketchOverlaysRef = useRef<
-    (google.maps.Polyline | google.maps.Polygon | google.maps.Marker)[]
-  >([]);
   const initialFitDone = useRef(false);
   const lastRecenter = useRef(-1);
 
@@ -166,13 +152,9 @@ function FieldCampaignMapWithKey({
   const resetTools = useCallback(() => {
     setMapTool("nav");
     setMeasurePath([]);
+    setDrawPath([]);
     setImportError(null);
-    clearSketchOverlays(sketchOverlaysRef.current);
-    sketchOverlaysRef.current = [];
-    const map = mapRef.current;
-    if (map) {
-      map.data.forEach((f) => map.data.remove(f));
-    }
+    setImportedGeoJson(null);
   }, []);
 
   const applyBounds = useCallback(() => {
@@ -180,22 +162,19 @@ function FieldCampaignMapWithKey({
     if (!map) return;
     const pts = collectPoints(obraPosition, furos, userPosition);
     if (pts.length === 0) {
-      map.setCenter(DEFAULT_CENTER);
-      map.setZoom(4);
+      map.setView([DEFAULT_CENTER.lat, DEFAULT_CENTER.lng], 4);
       return;
     }
     if (pts.length === 1) {
-      map.setCenter(pts[0]);
-      map.setZoom(17);
+      map.setView([pts[0]!.lat, pts[0]!.lng], 17);
       return;
     }
-    const bounds = new google.maps.LatLngBounds();
-    for (const p of pts) bounds.extend(p);
-    map.fitBounds(bounds, PAD);
+    const bounds = L.latLngBounds(pts.map((p) => [p.lat, p.lng] as L.LatLngTuple));
+    map.fitBounds(bounds, { padding: [PAD, PAD] });
   }, [obraPosition, furos, userPosition]);
 
   useEffect(() => {
-    if (!isLoaded || !mapRef.current) return;
+    if (!mapRef.current) return;
     if (!initialFitDone.current) {
       const pts = collectPoints(obraPosition, furos, userPosition);
       if (pts.length > 0) {
@@ -203,15 +182,15 @@ function FieldCampaignMapWithKey({
         applyBounds();
       }
     }
-  }, [isLoaded, obraPosition, furos, userPosition, applyBounds]);
+  }, [obraPosition, furos, userPosition, applyBounds]);
 
   useEffect(() => {
-    if (!isLoaded || !mapRef.current) return;
+    if (!mapRef.current) return;
     if (recenterKey !== lastRecenter.current) {
       lastRecenter.current = recenterKey;
       applyBounds();
     }
-  }, [recenterKey, isLoaded, applyBounds]);
+  }, [recenterKey, applyBounds]);
 
   const center = useMemo(() => {
     if (obraPosition) return obraPosition;
@@ -230,21 +209,17 @@ function FieldCampaignMapWithKey({
 
   const measureLengthM = useMemo(() => {
     if (measurePath.length < 2) return null;
-    return google.maps.geometry.spherical.computeLength(measurePath);
+    return measureLengthMeters(measurePath);
   }, [measurePath]);
 
   const onMapClick = useCallback(
-    (e: google.maps.MapMouseEvent) => {
-      const ll = e.latLng;
-      if (!ll) return;
-      const lng = ll.lng();
-      const lat = ll.lat();
-
+    (lat: number, lng: number) => {
       if (effectiveTool === "measure") {
         setMeasurePath((prev) => [...prev, { lat, lng }]);
         return;
       }
       if (effectiveTool === "draw") {
+        setDrawPath((prev) => [...prev, { lat, lng }]);
         return;
       }
 
@@ -264,41 +239,33 @@ function FieldCampaignMapWithKey({
   );
 
   const onImportFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    (e: ChangeEvent<HTMLInputElement>) => {
       setImportError(null);
       const file = e.target.files?.[0];
       e.target.value = "";
       if (!file) return;
-      const map = mapRef.current;
-      if (!map) return;
       const reader = new FileReader();
       reader.onload = () => {
         try {
           const text = String(reader.result ?? "");
           const parsed: unknown = JSON.parse(text);
-          if (typeof parsed !== "object" || parsed === null) {
+          if (
+            typeof parsed !== "object" ||
+            parsed === null ||
+            !("type" in parsed) ||
+            typeof (parsed as { type?: unknown }).type !== "string"
+          ) {
             setImportError("Ficheiro inválido.");
             return;
           }
-          map.data.forEach((f) => map.data.remove(f));
-          map.data.addGeoJson(parsed as object);
-          map.data.setStyle({
-            strokeColor: "#ea580c",
-            strokeWeight: 2,
-            fillOpacity: 0.12,
-            fillColor: "#ea580c",
-          });
-          const bounds = new google.maps.LatLngBounds();
-          map.data.forEach((feature) => {
-            const geom = feature.getGeometry();
-            if (!geom) return;
-            geom.forEachLatLng((latLng) => bounds.extend(latLng));
-          });
-          if (bounds.isEmpty()) {
+          const geo = parsed as GeoJsonObject;
+          const bounds = L.geoJSON(geo).getBounds();
+          if (!bounds.isValid()) {
             setImportError("GeoJSON sem coordenadas.");
             return;
           }
-          map.fitBounds(bounds, PAD);
+          setImportedGeoJson(geo);
+          mapRef.current?.fitBounds(bounds, { padding: [PAD, PAD] });
         } catch {
           setImportError("Não foi possível ler o GeoJSON.");
         }
@@ -307,44 +274,21 @@ function FieldCampaignMapWithKey({
     },
     [],
   );
+  useEffect(() => {
+    delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+      iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+    });
+  }, []);
 
-  const pushSketch = useCallback(
-    (o: google.maps.Polyline | google.maps.Polygon | google.maps.Marker) => {
-      sketchOverlaysRef.current.push(o);
-    },
-    [],
-  );
-
-  if (loadError) {
-    return (
-      <div
-        className={`rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200 ${className}`}
-      >
-        Não foi possível carregar o Google Maps. Verifique a chave e a API Maps
-        JavaScript.
-      </div>
-    );
-  }
-
-  if (!isLoaded) {
-    return (
-      <div
-        className={`flex items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-sm text-[var(--muted)] ${className} ${fullViewport ? "h-[100vh] w-full" : ""}`}
-        style={fullViewport ? undefined : { height: MAP_HEIGHT }}
-      >
-        A carregar mapa…
-      </div>
-    );
-  }
-
-  const userIcon: google.maps.Symbol = {
-    path: google.maps.SymbolPath.CIRCLE,
-    scale: 9,
-    fillColor: "#1a73e8",
-    fillOpacity: 1,
-    strokeColor: "#ffffff",
-    strokeWeight: 2,
-  };
+  const userIcon = L.divIcon({
+    className: "geo-user-location-icon",
+    html: `<span style="display:block;width:14px;height:14px;border-radius:9999px;background:#1a73e8;border:2px solid #fff;box-shadow:0 0 0 5px rgba(26,115,232,0.28)"></span>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
 
   const toolbarBtn =
     "rounded-lg border px-3 py-2 text-sm font-medium transition-colors";
@@ -357,10 +301,6 @@ function FieldCampaignMapWithKey({
     "w-full min-w-0 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm font-medium text-neutral-900 shadow-sm transition-colors hover:bg-neutral-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700";
   const toolbarBtnFullActive =
     "w-full min-w-0 rounded-lg border border-teal-600 bg-teal-50 px-3 py-2 text-left text-sm font-semibold text-teal-900 ring-2 ring-teal-500/30 dark:border-teal-500 dark:bg-teal-950/60 dark:text-teal-50";
-
-  const mapContainerStyleResolved: CSSProperties = fullViewport
-    ? { width: "100%", height: "100%" }
-    : mapContainerStyle;
 
   const mapContainerClassResolved = fullViewport
     ? "absolute inset-0 h-full w-full overflow-hidden"
@@ -385,8 +325,7 @@ function FieldCampaignMapWithKey({
 
   const drawHelp = (
     <>
-      Use a barra de desenho do Google Maps (linha, polígono ou marcador). «Ponto»
-      remove desenhos e camadas importadas.
+      Clique no mapa para desenhar uma polilinha simples. «Ponto» remove desenhos e importação.
     </>
   );
 
@@ -412,8 +351,6 @@ function FieldCampaignMapWithKey({
             className={`${toolbarBtn} ${effectiveTool === "measure" ? toolbarBtnActive : toolbarBtnIdle}`}
             onClick={() => {
               setImportError(null);
-              clearSketchOverlays(sketchOverlaysRef.current);
-              sketchOverlaysRef.current = [];
               setMapTool("measure");
               setMeasurePath([]);
             }}
@@ -425,9 +362,8 @@ function FieldCampaignMapWithKey({
             className={`${toolbarBtn} ${effectiveTool === "draw" ? toolbarBtnActive : toolbarBtnIdle}`}
             onClick={() => {
               setImportError(null);
-              clearSketchOverlays(sketchOverlaysRef.current);
-              sketchOverlaysRef.current = [];
               setMeasurePath([]);
+              setDrawPath([]);
               setMapTool("draw");
             }}
           >
@@ -470,56 +406,69 @@ function FieldCampaignMapWithKey({
           {importError}
         </p>
       )}
-      <GoogleMap
-        id={fullViewport ? "map" : undefined}
-        mapContainerStyle={mapContainerStyleResolved}
-        mapContainerClassName={mapContainerClassResolved}
-        center={center}
-        zoom={16}
-        options={mapOptions}
-        onClick={onMapClick}
-        onLoad={(m) => {
-          mapRef.current = m;
-        }}
-        onUnmount={() => {
-          mapRef.current = null;
-        }}
+      <div
+        className={mapContainerClassResolved}
+        style={fullViewport ? undefined : { height: MAP_HEIGHT }}
       >
-        {effectiveTool === "draw" && (
-          <DrawingManagerF
-            options={{
-              drawingControl: true,
-              drawingControlOptions: {
-                position: google.maps.ControlPosition.TOP_CENTER,
-                drawingModes: [
-                  google.maps.drawing.OverlayType.POLYLINE,
-                  google.maps.drawing.OverlayType.POLYGON,
-                  google.maps.drawing.OverlayType.MARKER,
-                ],
-              },
-            }}
-            onPolylineComplete={pushSketch}
-            onPolygonComplete={pushSketch}
-            onMarkerComplete={pushSketch}
+        <MapContainer
+          id={fullViewport ? "map" : undefined}
+          center={[center.lat, center.lng]}
+          zoom={16}
+          scrollWheelZoom
+          style={{ height: "100%", width: "100%" }}
+          className="z-0"
+          ref={mapRef}
+        >
+          <ClickCapture
+            mapTool={effectiveTool}
+            mapMode={mapMode}
+            selectedFuroId={selectedFuroId}
+            onMapClick={onMapClick}
           />
-        )}
-        {measurePath.length > 0 && (
-          <PolylineF
-            path={measurePath}
-            options={{
-              strokeColor: "#0d9488",
-              strokeOpacity: 0.95,
-              strokeWeight: 3,
-              clickable: false,
-            }}
+          <TileLayer
+            attribution="Imagem © Esri (Maxar, Earthstar Geographics, etc.)"
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            maxZoom={19}
+            maxNativeZoom={19}
           />
-        )}
+          <TileLayer
+            attribution="Nomes © Esri"
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+            maxZoom={19}
+            maxNativeZoom={19}
+            opacity={0.95}
+          />
+          {importedGeoJson && (
+            <LeafletGeoJSON
+              data={importedGeoJson}
+              style={{
+                color: "#ea580c",
+                weight: 2,
+                fillOpacity: 0.12,
+              }}
+            />
+          )}
+          {measurePath.length > 0 && (
+            <Polyline
+              positions={measurePath.map((p) => [p.lat, p.lng])}
+              pathOptions={{ color: "#0d9488", weight: 3 }}
+            />
+          )}
+          {drawPath.length > 0 && (
+            <Polyline
+              positions={drawPath.map((p) => [p.lat, p.lng])}
+              pathOptions={{ color: "#ea580c", weight: 3, dashArray: "6 4" }}
+            />
+          )}
         {obraPosition && (
           <Marker
-            position={obraPosition}
+            position={[obraPosition.lat, obraPosition.lng]}
             title="Referência da obra"
-            label={{ text: "Obra", color: "#1a1a1a", fontSize: "11px", fontWeight: "600" }}
-          />
+          >
+            <Tooltip permanent direction="top" offset={[0, -8]}>
+              Obra
+            </Tooltip>
+          </Marker>
         )}
         {furos.map((f) => {
           if (
@@ -533,25 +482,33 @@ function FieldCampaignMapWithKey({
           return (
             <Marker
               key={f.id}
-              position={{ lat: f.latitude, lng: f.longitude }}
+              position={[f.latitude, f.longitude]}
               title={`Furo ${f.codigo}`}
-              label={{
-                text: f.codigo.length > 8 ? `${f.codigo.slice(0, 7)}…` : f.codigo,
-                color: "#0f766e",
-                fontSize: "11px",
-                fontWeight: "600",
-              }}
-            />
+            >
+              <Tooltip permanent direction="top" offset={[0, -8]}>
+                {f.codigo.length > 8 ? `${f.codigo.slice(0, 7)}…` : f.codigo}
+              </Tooltip>
+            </Marker>
           );
         })}
         {userPosition && (
-          <Marker
-            position={userPosition}
-            title={userPositionTitle ?? "A sua posição (GPS)"}
-            icon={userIcon}
-          />
+          <>
+            <Circle
+              center={[userPosition.lat, userPosition.lng]}
+              radius={18}
+              interactive={false}
+              pathOptions={{ color: "#60a5fa", weight: 1, fillColor: "#93c5fd", fillOpacity: 0.25 }}
+            />
+            <Marker
+              position={[userPosition.lat, userPosition.lng]}
+              title={userPositionTitle ?? "A sua posição (GPS)"}
+              icon={userIcon}
+              interactive={false}
+            />
+          </>
         )}
-      </GoogleMap>
+        </MapContainer>
+      </div>
       {fullViewport && showToolbar && (
         <div
           className="toolbar absolute left-[10px] top-[50px] z-20 flex min-w-[152px] max-w-[min(260px,calc(100vw-24px))] flex-col gap-[10px] rounded-[10px] bg-white p-[10px] shadow-lg dark:border dark:border-zinc-600 dark:bg-zinc-900"
@@ -576,8 +533,6 @@ function FieldCampaignMapWithKey({
             }
             onClick={() => {
               setImportError(null);
-              clearSketchOverlays(sketchOverlaysRef.current);
-              sketchOverlaysRef.current = [];
               setMapTool("measure");
               setMeasurePath([]);
             }}
@@ -591,9 +546,8 @@ function FieldCampaignMapWithKey({
             }
             onClick={() => {
               setImportError(null);
-              clearSketchOverlays(sketchOverlaysRef.current);
-              sketchOverlaysRef.current = [];
               setMeasurePath([]);
+              setDrawPath([]);
               setMapTool("draw");
             }}
           >
@@ -648,12 +602,4 @@ function FieldCampaignMapWithKey({
       {!fullViewport && hint}
     </div>
   );
-}
-
-export function FieldCampaignMap(props: Props) {
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
-  if (!apiKey) {
-    return <MapMissingKeyMessage className={props.className ?? ""} />;
-  }
-  return <FieldCampaignMapWithKey {...props} apiKey={apiKey} />;
 }

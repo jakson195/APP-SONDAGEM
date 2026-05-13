@@ -13,6 +13,7 @@ export async function POST(req: Request) {
   let body: {
     codigo?: unknown;
     obraId?: unknown;
+    projectId?: unknown;
     tipo?: unknown;
     /** legado */
     tipoCampo?: unknown;
@@ -24,13 +25,13 @@ export async function POST(req: Request) {
   }
 
   const codigo = typeof body.codigo === "string" ? body.codigo.trim() : "";
-  const obraId = Number(body.obraId);
+  const obraId = Number(body.obraId ?? body.projectId);
   const tipoRaw = body.tipo ?? body.tipoCampo;
   const tipo = parseTipoCampo(tipoRaw);
 
   if (!codigo || !Number.isFinite(obraId)) {
     return NextResponse.json(
-      { error: "codigo e obraId válidos são obrigatórios" },
+      { error: "codigo e obraId/projectId válidos são obrigatórios" },
       { status: 400 },
     );
   }
@@ -87,12 +88,12 @@ export async function GET(req: Request) {
     return NextResponse.json(furo);
   }
 
-  const raw = searchParams.get("obraId");
+  const raw = searchParams.get("obraId") ?? searchParams.get("projectId");
   const obraId = raw === null || raw === "" ? NaN : Number(raw);
 
   if (!Number.isFinite(obraId)) {
     return NextResponse.json(
-      { error: "Query obraId ou furoId é obrigatória e deve ser numérica" },
+      { error: "Query obraId/projectId ou furoId é obrigatória e deve ser numérica" },
       { status: 400 },
     );
   }

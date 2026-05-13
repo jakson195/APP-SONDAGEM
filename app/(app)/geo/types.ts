@@ -4,4 +4,7 @@ export type FuroMapa = {
   lat: number;
   lng: number;
   camadas: unknown[];
+  nome: string;
+  descricao: string;
+  createdAtIso: string;
 };

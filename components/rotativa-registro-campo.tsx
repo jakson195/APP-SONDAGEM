@@ -185,10 +185,17 @@ export function RotativaRegistroCampo({ furoId }: RotativaRegistroCampoProps) {
   } | null>(null);
   const [campoMapaReady, setCampoMapaReady] = useState(false);
 
-  const mapCoordsForPdf = useMemo(
-    () => wgsPairFromInputs(mapaRelLatStr, mapaRelLngStr),
-    [mapaRelLatStr, mapaRelLngStr],
-  );
+  const mapCoordsForPdf = useMemo(() => {
+    const manual = wgsPairFromInputs(mapaRelLatStr, mapaRelLngStr);
+    if (manual) return manual;
+    if (obraRefMapa) return { lat: obraRefMapa.lat, lng: obraRefMapa.lng };
+    return null;
+  }, [mapaRelLatStr, mapaRelLngStr, obraRefMapa]);
+  const mapCoordsSourceForPdf = useMemo(() => {
+    if (wgsPairFromInputs(mapaRelLatStr, mapaRelLngStr)) return "manual";
+    if (obraRefMapa) return "obra";
+    return null;
+  }, [mapaRelLatStr, mapaRelLngStr, obraRefMapa]);
 
   const escalaPdfPxPorMetro = 48;
 
@@ -1034,9 +1041,15 @@ export function RotativaRegistroCampo({ furoId }: RotativaRegistroCampoProps) {
               inputMode="decimal"
             />
             <p className="text-xs text-[var(--muted)] sm:col-span-2 print:hidden">
-              Mapa no relatório: graus decimais WGS84 (opcional). Sem coordenadas,
-              o PDF não inclui o bloco de mapa.
+              Mapa no relatório: graus decimais WGS84 (opcional). Se vazio, usa a
+              referência da obra quando existir; o servidor gera imagem (Google, OSM
+              ou vista esquemática).
             </p>
+            {mapCoordsForPdf && mapCoordsSourceForPdf !== "manual" && (
+              <p className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800 sm:col-span-2 print:hidden dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-200">
+                Mapa será gerado com fallback de coordenadas da obra.
+              </p>
+            )}
             <input
               type="number"
               min={1}
@@ -1129,3 +1142,5 @@ export function RotativaRegistroCampo({ furoId }: RotativaRegistroCampoProps) {
     </div>
   );
 }
+
+

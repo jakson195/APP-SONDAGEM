@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">soilsul</string>
-    <string name="title_activity_main">soilsul</string>
-    <string name="package_name">com.soilsul.app</string>
-    <string name="custom_url_scheme">com.soilsul.app</string>
+    <string name="app_name">SOLODATA</string>
+    <string name="title_activity_main">SOLODATA</string>
+    <string name="package_name">com.soisul</string>
+    <string name="custom_url_scheme">com.soisul</string>
 </resources>

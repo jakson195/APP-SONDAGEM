@@ -1,13 +1,17 @@
 export type ToolbarProps = {
   onNovoFuro?: () => void;
   onMedir?: () => void;
+  onLocalizacao?: () => void;
   onImportarMapa?: () => void;
+  onExportarPontos?: () => void;
 };
 
 export default function Toolbar({
   onNovoFuro,
   onMedir,
+  onLocalizacao,
   onImportarMapa,
+  onExportarPontos,
 }: ToolbarProps) {
   const btnClass =
     "rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-left text-sm text-[var(--text)] shadow-sm transition hover:bg-[var(--muted)]/15";
@@ -24,13 +28,19 @@ export default function Toolbar({
       <button type="button" className={btnClass} onClick={onMedir}>
         📏 Medir
       </button>
+      <button type="button" className={btnClass} onClick={onLocalizacao}>
+        📡 Minha localização
+      </button>
       <button
         type="button"
         className={btnClass}
         onClick={onImportarMapa}
-        title="PDF georreferenciado (GeoPDF) ou GeoTIFF WGS84"
+        title="PDF/TIFF georreferenciado ou KML/KMZ"
       >
-        🗺️ Importar mapa (PDF / TIFF)
+        🗺️ Importar mapa (PDF / TIFF / KML / KMZ)
+      </button>
+      <button type="button" className={btnClass} onClick={onExportarPontos}>
+        ⬇️ Exportar pontos (KML / KMZ)
       </button>
     </div>
   );

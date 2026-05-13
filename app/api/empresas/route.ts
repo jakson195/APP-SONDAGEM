@@ -1,5 +1,6 @@
 import { nextResponseDbFailure } from "@/lib/db-route-error";
 import { prisma } from "@/lib/prisma";
+import { garantirModulosPadraoEmpresa } from "@/lib/seed-empresa-modulos";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -7,11 +8,11 @@ export const dynamic = "force-dynamic";
 /** Lista empresas (para escolher na Nova obra). */
 export async function GET() {
   try {
-    const empresas = await prisma.empresa.findMany({
+    const rows = await prisma.company.findMany({
       orderBy: { id: "asc" },
-      select: { id: true, nome: true },
+      select: { id: true, name: true },
     });
-    return NextResponse.json(empresas);
+    return NextResponse.json(rows.map((r) => ({ id: r.id, nome: r.name })));
   } catch (e) {
     return nextResponseDbFailure(e);
   }
@@ -45,11 +46,25 @@ export async function POST(req: Request) {
       });
     }
 
-    const empresa = await prisma.empresa.create({
-      data: { nome, userId: user.id },
+    const company = await prisma.company.create({
+      data: { name: nome, userId: user.id },
     });
 
-    return NextResponse.json(empresa);
+    await prisma.orgMembership.upsert({
+      where: {
+        userId_empresaId: { userId: user.id, empresaId: company.id },
+      },
+      create: {
+        userId: user.id,
+        empresaId: company.id,
+        orgRole: "ADMIN",
+      },
+      update: { orgRole: "ADMIN" },
+    });
+
+    await garantirModulosPadraoEmpresa(company.id);
+
+    return NextResponse.json({ id: company.id, nome: company.name });
   } catch (e) {
     return nextResponseDbFailure(e);
   }

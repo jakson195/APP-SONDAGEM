@@ -8,7 +8,11 @@
  * ρa = π (s² − b²) / (2b) · |ΔV|/I  (convencional; requer s > b > 0).
  */
 
-import type { LeituraCampoVES, ModeloDuasCamadas } from "./types";
+import type {
+  LeituraCampoSchlumberger,
+  LeituraCampoVES,
+  ModeloDuasCamadas,
+} from "./types";
 import { greenSurfaceRoverI, reflectionCoeff } from "./wenner-two-layer";
 
 const PI = Math.PI;
@@ -47,5 +51,14 @@ export function syntheticCurveSchlumberger(
 ): number[] {
   return abHalfM.map((s) =>
     apparentResistivitySchlumbergerTwoLayer(s, mnHalfM, model),
+  );
+}
+
+export function syntheticCurveSchlumbergerByReading(
+  leituras: LeituraCampoSchlumberger[],
+  model: ModeloDuasCamadas,
+): number[] {
+  return leituras.map((l) =>
+    apparentResistivitySchlumbergerTwoLayer(l.abHalfM, l.mnHalfM, model),
   );
 }

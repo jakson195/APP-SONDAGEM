@@ -9,34 +9,152 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-model User {
-  id       Int       @id @default(autoincrement())
-  email    String    @unique
-  password String
-  empresas Empresa[]
+/** Controlo global da plataforma (SUPER_ADMIN / MASTER_ADMIN legado). */
+enum SystemRole {
+  MASTER_ADMIN
+  SUPER_ADMIN
+  USER
 }
 
-model Empresa {
-  id     Int    @id @default(autoincrement())
-  nome   String
-  userId Int
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+/** Papel do utilizador dentro de uma empresa (equipa / permissões de negócio). */
+enum OrgRole {
+  ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
+}
 
-  obras Obra[]
+/** Estado de assinatura (extensível para billing). */
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  SUSPENDED
+  CANCELLED
+}
+
+/** Ciclo de vida da obra (projeto de campo). */
+enum ObraStatus {
+  DRAFT
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+model User {
+  id         Int        @id @default(autoincrement())
+  email      String     @unique
+  password   String
+  name       String?
+  systemRole SystemRole @default(USER)
+
+  companies   Company[]
+  memberships OrgMembership[]
+}
+
+/**
+ * Empresa na plataforma (tabela física `empresa`).
+ * Modelo `Company` para alinhar com nomenclatura multi-tenant SaaS.
+ */
+model Company {
+  id     Int  @id @default(autoincrement())
+  name   String @map("nome")
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plan   String?              @map("planSlug")
+  status SubscriptionStatus @default(ACTIVE) @map("subscriptionStatus")
+
+  cnpj    String? @unique
+  phone   String?
+  email   String?
+  address String?
+  logo    String?
+  createdAt DateTime @default(now())
+
+  obras       Obra[]
+  equipes     Equipe[]
+  memberships OrgMembership[]
+  modulos     EmpresaModulo[]
+
+  @@map("Empresa")
+}
+
+/** Equipa operacional dentro da empresa (alocação de campo / projetos). */
+model Equipe {
+  id        Int     @id @default(autoincrement())
+  nome      String
+  empresaId Int     @map("empresaId")
+  company   Company @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  memberships OrgMembership[]
+}
+
+/**
+ * Utilizador ↔ empresa (e opcionalmente equipe).
+ * Um utilizador pode pertencer a várias empresas com papéis distintos.
+ */
+model OrgMembership {
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  empresaId Int     @map("empresaId")
+  equipeId  Int?
+  orgRole   OrgRole @default(MEMBER)
+  /**
+   * Módulos explícitos (chaves de `modulos-plataforma.ts`). Lista vazia = acede a
+   * todos os módulos ativos na empresa. Caso contrário, apenas a interseção.
+   */
+  modulosPermitidos String[] @default([])
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  equipe  Equipe? @relation(fields: [equipeId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, empresaId])
+}
+
+/** Módulos da app ligados por chave (`lib/modulos-plataforma.ts`). */
+model EmpresaModulo {
+  id        Int     @id @default(autoincrement())
+  empresaId Int     @map("empresaId")
+  modulo    String
+  ativo     Boolean @default(true)
+
+  company Company @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@unique([empresaId, modulo])
 }
 
 model Obra {
-  id         Int     @id @default(autoincrement())
-  nome       String
-  cliente    String
-  local      String
+  id        Int     @id @default(autoincrement())
+  nome      String
+  cliente   String
+  local     String
+  /** Notas internas / âmbito do projeto */
+  description String?
+  status    ObraStatus @default(ACTIVE)
   /** WGS84 graus decimais (opcional), para Google Maps */
-  latitude   Float?
-  longitude  Float?
-  empresaId  Int
-  empresa    Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  latitude  Float?
+  longitude Float?
+  /** Empresa proprietária (multi-tenant) — coluna física `empresaId`. */
+  companyId Int        @map("empresaId")
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  furos Furo[]
+  furos          Furo[]
+  projectModules ProjectModule[]
+  vesProjects    VESProject[]
+}
+
+/** Módulos ativados por obra (projeto de campo). */
+model ProjectModule {
+  id        Int     @id @default(autoincrement())
+  projectId Int     @map("projectId")
+  module    String
+  active    Boolean @default(true)
+  project   Obra    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, module])
+  @@map("ProjectModule")
 }
 
 model Furo {
@@ -69,4 +187,17 @@ model SPT {
   solo   String
   furoId Int
   furo   Furo  @relation(fields: [furoId], references: [id])
+}
+
+model VESProject {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  metodo    String
+  payload   Json
+  projectId Int?
+  project   Obra?    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, nome])
 }

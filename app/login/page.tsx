@@ -1,18 +1,52 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
 import { Mountain } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const nextRaw = searchParams.get("next");
+  const next =
+    nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//")
+      ? nextRaw
+      : "/dashboard";
 
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError(null);
     setLoading(true);
-    router.push("/dashboard");
+    const fd = new FormData(e.currentTarget);
+    const email = String(fd.get("email") ?? "").trim();
+    const password = String(fd.get("password") ?? "");
+
+    try {
+      const r = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+        credentials: "include",
+      });
+      const data = (await r.json().catch(() => ({}))) as {
+        error?: string;
+        systemRole?: string;
+      };
+      if (!r.ok) {
+        setError(typeof data.error === "string" ? data.error : "Falha no login.");
+        setLoading(false);
+        return;
+      }
+      router.push(next);
+      router.refresh();
+    } catch {
+      setError("Falha de rede.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -30,12 +64,17 @@ export default function LoginPage() {
             Vision Sondagem
           </h1>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Sign in to your geotechnical workspace
+            Entrar na área de trabalho
           </p>
         </div>
 
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl shadow-black/5 dark:shadow-black/40 sm:p-8">
-          <form onSubmit={onSubmit} className="space-y-5">
+          <form onSubmit={(e) => void onSubmit(e)} className="space-y-5">
+            {error && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-300" role="alert">
+                {error}
+              </p>
+            )}
             <div>
               <label
                 htmlFor="email"
@@ -58,7 +97,7 @@ export default function LoginPage() {
                 htmlFor="password"
                 className="mb-1.5 block text-sm font-medium text-[var(--text)]"
               >
-                Password
+                Palavra-passe
               </label>
               <input
                 id="password"
@@ -75,11 +114,15 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full rounded-lg bg-[var(--accent)] py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-70"
             >
-              {loading ? "Signing in…" : "Sign in"}
+              {loading ? "A entrar…" : "Entrar"}
             </button>
           </form>
           <p className="mt-6 text-center text-xs text-[var(--muted)]">
-            Demo: any credentials route to the dashboard.
+            Conta de super administrador: credenciais em{" "}
+            <code className="rounded bg-[var(--surface)] px-1">MASTER_ADMIN_*</code>{" "}
+            após <code className="rounded bg-[var(--surface)] px-1">npm run db:seed</code>{" "}
+            (papel <code className="rounded bg-[var(--surface)] px-1">MASTER_ADMIN</code> ou{" "}
+            <code className="rounded bg-[var(--surface)] px-1">SUPER_ADMIN</code>).
           </p>
         </div>
 
@@ -88,10 +131,28 @@ export default function LoginPage() {
             href="/dashboard"
             className="font-medium text-[var(--accent)] hover:underline"
           >
-            Skip to dashboard
+            Continuar para a app (sem sessão)
+          </Link>
+          {" · "}
+          <Link href="/login?next=/adm" className="font-medium text-[var(--accent)] hover:underline">
+            Login → ADM mestre
           </Link>
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center text-sm text-[var(--muted)]">
+          A carregar…
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

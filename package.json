@@ -14,11 +14,15 @@
     "db:studio": "dotenv -e .env.local -e .env -- prisma studio",
     "db:validate": "dotenv -e .env.local -e .env -- prisma validate",
     "db:sync": "npm run db:push && prisma generate",
+    "db:seed": "dotenv -e .env.local -e .env -- npx tsx prisma/seed.ts",
     "android:live": "npx cap run android -l --host=localhost --port=3000 --forwardPorts 3000:3000",
     "vercel": "vercel",
     "verce": "vercel",
     "vercel:prod": "vercel --prod",
     "vercel:pull": "vercel env pull .env.local"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",
@@ -47,6 +51,7 @@
     "react-dom": "19.2.4",
     "react-leaflet": "^5.0.0",
     "recharts": "^3.8.1",
+    "sharp": "^0.34.5",
     "tailwindcss": "^3.4.17",
     "three": "^0.184.0",
     "utm": "^1.1.1"
@@ -62,6 +67,7 @@
     "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "tsx": "^4.21.0",
     "typescript": "^5",
     "vercel": "^53.1.1"
   }

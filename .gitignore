@@ -18,6 +18,9 @@
 /out/
 /dist/
 
+# Sentinel-1 / storage local (SAFE, zip)
+/storage/
+
 # production
 /build
 

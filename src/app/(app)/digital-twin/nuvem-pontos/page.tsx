@@ -1,0 +1,17 @@
+import {
+  DigitalTwinSectionPage,
+  digitalTwinViewerUrl,
+} from "@/components/digital-twin/section-page";
+import { digitalTwinSection } from "@/lib/digital-twin-page";
+
+export default function DigitalTwinNuvemPontosPage() {
+  const s = digitalTwinSection("nuvem-pontos");
+  return (
+    <DigitalTwinSectionPage
+      title={s.label}
+      description={s.description ?? ""}
+      icon={s.icon}
+      viewerUrl={digitalTwinViewerUrl()}
+    />
+  );
+}

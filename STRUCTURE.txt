@@ -1,0 +1,14 @@
+App Web — SOILSUL (UI)
+========================
+
+Next.js: páginas, componentes, auth no browser.
+API de negócio: serviço separado api-core (proxy /api/* no next.config).
+
+Dev local:
+  cd app-web && npm run dev          → :3000
+  cd api-core && npm run dev         → :3001
+  ou gateway Docker                  → :8080
+
+Docker: app-web/Dockerfile (contexto na raiz do repo)
+
+Acesso produção: http://localhost:8080/ (via gateway)

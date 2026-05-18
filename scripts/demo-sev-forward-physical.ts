@@ -1,4 +1,4 @@
-import { forwardPhysical } from "../lib/geofisica/sev-forward-physical.js";
+import { forwardPhysical } from "../src/lib/geofisica/sev-forward-physical";
 
 const model = {
   rhos: [1360, 4776, 3000, 2950],

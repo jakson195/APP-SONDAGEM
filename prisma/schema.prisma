@@ -136,6 +136,18 @@ model Obra {
   /** WGS84 graus decimais (opcional), para Google Maps */
   latitude  Float?
   longitude Float?
+  /** InSAR / GNSS / campo — texto livre categorizado na UI */
+  tipoMonitoramento String? @map("tipo_monitoramento")
+  /**
+   * Área de interesse (AOI) para pipelines InSAR — SRID 4326.
+   * Leitura/escrita via `$queryRaw` / `$executeRaw` (tipo PostGIS).
+   */
+  areaOfInterest Unsupported("geometry(Polygon,4326)")? @map("area_of_interest")
+  /**
+   * AOI em GeoJSON quando PostGIS não está instalado (ex.: Neon sem extensão).
+   * Mantém-se sincronizado: se `area_of_interest` for gravado com PostGIS, este campo é limpo.
+   */
+  areaOfInterestGeojson Json? @map("area_of_interest_geojson")
   /** Empresa proprietária (multi-tenant) — coluna física `empresaId`. */
   companyId Int        @map("empresaId")
   company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -143,6 +155,76 @@ model Obra {
   furos          Furo[]
   projectModules ProjectModule[]
   vesProjects    VESProject[]
+  sentinel1Scenes Sentinel1CatalogEntry[]
+  insarJobs       InsarPipelineJob[]
+}
+
+/** Estado grosso do job InSAR (sub-passos em `properties.stages`). */
+enum InsarPipelineJobStatus {
+  pending
+  resolving_scenes
+  downloading_slc
+  snap_processing
+  exporting_geotiff
+  completed
+  failed
+}
+
+/**
+ * Pipeline automático: SLC → SNAP (coregistro + interferograma + unwrap + deslocamento) → GeoTIFF → BD.
+ */
+model InsarPipelineJob {
+  id       Int                    @id @default(autoincrement())
+  obraId   Int                    @map("obra_id")
+  obra     Obra                   @relation(fields: [obraId], references: [id], onDelete: Cascade)
+  name     String                 @default("InSAR")
+  status   InsarPipelineJobStatus @default(pending)
+  dateFrom DateTime               @map("date_from")
+  dateTo   DateTime               @map("date_to")
+  /** Data de referência opcional para deslocamento relativo. */
+  referenceDate DateTime? @map("reference_date")
+  orbitDirection String? @map("orbit_direction")
+  aoiWkt         String? @map("aoi_wkt") @db.Text
+  masterCopernicusId String? @map("master_copernicus_id")
+  slaveCopernicusId  String? @map("slave_copernicus_id")
+  sceneCount         Int     @default(0) @map("scene_count")
+  errorMessage       String? @map("error_message") @db.Text
+  /** timeline: [{ step, at, ok, detail }], progress, mensagens SNAP */
+  properties Json?
+
+  rasters InsarGeoRaster[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([obraId, createdAt])
+  @@map("InsarPipelineJob")
+}
+
+/** Produto raster persistido (caminho relativo a `INSAR_STORAGE_DIR` ou `storage/insar`). */
+model InsarGeoRaster {
+  id           Int              @id @default(autoincrement())
+  jobId        Int              @map("job_id")
+  job          InsarPipelineJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  rasterKind   String           @map("raster_kind")
+  epochDate    DateTime?        @map("epoch_date")
+  relativePath String           @map("relative_path") @db.Text
+  fileSizeBytes BigInt?         @map("file_size_bytes")
+  crsEpsg      Int?             @map("crs_epsg")
+  width        Int?
+  height       Int?
+  minValue     Float?           @map("min_value")
+  maxValue     Float?           @map("max_value")
+  meanValue    Float?           @map("mean_value")
+  nodataValue  Float?           @map("nodata_value")
+  units        String           @default("mm")
+  footprintGeoJson Json?        @map("footprint_geo_json")
+  metadata   Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([jobId, rasterKind])
+  @@map("InsarGeoRaster")
 }
 
 /** Módulos ativados por obra (projeto de campo). */
@@ -200,4 +282,33 @@ model VESProject {
   updatedAt DateTime @updatedAt
 
   @@unique([projectId, nome])
+}
+
+/** Metadados de produtos Sentinel-1 SLC obtidos via Copernicus Data Space (catálogo OData). */
+model Sentinel1CatalogEntry {
+  id             Int      @id @default(autoincrement())
+  copernicusId   String   @unique @map("copernicus_id")
+  productName    String   @map("product_name")
+  productType    String   @default("SLC") @map("product_type")
+  acquisitionAt  DateTime @map("acquisition_at")
+  orbitDirection String?  @map("orbit_direction")
+  polarization   String?  @map("polarization")
+  footprintWkt   String?  @map("footprint_wkt") @db.Text
+  s3Path         String?  @map("s3_path")
+  contentLength  BigInt?  @map("content_length")
+  downloadUrl    String?  @map("download_url") @db.Text
+  localPath      String?  @map("local_path") @db.Text
+  /** SHA-256 do ficheiro descarregado (arquivo .zip) antes/após extração — dedupe e auditoria. */
+  archiveSha256  String?  @map("archive_sha256")
+  /** pending | queued | downloading | ready | failed | duplicate */
+  downloadStatus String?  @default("pending") @map("download_status")
+  integrityOk    Boolean? @map("integrity_ok")
+  obraId         Int?     @map("obra_id")
+  obra           Obra?    @relation(fields: [obraId], references: [id], onDelete: SetNull)
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([obraId, acquisitionAt])
+  @@map("Sentinel1CatalogEntry")
 }

@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
-import { garantirModulosPadraoEmpresa } from "../lib/seed-empresa-modulos";
+import { garantirModulosPadraoEmpresa } from "../src/lib/seed-empresa-modulos";
 
 const prisma = new PrismaClient();
 

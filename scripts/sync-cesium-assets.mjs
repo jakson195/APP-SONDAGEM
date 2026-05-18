@@ -11,6 +11,12 @@ if (!existsSync(src)) {
   process.exit(0);
 }
 
+const marker = join(dest, "Cesium.js");
+if (existsSync(marker)) {
+  console.log("[sync-cesium] public/cesium já existe — ignorar");
+  process.exit(0);
+}
+
 mkdirSync(dest, { recursive: true });
 cpSync(src, dest, { recursive: true });
 console.log("[sync-cesium] assets copiados para public/cesium");

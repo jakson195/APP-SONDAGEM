@@ -5,8 +5,9 @@
   "scripts": {
     "dev": "next dev --webpack -p 3000",
     "dev:prisma": "prisma generate && next dev",
-    "build": "prisma migrate deploy && prisma generate && next build",
-    "build:no-migrate": "prisma generate && next build",
+    "build": "prisma generate && next build --webpack",
+    "build:vercel": "prisma migrate deploy && prisma generate && next build --webpack",
+    "build:no-migrate": "prisma generate && next build --webpack",
     "postinstall": "prisma generate && node scripts/sync-cesium-assets.mjs",
     "start": "next start",
     "lint": "eslint",

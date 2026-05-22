@@ -5,12 +5,6 @@ const nextConfig: NextConfig = {
   output: "standalone",
   /** Next 16 usa Turbopack por defeito; o projeto tem webpack custom (Cesium). */
   turbopack: {},
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: false,
-  },
   serverExternalPackages: ["leaflet", "@prisma/client", "cesium", "pg"],
   async rewrites() {
     return [

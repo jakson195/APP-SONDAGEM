@@ -5,7 +5,7 @@ export const FIELD_GPS_OPTIONS: PositionOptions = {
   maximumAge: 86_400_000, // 24 h
 };
 
-const STORAGE_KEY = "vision-app-sondagem-user-gps-v1";
+const STORAGE_KEY = "datageo-digital:user-gps-v1";
 
 export type StoredUserLatLng = {
   lat: number;

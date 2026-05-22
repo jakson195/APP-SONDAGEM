@@ -1,0 +1,1495 @@
+{
+  "fonte": "EPAGRI/HidroChuSC — Back et al. (2021) Agropecuária Catarinense 34(2)",
+  "referencia": "Chuvas intensas para projetos de conservação do solo e da água no estado de Santa Catarina",
+  "periodoRetorno": 10,
+  "idfRegional": {
+    "curta": {
+      "K": 944.88,
+      "m": 0.192,
+      "b": 8.92,
+      "n": 0.698,
+      "limiteMin": 120
+    },
+    "longa": {
+      "K": 1380.95,
+      "m": 0.192,
+      "b": 11.68,
+      "n": 0.773,
+      "limiteMin": 1440
+    },
+    "nota": "Coeficientes regionais SC (HidroChuSC / relatórios exportados)"
+  },
+  "totalMunicipios": 294,
+  "municipios": [
+    {
+      "nome": "Abdon Batista",
+      "p1dia10": 123.3,
+      "i15_10": 109.5
+    },
+    {
+      "nome": "Abelardo Luz",
+      "p1dia10": 132,
+      "i15_10": 117.2
+    },
+    {
+      "nome": "Agrolândia",
+      "p1dia10": 108.9,
+      "i15_10": 96.7
+    },
+    {
+      "nome": "Agronômica",
+      "p1dia10": 105.7,
+      "i15_10": 93.9
+    },
+    {
+      "nome": "Água Doce",
+      "p1dia10": 125.8,
+      "i15_10": 111.7
+    },
+    {
+      "nome": "Águas de Chapecó",
+      "p1dia10": 135.8,
+      "i15_10": 120.5
+    },
+    {
+      "nome": "Águas Frias",
+      "p1dia10": 135.2,
+      "i15_10": 120
+    },
+    {
+      "nome": "Águas Mornas",
+      "p1dia10": 143.5,
+      "i15_10": 127.5
+    },
+    {
+      "nome": "Alfredo Wagner",
+      "p1dia10": 116.3,
+      "i15_10": 103.3
+    },
+    {
+      "nome": "Alto Bela Vista",
+      "p1dia10": 127.5,
+      "i15_10": 113.2
+    },
+    {
+      "nome": "Anchieta",
+      "p1dia10": 139.9,
+      "i15_10": 124.2
+    },
+    {
+      "nome": "Angelina",
+      "p1dia10": 130,
+      "i15_10": 115.4
+    },
+    {
+      "nome": "Anita Garibaldi",
+      "p1dia10": 122.7,
+      "i15_10": 108.9
+    },
+    {
+      "nome": "Anitápolis",
+      "p1dia10": 126.1,
+      "i15_10": 112
+    },
+    {
+      "nome": "Antônio Carlos",
+      "p1dia10": 149.1,
+      "i15_10": 132.4
+    },
+    {
+      "nome": "Apiúna",
+      "p1dia10": 108,
+      "i15_10": 95.9
+    },
+    {
+      "nome": "Arabutã",
+      "p1dia10": 129.4,
+      "i15_10": 114.9
+    },
+    {
+      "nome": "Araquari",
+      "p1dia10": 146.9,
+      "i15_10": 130.4
+    },
+    {
+      "nome": "Araranguá",
+      "p1dia10": 125.7,
+      "i15_10": 111.7
+    },
+    {
+      "nome": "Armazém",
+      "p1dia10": 126.6,
+      "i15_10": 112.4
+    },
+    {
+      "nome": "Arroio Trinta",
+      "p1dia10": 122.1,
+      "i15_10": 108.4
+    },
+    {
+      "nome": "Arvoredo",
+      "p1dia10": 130.8,
+      "i15_10": 116.2
+    },
+    {
+      "nome": "Ascurra",
+      "p1dia10": 110.7,
+      "i15_10": 98.3
+    },
+    {
+      "nome": "Atalanta",
+      "p1dia10": 108.1,
+      "i15_10": 96
+    },
+    {
+      "nome": "Aurora",
+      "p1dia10": 105.1,
+      "i15_10": 93.3
+    },
+    {
+      "nome": "Bal. Arroio do Silva",
+      "p1dia10": 126,
+      "i15_10": 111.9
+    },
+    {
+      "nome": "Bal. Barra do Sul",
+      "p1dia10": 147.4,
+      "i15_10": 130.9
+    },
+    {
+      "nome": "Balneário Camboriú",
+      "p1dia10": 131.7,
+      "i15_10": 116.9
+    },
+    {
+      "nome": "Balneário Gaivota",
+      "p1dia10": 125.9,
+      "i15_10": 111.8
+    },
+    {
+      "nome": "Balneário Piçarras",
+      "p1dia10": 134,
+      "i15_10": 119
+    },
+    {
+      "nome": "Balneário Rincão",
+      "p1dia10": 125.8,
+      "i15_10": 111.7
+    },
+    {
+      "nome": "Bandeirante",
+      "p1dia10": 141,
+      "i15_10": 125.2
+    },
+    {
+      "nome": "Barra Bonita",
+      "p1dia10": 139.5,
+      "i15_10": 123.9
+    },
+    {
+      "nome": "Barra Velha",
+      "p1dia10": 138,
+      "i15_10": 122.6
+    },
+    {
+      "nome": "Bela Vista do Toldo",
+      "p1dia10": 122,
+      "i15_10": 108.3
+    },
+    {
+      "nome": "Belmonte",
+      "p1dia10": 141,
+      "i15_10": 125.2
+    },
+    {
+      "nome": "Benedito Novo",
+      "p1dia10": 113.3,
+      "i15_10": 100.6
+    },
+    {
+      "nome": "Biguaçu",
+      "p1dia10": 149.8,
+      "i15_10": 133
+    },
+    {
+      "nome": "Blumenau",
+      "p1dia10": 120.2,
+      "i15_10": 106.7
+    },
+    {
+      "nome": "Bocaina do Sul",
+      "p1dia10": 109.6,
+      "i15_10": 97.3
+    },
+    {
+      "nome": "Bom Jardim Da Serra",
+      "p1dia10": 118.1,
+      "i15_10": 104.9
+    },
+    {
+      "nome": "Bom Jesus",
+      "p1dia10": 131.6,
+      "i15_10": 116.9
+    },
+    {
+      "nome": "Bom Jesus do Oeste",
+      "p1dia10": 138.1,
+      "i15_10": 122.7
+    },
+    {
+      "nome": "Bom Retiro",
+      "p1dia10": 112.7,
+      "i15_10": 100.1
+    },
+    {
+      "nome": "Bombinhas",
+      "p1dia10": 147.1,
+      "i15_10": 130.6
+    },
+    {
+      "nome": "Botuverá",
+      "p1dia10": 117.7,
+      "i15_10": 104.5
+    },
+    {
+      "nome": "Braço do Norte",
+      "p1dia10": 125.2,
+      "i15_10": 111.2
+    },
+    {
+      "nome": "Braço do Trombudo",
+      "p1dia10": 108.7,
+      "i15_10": 96.6
+    },
+    {
+      "nome": "Brunópolis",
+      "p1dia10": 115.9,
+      "i15_10": 103
+    },
+    {
+      "nome": "Brusque",
+      "p1dia10": 127,
+      "i15_10": 112.8
+    },
+    {
+      "nome": "Caçador",
+      "p1dia10": 118.6,
+      "i15_10": 105.3
+    },
+    {
+      "nome": "Caibi",
+      "p1dia10": 136.2,
+      "i15_10": 120.9
+    },
+    {
+      "nome": "Calmon",
+      "p1dia10": 118.9,
+      "i15_10": 105.6
+    },
+    {
+      "nome": "Camboriú",
+      "p1dia10": 131.7,
+      "i15_10": 116.9
+    },
+    {
+      "nome": "Campo Alegre",
+      "p1dia10": 139,
+      "i15_10": 123.4
+    },
+    {
+      "nome": "Campo Belo do Sul",
+      "p1dia10": 120.2,
+      "i15_10": 106.7
+    },
+    {
+      "nome": "Campo Erê",
+      "p1dia10": 139.8,
+      "i15_10": 124.2
+    },
+    {
+      "nome": "Campos Novos",
+      "p1dia10": 122.6,
+      "i15_10": 108.8
+    },
+    {
+      "nome": "Canelinha",
+      "p1dia10": 134.5,
+      "i15_10": 119.4
+    },
+    {
+      "nome": "Canoinhas",
+      "p1dia10": 122.2,
+      "i15_10": 108.5
+    },
+    {
+      "nome": "Capão Alto",
+      "p1dia10": 119,
+      "i15_10": 105.7
+    },
+    {
+      "nome": "Capinzal",
+      "p1dia10": 126.4,
+      "i15_10": 112.3
+    },
+    {
+      "nome": "Capivari de Baixo",
+      "p1dia10": 127.2,
+      "i15_10": 113
+    },
+    {
+      "nome": "Catanduvas",
+      "p1dia10": 126.3,
+      "i15_10": 112.2
+    },
+    {
+      "nome": "Caxambu do Sul",
+      "p1dia10": 135.4,
+      "i15_10": 120.2
+    },
+    {
+      "nome": "Celso Ramos",
+      "p1dia10": 124.2,
+      "i15_10": 110.2
+    },
+    {
+      "nome": "Cerro Negro",
+      "p1dia10": 120.5,
+      "i15_10": 107
+    },
+    {
+      "nome": "Chapadão do Lageado",
+      "p1dia10": 108.4,
+      "i15_10": 96.3
+    },
+    {
+      "nome": "Chapecó",
+      "p1dia10": 132.2,
+      "i15_10": 117.4
+    },
+    {
+      "nome": "Cocal do Sul",
+      "p1dia10": 124,
+      "i15_10": 110.2
+    },
+    {
+      "nome": "Concórdia",
+      "p1dia10": 128.2,
+      "i15_10": 113.9
+    },
+    {
+      "nome": "Cordilheira Alta",
+      "p1dia10": 133.2,
+      "i15_10": 118.3
+    },
+    {
+      "nome": "Coronel Freitas",
+      "p1dia10": 134.5,
+      "i15_10": 119.4
+    },
+    {
+      "nome": "Coronel Martins",
+      "p1dia10": 135.8,
+      "i15_10": 120.6
+    },
+    {
+      "nome": "Correia Pinto",
+      "p1dia10": 114.7,
+      "i15_10": 101.8
+    },
+    {
+      "nome": "Corupá",
+      "p1dia10": 129.7,
+      "i15_10": 115.1
+    },
+    {
+      "nome": "Criciúma",
+      "p1dia10": 123.7,
+      "i15_10": 109.9
+    },
+    {
+      "nome": "Cunha Porã",
+      "p1dia10": 137.3,
+      "i15_10": 121.9
+    },
+    {
+      "nome": "Cunhataí",
+      "p1dia10": 135.8,
+      "i15_10": 120.6
+    },
+    {
+      "nome": "Curitibanos",
+      "p1dia10": 114.1,
+      "i15_10": 101.3
+    },
+    {
+      "nome": "Descanso",
+      "p1dia10": 139.5,
+      "i15_10": 123.9
+    },
+    {
+      "nome": "Dionísio Cerqueira",
+      "p1dia10": 141.1,
+      "i15_10": 125.3
+    },
+    {
+      "nome": "Doutor Pedrinho",
+      "p1dia10": 115.4,
+      "i15_10": 102.5
+    },
+    {
+      "nome": "Entre Rios",
+      "p1dia10": 134.2,
+      "i15_10": 119.1
+    },
+    {
+      "nome": "Ermo",
+      "p1dia10": 124.7,
+      "i15_10": 110.7
+    },
+    {
+      "nome": "Erval Velho",
+      "p1dia10": 123.5,
+      "i15_10": 109.7
+    },
+    {
+      "nome": "Faxinal dos Guedes",
+      "p1dia10": 131.1,
+      "i15_10": 116.4
+    },
+    {
+      "nome": "Flor do Sertão",
+      "p1dia10": 138.9,
+      "i15_10": 123.3
+    },
+    {
+      "nome": "Florianópolis",
+      "p1dia10": 157.2,
+      "i15_10": 139.6
+    },
+    {
+      "nome": "Formosa do Sul",
+      "p1dia10": 135.8,
+      "i15_10": 120.6
+    },
+    {
+      "nome": "Forquilhinha",
+      "p1dia10": 123.2,
+      "i15_10": 109.4
+    },
+    {
+      "nome": "Fraiburgo",
+      "p1dia10": 115.5,
+      "i15_10": 102.6
+    },
+    {
+      "nome": "Frei Rogério",
+      "p1dia10": 113.6,
+      "i15_10": 100.8
+    },
+    {
+      "nome": "Galvão",
+      "p1dia10": 136,
+      "i15_10": 120.8
+    },
+    {
+      "nome": "Garopaba",
+      "p1dia10": 141.6,
+      "i15_10": 125.8
+    },
+    {
+      "nome": "Garuva",
+      "p1dia10": 144.4,
+      "i15_10": 128.2
+    },
+    {
+      "nome": "Gaspar",
+      "p1dia10": 124,
+      "i15_10": 110.1
+    },
+    {
+      "nome": "Gov. Celso Ramos",
+      "p1dia10": 151.2,
+      "i15_10": 134.3
+    },
+    {
+      "nome": "Grão Pará",
+      "p1dia10": 120.5,
+      "i15_10": 107
+    },
+    {
+      "nome": "Gravatal",
+      "p1dia10": 127.3,
+      "i15_10": 113.1
+    },
+    {
+      "nome": "Guabiruba",
+      "p1dia10": 120.4,
+      "i15_10": 106.9
+    },
+    {
+      "nome": "Guaraciaba",
+      "p1dia10": 141,
+      "i15_10": 125.2
+    },
+    {
+      "nome": "Guaramirim",
+      "p1dia10": 144.6,
+      "i15_10": 128.4
+    },
+    {
+      "nome": "Guarujá do Sul",
+      "p1dia10": 141.1,
+      "i15_10": 125.3
+    },
+    {
+      "nome": "Guatambu",
+      "p1dia10": 134.3,
+      "i15_10": 119.2
+    },
+    {
+      "nome": "Herval D'Oeste",
+      "p1dia10": 123,
+      "i15_10": 109.2
+    },
+    {
+      "nome": "Ibiam",
+      "p1dia10": 120.2,
+      "i15_10": 106.7
+    },
+    {
+      "nome": "Ibicaré",
+      "p1dia10": 122.4,
+      "i15_10": 108.7
+    },
+    {
+      "nome": "Ibirama",
+      "p1dia10": 106.9,
+      "i15_10": 94.9
+    },
+    {
+      "nome": "Içara",
+      "p1dia10": 124.8,
+      "i15_10": 110.8
+    },
+    {
+      "nome": "Ilhota",
+      "p1dia10": 129.1,
+      "i15_10": 114.6
+    },
+    {
+      "nome": "Imaruí",
+      "p1dia10": 131.3,
+      "i15_10": 116.6
+    },
+    {
+      "nome": "Imbituba",
+      "p1dia10": 134.4,
+      "i15_10": 119.4
+    },
+    {
+      "nome": "Imbuia",
+      "p1dia10": 109.7,
+      "i15_10": 97.5
+    },
+    {
+      "nome": "Indaial",
+      "p1dia10": 114.8,
+      "i15_10": 101.9
+    },
+    {
+      "nome": "Iomerê",
+      "p1dia10": 121,
+      "i15_10": 107.5
+    },
+    {
+      "nome": "Ipira",
+      "p1dia10": 126.9,
+      "i15_10": 112.7
+    },
+    {
+      "nome": "Iporã do Oeste",
+      "p1dia10": 139.4,
+      "i15_10": 123.8
+    },
+    {
+      "nome": "Ipuaçu",
+      "p1dia10": 133.5,
+      "i15_10": 118.6
+    },
+    {
+      "nome": "Ipumirim",
+      "p1dia10": 130.2,
+      "i15_10": 115.6
+    },
+    {
+      "nome": "Iraceminha",
+      "p1dia10": 138.5,
+      "i15_10": 123
+    },
+    {
+      "nome": "Irani",
+      "p1dia10": 127.7,
+      "i15_10": 113.4
+    },
+    {
+      "nome": "Irati",
+      "p1dia10": 136.2,
+      "i15_10": 120.9
+    },
+    {
+      "nome": "Irineópolis",
+      "p1dia10": 119.4,
+      "i15_10": 106.1
+    },
+    {
+      "nome": "Itá",
+      "p1dia10": 129.3,
+      "i15_10": 114.8
+    },
+    {
+      "nome": "Itaiópolis",
+      "p1dia10": 120.7,
+      "i15_10": 107.2
+    },
+    {
+      "nome": "Itajaí",
+      "p1dia10": 130.9,
+      "i15_10": 116.2
+    },
+    {
+      "nome": "Itapema",
+      "p1dia10": 132.5,
+      "i15_10": 117.6
+    },
+    {
+      "nome": "Itapiranga",
+      "p1dia10": 139.6,
+      "i15_10": 124
+    },
+    {
+      "nome": "Itapoá",
+      "p1dia10": 145.9,
+      "i15_10": 129.6
+    },
+    {
+      "nome": "Ituporanga",
+      "p1dia10": 106.8,
+      "i15_10": 94.9
+    },
+    {
+      "nome": "Jaborá",
+      "p1dia10": 127.2,
+      "i15_10": 112.9
+    },
+    {
+      "nome": "Jacinto Machado",
+      "p1dia10": 124.9,
+      "i15_10": 110.9
+    },
+    {
+      "nome": "Jaguaruna",
+      "p1dia10": 125.4,
+      "i15_10": 111.4
+    },
+    {
+      "nome": "Jaraguá do Sul",
+      "p1dia10": 136.1,
+      "i15_10": 120.8
+    },
+    {
+      "nome": "Jardinópolis",
+      "p1dia10": 135.6,
+      "i15_10": 120.4
+    },
+    {
+      "nome": "Joaçaba",
+      "p1dia10": 125.2,
+      "i15_10": 111.1
+    },
+    {
+      "nome": "Joinville",
+      "p1dia10": 144.4,
+      "i15_10": 128.2
+    },
+    {
+      "nome": "José Boiteux",
+      "p1dia10": 109,
+      "i15_10": 96.8
+    },
+    {
+      "nome": "Jupiá",
+      "p1dia10": 137,
+      "i15_10": 121.6
+    },
+    {
+      "nome": "Lacerdópolis",
+      "p1dia10": 125.4,
+      "i15_10": 111.3
+    },
+    {
+      "nome": "Lages",
+      "p1dia10": 116.6,
+      "i15_10": 103.6
+    },
+    {
+      "nome": "Laguna",
+      "p1dia10": 129.6,
+      "i15_10": 115.1
+    },
+    {
+      "nome": "Lajeado Grande",
+      "p1dia10": 132.9,
+      "i15_10": 118
+    },
+    {
+      "nome": "Laurentino",
+      "p1dia10": 106.4,
+      "i15_10": 94.5
+    },
+    {
+      "nome": "Lauro Muller",
+      "p1dia10": 119.6,
+      "i15_10": 106.2
+    },
+    {
+      "nome": "Lebon Régis",
+      "p1dia10": 115.5,
+      "i15_10": 102.6
+    },
+    {
+      "nome": "Leoberto Leal",
+      "p1dia10": 116.7,
+      "i15_10": 103.6
+    },
+    {
+      "nome": "Lindóia Do Sul",
+      "p1dia10": 129.4,
+      "i15_10": 114.9
+    },
+    {
+      "nome": "Lontras",
+      "p1dia10": 105.2,
+      "i15_10": 93.4
+    },
+    {
+      "nome": "Luiz Alves",
+      "p1dia10": 134.5,
+      "i15_10": 119.5
+    },
+    {
+      "nome": "Luzerna",
+      "p1dia10": 124.6,
+      "i15_10": 110.6
+    },
+    {
+      "nome": "Macieira",
+      "p1dia10": 122.9,
+      "i15_10": 109.1
+    },
+    {
+      "nome": "Mafra",
+      "p1dia10": 122.5,
+      "i15_10": 108.8
+    },
+    {
+      "nome": "Major Gercino",
+      "p1dia10": 126.7,
+      "i15_10": 112.6
+    },
+    {
+      "nome": "Major Vieira",
+      "p1dia10": 123.1,
+      "i15_10": 109.3
+    },
+    {
+      "nome": "Maracajá",
+      "p1dia10": 125.2,
+      "i15_10": 111.2
+    },
+    {
+      "nome": "Maravilha",
+      "p1dia10": 138,
+      "i15_10": 122.5
+    },
+    {
+      "nome": "Marema",
+      "p1dia10": 134,
+      "i15_10": 119
+    },
+    {
+      "nome": "Massaranduba",
+      "p1dia10": 135.6,
+      "i15_10": 120.4
+    },
+    {
+      "nome": "Matos Costa",
+      "p1dia10": 120.4,
+      "i15_10": 106.9
+    },
+    {
+      "nome": "Meleiro",
+      "p1dia10": 123.5,
+      "i15_10": 109.7
+    },
+    {
+      "nome": "Mirim Doce",
+      "p1dia10": 111.9,
+      "i15_10": 99.3
+    },
+    {
+      "nome": "Modelo",
+      "p1dia10": 136.8,
+      "i15_10": 121.5
+    },
+    {
+      "nome": "Mondai",
+      "p1dia10": 137.9,
+      "i15_10": 122.4
+    },
+    {
+      "nome": "Monte Carlo",
+      "p1dia10": 114.9,
+      "i15_10": 102.1
+    },
+    {
+      "nome": "Monte Castelo",
+      "p1dia10": 121.1,
+      "i15_10": 107.6
+    },
+    {
+      "nome": "Morro da Fumaça",
+      "p1dia10": 124.2,
+      "i15_10": 110.3
+    },
+    {
+      "nome": "Morro Grande",
+      "p1dia10": 121.9,
+      "i15_10": 108.3
+    },
+    {
+      "nome": "Navegantes",
+      "p1dia10": 133.7,
+      "i15_10": 118.8
+    },
+    {
+      "nome": "Nova Erechim",
+      "p1dia10": 135.7,
+      "i15_10": 120.5
+    },
+    {
+      "nome": "Nova Itaberaba",
+      "p1dia10": 135.1,
+      "i15_10": 120
+    },
+    {
+      "nome": "Nova Trento",
+      "p1dia10": 124.3,
+      "i15_10": 110.4
+    },
+    {
+      "nome": "Nova Veneza",
+      "p1dia10": 121.3,
+      "i15_10": 107.7
+    },
+    {
+      "nome": "Novo Horizonte",
+      "p1dia10": 136.9,
+      "i15_10": 121.6
+    },
+    {
+      "nome": "Orleans",
+      "p1dia10": 120.5,
+      "i15_10": 107
+    },
+    {
+      "nome": "Otacílio Costa",
+      "p1dia10": 109.3,
+      "i15_10": 97.1
+    },
+    {
+      "nome": "Ouro",
+      "p1dia10": 126.6,
+      "i15_10": 112.4
+    },
+    {
+      "nome": "Ouro Verde",
+      "p1dia10": 131.3,
+      "i15_10": 116.6
+    },
+    {
+      "nome": "Paial",
+      "p1dia10": 130.6,
+      "i15_10": 116
+    },
+    {
+      "nome": "Painel",
+      "p1dia10": 113.9,
+      "i15_10": 101.1
+    },
+    {
+      "nome": "Palhoça",
+      "p1dia10": 155,
+      "i15_10": 137.6
+    },
+    {
+      "nome": "Palma Sola",
+      "p1dia10": 141.2,
+      "i15_10": 125.4
+    },
+    {
+      "nome": "Palmeira",
+      "p1dia10": 111.2,
+      "i15_10": 98.7
+    },
+    {
+      "nome": "Palmitos",
+      "p1dia10": 135.8,
+      "i15_10": 120.6
+    },
+    {
+      "nome": "Papanduva",
+      "p1dia10": 122,
+      "i15_10": 108.3
+    },
+    {
+      "nome": "Paraíso",
+      "p1dia10": 141.4,
+      "i15_10": 125.5
+    },
+    {
+      "nome": "Passo de Torres",
+      "p1dia10": 125.8,
+      "i15_10": 111.7
+    },
+    {
+      "nome": "Passos Maia",
+      "p1dia10": 128.8,
+      "i15_10": 114.4
+    },
+    {
+      "nome": "Paulo Lopes",
+      "p1dia10": 142.8,
+      "i15_10": 126.8
+    },
+    {
+      "nome": "Pedras Grandes",
+      "p1dia10": 125.1,
+      "i15_10": 111.1
+    },
+    {
+      "nome": "Penha",
+      "p1dia10": 133.8,
+      "i15_10": 118.8
+    },
+    {
+      "nome": "Peritiba",
+      "p1dia10": 127.1,
+      "i15_10": 112.8
+    },
+    {
+      "nome": "Pescaria Brava",
+      "p1dia10": 129.4,
+      "i15_10": 115
+    },
+    {
+      "nome": "Petrolândia",
+      "p1dia10": 108.5,
+      "i15_10": 96.3
+    },
+    {
+      "nome": "Pinhalzinho",
+      "p1dia10": 135.7,
+      "i15_10": 120.5
+    },
+    {
+      "nome": "Pinheiro Preto",
+      "p1dia10": 119.2,
+      "i15_10": 105.9
+    },
+    {
+      "nome": "Piratuba",
+      "p1dia10": 127.2,
+      "i15_10": 112.9
+    },
+    {
+      "nome": "Planalto Alegre",
+      "p1dia10": 135.3,
+      "i15_10": 120.1
+    },
+    {
+      "nome": "Pomerode",
+      "p1dia10": 123,
+      "i15_10": 109.3
+    },
+    {
+      "nome": "Ponte Alta",
+      "p1dia10": 111.7,
+      "i15_10": 99.2
+    },
+    {
+      "nome": "Ponte Alta do Norte",
+      "p1dia10": 114.2,
+      "i15_10": 101.4
+    },
+    {
+      "nome": "Ponte Serrada",
+      "p1dia10": 128.1,
+      "i15_10": 113.7
+    },
+    {
+      "nome": "Porto Belo",
+      "p1dia10": 141.1,
+      "i15_10": 125.3
+    },
+    {
+      "nome": "Porto União",
+      "p1dia10": 120,
+      "i15_10": 106.6
+    },
+    {
+      "nome": "Pouso Redondo",
+      "p1dia10": 109.7,
+      "i15_10": 97.4
+    },
+    {
+      "nome": "Praia Grande",
+      "p1dia10": 125.7,
+      "i15_10": 111.7
+    },
+    {
+      "nome": "Pres. Castello Branco",
+      "p1dia10": 126.9,
+      "i15_10": 112.7
+    },
+    {
+      "nome": "Presidente Getúlio",
+      "p1dia10": 106.6,
+      "i15_10": 94.7
+    },
+    {
+      "nome": "Presidente Nereu",
+      "p1dia10": 107.5,
+      "i15_10": 95.5
+    },
+    {
+      "nome": "Princesa",
+      "p1dia10": 141.2,
+      "i15_10": 125.4
+    },
+    {
+      "nome": "Quilombo",
+      "p1dia10": 134.9,
+      "i15_10": 119.8
+    },
+    {
+      "nome": "Rancho Queimado",
+      "p1dia10": 128.2,
+      "i15_10": 113.8
+    },
+    {
+      "nome": "Rio das Antas",
+      "p1dia10": 119.4,
+      "i15_10": 106
+    },
+    {
+      "nome": "Rio do Campo",
+      "p1dia10": 113.7,
+      "i15_10": 100.9
+    },
+    {
+      "nome": "Rio do Oeste",
+      "p1dia10": 107.9,
+      "i15_10": 95.8
+    },
+    {
+      "nome": "Rio do Sul",
+      "p1dia10": 105,
+      "i15_10": 93.2
+    },
+    {
+      "nome": "Rio dos Cedros",
+      "p1dia10": 123.1,
+      "i15_10": 109.3
+    },
+    {
+      "nome": "Rio Fortuna",
+      "p1dia10": 122.6,
+      "i15_10": 108.8
+    },
+    {
+      "nome": "Rio Negrinho",
+      "p1dia10": 122.7,
+      "i15_10": 109
+    },
+    {
+      "nome": "Rio Rufino",
+      "p1dia10": 111.2,
+      "i15_10": 98.7
+    },
+    {
+      "nome": "Riqueza",
+      "p1dia10": 138.1,
+      "i15_10": 122.6
+    },
+    {
+      "nome": "Rodeio",
+      "p1dia10": 113.2,
+      "i15_10": 100.5
+    },
+    {
+      "nome": "Romelândia",
+      "p1dia10": 139.4,
+      "i15_10": 123.8
+    },
+    {
+      "nome": "S. Amaro da Imperatriz",
+      "p1dia10": 151.6,
+      "i15_10": 134.6
+    },
+    {
+      "nome": "S. Lourenço do Oeste",
+      "p1dia10": 137.7,
+      "i15_10": 122.3
+    },
+    {
+      "nome": "S. Miguel da Boa Vista",
+      "p1dia10": 137.8,
+      "i15_10": 122.4
+    },
+    {
+      "nome": "Salete",
+      "p1dia10": 112.3,
+      "i15_10": 99.8
+    },
+    {
+      "nome": "Saltinho",
+      "p1dia10": 138.1,
+      "i15_10": 122.7
+    },
+    {
+      "nome": "Salto Veloso",
+      "p1dia10": 122.9,
+      "i15_10": 109.1
+    },
+    {
+      "nome": "Sangão",
+      "p1dia10": 124.8,
+      "i15_10": 110.8
+    },
+    {
+      "nome": "Santa Cecília",
+      "p1dia10": 115.9,
+      "i15_10": 103
+    },
+    {
+      "nome": "Santa Helena",
+      "p1dia10": 140.5,
+      "i15_10": 124.7
+    },
+    {
+      "nome": "Santa Rosa de Lima",
+      "p1dia10": 123.1,
+      "i15_10": 109.3
+    },
+    {
+      "nome": "Santa Rosa do Sul",
+      "p1dia10": 125.8,
+      "i15_10": 111.7
+    },
+    {
+      "nome": "Santa Ter. do Progresso",
+      "p1dia10": 138.4,
+      "i15_10": 122.9
+    },
+    {
+      "nome": "Santa Terezinha",
+      "p1dia10": 119.8,
+      "i15_10": 106.4
+    },
+    {
+      "nome": "Santiago do Sul",
+      "p1dia10": 135.6,
+      "i15_10": 120.4
+    },
+    {
+      "nome": "São Bento do Sul",
+      "p1dia10": 135.6,
+      "i15_10": 120.5
+    },
+    {
+      "nome": "São Bernardino",
+      "p1dia10": 138.7,
+      "i15_10": 123.2
+    },
+    {
+      "nome": "São Bonifácio",
+      "p1dia10": 136,
+      "i15_10": 120.8
+    },
+    {
+      "nome": "São Carlos",
+      "p1dia10": 135.8,
+      "i15_10": 120.6
+    },
+    {
+      "nome": "São Cristóvão do Sul",
+      "p1dia10": 113.5,
+      "i15_10": 100.8
+    },
+    {
+      "nome": "São Domingos",
+      "p1dia10": 134.9,
+      "i15_10": 119.8
+    },
+    {
+      "nome": "São Francisco do Sul",
+      "p1dia10": 147.4,
+      "i15_10": 130.9
+    },
+    {
+      "nome": "São João Batista",
+      "p1dia10": 138.4,
+      "i15_10": 122.9
+    },
+    {
+      "nome": "São João do Itaperiú",
+      "p1dia10": 141.1,
+      "i15_10": 125.3
+    },
+    {
+      "nome": "São João do Oeste",
+      "p1dia10": 139.1,
+      "i15_10": 123.5
+    },
+    {
+      "nome": "São João do Sul",
+      "p1dia10": 125.8,
+      "i15_10": 111.7
+    },
+    {
+      "nome": "São Joaquim",
+      "p1dia10": 116.9,
+      "i15_10": 103.8
+    },
+    {
+      "nome": "São José",
+      "p1dia10": 152.9,
+      "i15_10": 135.7
+    },
+    {
+      "nome": "São José do Cedro",
+      "p1dia10": 141.3,
+      "i15_10": 125.4
+    },
+    {
+      "nome": "São José do Cerrito",
+      "p1dia10": 116.9,
+      "i15_10": 103.8
+    },
+    {
+      "nome": "São Ludgero",
+      "p1dia10": 125.4,
+      "i15_10": 111.3
+    },
+    {
+      "nome": "São Martinho",
+      "p1dia10": 128,
+      "i15_10": 113.7
+    },
+    {
+      "nome": "São Miguel do Oeste",
+      "p1dia10": 140.7,
+      "i15_10": 125
+    },
+    {
+      "nome": "São Pedro de Alcântara",
+      "p1dia10": 148.5,
+      "i15_10": 131.8
+    },
+    {
+      "nome": "Saudades",
+      "p1dia10": 135.8,
+      "i15_10": 120.6
+    },
+    {
+      "nome": "Schroeder",
+      "p1dia10": 143.7,
+      "i15_10": 127.6
+    },
+    {
+      "nome": "Seara",
+      "p1dia10": 130.4,
+      "i15_10": 115.8
+    },
+    {
+      "nome": "Serra Alta",
+      "p1dia10": 137.7,
+      "i15_10": 122.2
+    },
+    {
+      "nome": "Siderópolis",
+      "p1dia10": 120.8,
+      "i15_10": 107.2
+    },
+    {
+      "nome": "Sombrio",
+      "p1dia10": 125.9,
+      "i15_10": 111.8
+    },
+    {
+      "nome": "Sul Brasil",
+      "p1dia10": 136.5,
+      "i15_10": 121.2
+    },
+    {
+      "nome": "Taió",
+      "p1dia10": 111.3,
+      "i15_10": 98.8
+    },
+    {
+      "nome": "Tangará",
+      "p1dia10": 119,
+      "i15_10": 105.7
+    },
+    {
+      "nome": "Tigrinhos",
+      "p1dia10": 137.8,
+      "i15_10": 122.4
+    },
+    {
+      "nome": "Tijucas",
+      "p1dia10": 140,
+      "i15_10": 124.4
+    },
+    {
+      "nome": "Timbé do Sul",
+      "p1dia10": 122.3,
+      "i15_10": 108.6
+    },
+    {
+      "nome": "Timbó",
+      "p1dia10": 117.2,
+      "i15_10": 104
+    },
+    {
+      "nome": "Timbó Grande",
+      "p1dia10": 119.1,
+      "i15_10": 105.8
+    },
+    {
+      "nome": "Três Barras",
+      "p1dia10": 122.9,
+      "i15_10": 109.2
+    },
+    {
+      "nome": "Treviso",
+      "p1dia10": 119.9,
+      "i15_10": 106.5
+    },
+    {
+      "nome": "Treze de Maio",
+      "p1dia10": 124.7,
+      "i15_10": 110.8
+    },
+    {
+      "nome": "Treze Tílias",
+      "p1dia10": 123.2,
+      "i15_10": 109.4
+    },
+    {
+      "nome": "Trombudo Central",
+      "p1dia10": 106.5,
+      "i15_10": 94.5
+    },
+    {
+      "nome": "Tubarão",
+      "p1dia10": 126.2,
+      "i15_10": 112.1
+    },
+    {
+      "nome": "Tunápolis",
+      "p1dia10": 140,
+      "i15_10": 124.3
+    },
+    {
+      "nome": "Turvo",
+      "p1dia10": 123.8,
+      "i15_10": 109.9
+    },
+    {
+      "nome": "União do Oeste",
+      "p1dia10": 135.2,
+      "i15_10": 120
+    },
+    {
+      "nome": "Urubici",
+      "p1dia10": 114.9,
+      "i15_10": 102
+    },
+    {
+      "nome": "Urupema",
+      "p1dia10": 112.5,
+      "i15_10": 99.9
+    },
+    {
+      "nome": "Urussanga",
+      "p1dia10": 123.4,
+      "i15_10": 109.6
+    },
+    {
+      "nome": "Vargeão",
+      "p1dia10": 130.9,
+      "i15_10": 116.2
+    },
+    {
+      "nome": "Vargem",
+      "p1dia10": 119.8,
+      "i15_10": 106.4
+    },
+    {
+      "nome": "Vargem Bonita",
+      "p1dia10": 126.7,
+      "i15_10": 112.5
+    },
+    {
+      "nome": "Vidal Ramos",
+      "p1dia10": 110.4,
+      "i15_10": 98.1
+    },
+    {
+      "nome": "Videira",
+      "p1dia10": 119.6,
+      "i15_10": 106.2
+    },
+    {
+      "nome": "Vitor Meireles",
+      "p1dia10": 115.2,
+      "i15_10": 102.3
+    },
+    {
+      "nome": "Witmarsum",
+      "p1dia10": 110.1,
+      "i15_10": 97.8
+    },
+    {
+      "nome": "Xanxerê",
+      "p1dia10": 131.6,
+      "i15_10": 116.9
+    },
+    {
+      "nome": "Xavantina",
+      "p1dia10": 130.7,
+      "i15_10": 116
+    },
+    {
+      "nome": "Xaxim",
+      "p1dia10": 132.2,
+      "i15_10": 117.4
+    },
+    {
+      "nome": "Zortéa",
+      "p1dia10": 125.2,
+      "i15_10": 111.2
+    }
+  ]
+}

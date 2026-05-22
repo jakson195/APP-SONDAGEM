@@ -15,12 +15,16 @@ import {
   MapContainer,
   Marker,
   Popup,
+  Polygon,
   Polyline,
   TileLayer,
   useMap,
   useMapEvents,
 } from "react-leaflet";
-import { geotiffToPngDataUrlAndBounds } from "@/lib/geotiff-for-leaflet";
+import {
+  geotiffImportSuccessMessage,
+  geotiffToPngDataUrlAndBounds,
+} from "@/lib/geotiff-for-leaflet";
 import { renderPdfFirstPageToPngWithGeo } from "@/lib/render-pdf-first-page-png";
 import type { FuroMapa } from "../types";
 import Toolbar from "./Toolbar";
@@ -37,6 +41,7 @@ type BasemapId = "hybrid" | "satellite" | "terrain" | "osm";
 
 type RasterOverlay = {
   id: string;
+  name: string;
   url: string;
   south: number;
   west: number;
@@ -141,6 +146,32 @@ function haversineM(a: { lat: number; lng: number }, b: { lat: number; lng: numb
   return s;
 }
 
+/** Área geodésica aproximada (esfera WGS84) de um polígono fechado em graus. */
+function sphericalPolygonAreaM2(vertices: Array<{ lat: number; lng: number }>): number {
+  if (vertices.length < 3) return 0;
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  let sum = 0;
+  for (let i = 0; i < vertices.length; i++) {
+    const p1 = vertices[i]!;
+    const p2 = vertices[(i + 1) % vertices.length]!;
+    const λ1 = toRad(p1.lng);
+    const λ2 = toRad(p2.lng);
+    const φ1 = toRad(p1.lat);
+    const φ2 = toRad(p2.lat);
+    sum += (λ2 - λ1) * (2 + Math.sin(φ1) + Math.sin(φ2));
+  }
+  return Math.abs((sum * R * R) / 2);
+}
+
+function formatAreaM2(m2: number): string {
+  if (m2 < 10_000) return `${m2.toFixed(0)} m²`;
+  if (m2 < 1_000_000) {
+    return `${(m2 / 10_000).toFixed(2)} ha (${m2.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²)`;
+  }
+  return `${(m2 / 1_000_000).toFixed(3)} km² (${(m2 / 10_000).toFixed(1)} ha)`;
+}
+
 function parseKmlPoints(kmlText: string): Array<{ lat: number; lng: number }> {
   const xml = new DOMParser().parseFromString(kmlText, "application/xml");
   if (xml.getElementsByTagName("parsererror").length > 0) return [];
@@ -234,16 +265,20 @@ function FlyToPoint({
 function ClickHandler({
   placementMode,
   measureMode,
+  areaMode,
   measureA,
   onMeasureA,
   onMeasureB,
+  onAreaVertex,
   onPlaceFuro,
 }: {
   placementMode: boolean;
   measureMode: boolean;
+  areaMode: boolean;
   measureA: { lat: number; lng: number } | null;
   onMeasureA: (p: { lat: number; lng: number }) => void;
   onMeasureB: (p: { lat: number; lng: number }) => void;
+  onAreaVertex: (p: { lat: number; lng: number }) => void;
   onPlaceFuro: (lat: number, lng: number) => void;
 }) {
   useMapEvents({
@@ -254,11 +289,24 @@ function ClickHandler({
         else onMeasureB({ lat, lng });
         return;
       }
+      if (areaMode) {
+        onAreaVertex({ lat, lng });
+        return;
+      }
       if (placementMode) {
         onPlaceFuro(lat, lng);
       }
     },
   });
+  return null;
+}
+
+function AreaModeMapOptions({ areaMode }: { areaMode: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    if (areaMode) map.doubleClickZoom.disable();
+    else map.doubleClickZoom.enable();
+  }, [areaMode, map]);
   return null;
 }
 
@@ -279,6 +327,11 @@ export default function Mapa({
     [[number, number], [number, number]] | null
   >(null);
   const [measureLabelM, setMeasureLabelM] = useState<number | null>(null);
+  const [areaMode, setAreaMode] = useState(false);
+  const [areaVertices, setAreaVertices] = useState<
+    Array<{ lat: number; lng: number }>
+  >([]);
+  const [areaResultM2, setAreaResultM2] = useState<number | null>(null);
   const [rasters, setRasters] = useState<RasterOverlay[]>([]);
   const [importBusy, setImportBusy] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
@@ -296,9 +349,25 @@ export default function Mapa({
     zoom?: number;
   } | null>(null);
 
+  const removeImportedRaster = useCallback((id: string) => {
+    setRasters((prev) => {
+      const next = prev.filter((r) => r.id !== id);
+      if (next.length !== prev.length) {
+        setImportMsg("Mapa importado removido.");
+      }
+      return next;
+    });
+  }, []);
+
+  const clearImportedRasters = useCallback(() => {
+    setRasters([]);
+    setImportMsg("Todos os mapas importados foram removidos.");
+  }, []);
+
   const addRasterFromBounds = useCallback(
     (
       id: string,
+      name: string,
       dataUrl: string,
       bounds: { south: number; west: number; north: number; east: number },
       successMsg: string,
@@ -307,6 +376,7 @@ export default function Mapa({
         ...prev,
         {
           id,
+          name,
           url: dataUrl,
           south: bounds.south,
           west: bounds.west,
@@ -326,12 +396,23 @@ export default function Mapa({
     [],
   );
 
+  const resetArea = useCallback(() => {
+    setAreaMode(false);
+    setAreaVertices([]);
+    setAreaResultM2(null);
+  }, []);
+
   const resetMeasure = useCallback(() => {
     setMeasureMode(false);
     setMeasureA(null);
     setMeasureLine(null);
     setMeasureLabelM(null);
   }, []);
+
+  const resetMapTools = useCallback(() => {
+    resetMeasure();
+    resetArea();
+  }, [resetMeasure, resetArea]);
 
   const onPlaceFuro = useCallback(
     (lat: number, lng: number) => {
@@ -380,8 +461,35 @@ export default function Mapa({
     [measureA],
   );
 
-  const onNovoFuro = useCallback(() => {
+  const onAreaVertex = useCallback((p: { lat: number; lng: number }) => {
+    setAreaVertices((prev) => [...prev, p]);
+    setAreaResultM2(null);
+  }, []);
+
+  const onConcluirArea = useCallback(() => {
+    if (areaVertices.length < 3) {
+      setImportMsg("Defina pelo menos 3 vértices para calcular a área.");
+      return;
+    }
+    const m2 = sphericalPolygonAreaM2(areaVertices);
+    setAreaResultM2(m2);
+    setAreaMode(false);
+    setImportMsg(`Área: ${formatAreaM2(m2)}`);
+  }, [areaVertices]);
+
+  const onCalcularArea = useCallback(() => {
+    setPlacementMode(false);
     resetMeasure();
+    setAreaMode(true);
+    setAreaVertices([]);
+    setAreaResultM2(null);
+    setImportMsg(
+      "Clique no mapa para marcar os vértices do polígono (mín. 3). Use «Concluir área» quando terminar.",
+    );
+  }, [resetMeasure]);
+
+  const onNovoFuro = useCallback(() => {
+    resetMapTools();
     if (userLocation) {
       onPlaceFuro(userLocation.lat, userLocation.lng);
       setImportMsg(
@@ -391,26 +499,27 @@ export default function Mapa({
     }
     setPlacementMode((v) => !v);
     setImportMsg("Sem localização ativa: clique no mapa para posicionar o furo.");
-  }, [onPlaceFuro, resetMeasure, userLocation]);
+  }, [onPlaceFuro, resetMapTools, userLocation]);
 
   const onMedir = useCallback(() => {
     setPlacementMode(false);
+    resetArea();
     setMeasureMode(true);
     setMeasureA(null);
     setMeasureLine(null);
     setMeasureLabelM(null);
     setImportMsg("Clique dois pontos no mapa para medir a distância.");
-  }, []);
+  }, [resetArea]);
 
   const onImportarMapa = useCallback(() => {
     setPlacementMode(false);
-    resetMeasure();
+    resetMapTools();
     mapImportInputRef.current?.click();
-  }, [resetMeasure]);
+  }, [resetMapTools]);
 
   const onLocalizacao = useCallback(() => {
     setPlacementMode(false);
-    resetMeasure();
+    resetMapTools();
     setImportMsg("A obter localização atual…");
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setImportMsg("Geolocalização não suportada neste navegador.");
@@ -430,7 +539,7 @@ export default function Mapa({
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
-  }, [resetMeasure]);
+  }, [resetMapTools]);
 
   const onExportarPontos = useCallback(async () => {
     if (furos.length === 0) {
@@ -519,13 +628,14 @@ export default function Mapa({
           if (pdfGeoBounds) {
             addRasterFromBounds(
               `${Date.now()}-${file.name}`,
+              file.name,
               dataUrl,
               pdfGeoBounds,
               `PDF «${file.name}» georreferenciado (1.ª página), como no Avenza.`,
             );
           } else {
             setImportMsg(
-              "Este PDF não tem limites WGS84 detetáveis (GeoPDF). No QGIS exporte com georreferência embutida ou use um GeoTIFF em EPSG:4326.",
+              "Este PDF não tem limites WGS84 detetáveis (GeoPDF). No QGIS exporte com georreferência embutida ou use um GeoTIFF com CRS (UTM/SIRGAS/WGS84).",
             );
           }
         } else if (isKml || isKmz) {
@@ -556,12 +666,13 @@ export default function Mapa({
           setFlyTarget({ key: Date.now(), lat: first.lat, lng: first.lng, zoom: 15 });
           setImportMsg(`${points.length} ponto(s) importado(s) de «${file.name}».`);
         } else {
-          const { dataUrl, bounds } = await geotiffToPngDataUrlAndBounds(file);
+          const { dataUrl, bounds, crs } = await geotiffToPngDataUrlAndBounds(file);
           addRasterFromBounds(
             `${Date.now()}-${file.name}`,
+            file.name,
             dataUrl,
             bounds,
-            `GeoTIFF «${file.name}» carregado (EPSG:4326, como no Avenza).`,
+            geotiffImportSuccessMessage(file.name, crs),
           );
         }
       } catch (err) {
@@ -588,10 +699,57 @@ export default function Mapa({
       <Toolbar
         onNovoFuro={onNovoFuro}
         onMedir={onMedir}
+        onCalcularArea={onCalcularArea}
         onLocalizacao={onLocalizacao}
         onImportarMapa={onImportarMapa}
         onExportarPontos={() => void onExportarPontos()}
       />
+
+      {rasters.length > 0 && (
+        <div
+          className="absolute left-2.5 top-[17.5rem] z-[1000] flex max-h-[min(40vh,16rem)] w-[min(100%,17rem)] flex-col gap-1.5 overflow-hidden rounded-lg border border-[var(--border)] bg-white/95 p-2 text-xs shadow-md backdrop-blur-sm dark:bg-gray-900/90"
+          role="region"
+          aria-label="Mapas importados"
+        >
+          <div className="flex items-center justify-between gap-2 px-0.5">
+            <span className="font-semibold text-[var(--text)]">
+              Mapas importados ({rasters.length})
+            </span>
+            <button
+              type="button"
+              onClick={clearImportedRasters}
+              className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40"
+              title="Remover todos os mapas importados"
+            >
+              Remover todos
+            </button>
+          </div>
+          <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+            {rasters.map((r) => (
+              <li
+                key={r.id}
+                className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1"
+              >
+                <span
+                  className="min-w-0 flex-1 truncate text-[var(--text)]"
+                  title={r.name}
+                >
+                  {r.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeImportedRaster(r.id)}
+                  className="shrink-0 rounded p-1 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50"
+                  title={`Remover ${r.name}`}
+                  aria-label={`Remover ${r.name}`}
+                >
+                  🗑️
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div
         className="absolute right-2.5 top-2.5 z-[1000] flex flex-col gap-1 rounded-lg border border-[var(--border)] bg-white/95 p-2 text-xs shadow-md backdrop-blur-sm dark:bg-gray-900/90"
@@ -645,7 +803,12 @@ export default function Mapa({
         </button>
       </div>
 
-      {(placementMode || importBusy || importMsg || measureLabelM != null) && (
+      {(placementMode ||
+        importBusy ||
+        importMsg ||
+        measureLabelM != null ||
+        areaMode ||
+        areaResultM2 != null) && (
         <div className="absolute bottom-3 left-1/2 z-[1000] max-w-[min(90vw,28rem)] -translate-x-1/2 rounded-lg border border-[var(--border)] bg-white/95 px-3 py-2 text-center text-xs text-[var(--text)] shadow-md backdrop-blur-sm dark:bg-gray-900/90">
           {importBusy && <p>A processar ficheiro geográfico…</p>}
           {!importBusy && placementMode && (
@@ -659,11 +822,55 @@ export default function Mapa({
               {!measureA ? "primeiro ponto…" : "segundo ponto…"}
             </p>
           )}
+          {!importBusy && areaMode && (
+            <div className="space-y-2">
+              <p>
+                <strong>Área:</strong> {areaVertices.length} vértice(s) — clique para
+                adicionar (mín. 3).
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <button
+                  type="button"
+                  disabled={areaVertices.length < 3}
+                  onClick={onConcluirArea}
+                  className="rounded-md bg-violet-600 px-2.5 py-1 text-xs font-medium text-white disabled:opacity-40"
+                >
+                  Concluir área
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAreaVertices((prev) => prev.slice(0, -1));
+                    setAreaResultM2(null);
+                  }}
+                  disabled={areaVertices.length === 0}
+                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs disabled:opacity-40"
+                >
+                  Desfazer vértice
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetArea();
+                    setImportMsg(null);
+                  }}
+                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
           {measureLabelM != null && (
             <p className="mt-1 font-mono text-sm">
               Distância: {measureLabelM < 1000
                 ? `${measureLabelM.toFixed(1)} m`
                 : `${(measureLabelM / 1000).toFixed(3)} km`}
+            </p>
+          )}
+          {areaResultM2 != null && !areaMode && (
+            <p className="mt-1 font-mono text-sm text-violet-800 dark:text-violet-200">
+              Área: {formatAreaM2(areaResultM2)}
             </p>
           )}
           {importMsg && <p className="mt-1 text-[var(--muted)]">{importMsg}</p>}
@@ -678,6 +885,7 @@ export default function Mapa({
         className="z-0"
       >
         <FixLeafletIcons />
+        <AreaModeMapOptions areaMode={areaMode} />
         <MapResizeOnMount />
         <FitMapToImport fitTarget={fitTarget} />
         <FlyToPoint target={flyTarget} />
@@ -735,9 +943,11 @@ export default function Mapa({
         <ClickHandler
           placementMode={placementMode}
           measureMode={measureMode}
+          areaMode={areaMode}
           measureA={measureA}
           onMeasureA={onMeasureA}
           onMeasureB={onMeasureB}
+          onAreaVertex={onAreaVertex}
           onPlaceFuro={onPlaceFuro}
         />
 
@@ -745,6 +955,24 @@ export default function Mapa({
           <Polyline
             positions={measureLine}
             pathOptions={{ color: "#0d9488", weight: 3, dashArray: "6 4" }}
+          />
+        )}
+
+        {areaVertices.length >= 2 && areaVertices.length < 3 && (
+          <Polyline
+            positions={areaVertices.map((v) => [v.lat, v.lng] as [number, number])}
+            pathOptions={{ color: "#7c3aed", weight: 2, dashArray: "4 4" }}
+          />
+        )}
+        {areaVertices.length >= 3 && (
+          <Polygon
+            positions={areaVertices.map((v) => [v.lat, v.lng] as [number, number])}
+            pathOptions={{
+              color: "#7c3aed",
+              weight: 2,
+              fillColor: "#7c3aed",
+              fillOpacity: areaResultM2 != null ? 0.28 : 0.15,
+            }}
           />
         )}
 

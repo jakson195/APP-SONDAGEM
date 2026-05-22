@@ -11,7 +11,7 @@ import {
 import { apiUrl } from "@/lib/api-url";
 import type { ModuloProjetoChave } from "@/lib/modulos-projeto";
 
-const STORAGE_KEY = "soilsul:obraContextId";
+const STORAGE_KEY = "datageo-digital:obraContextId";
 
 type ObraModulosCtx = {
   selectedObraId: number | null;

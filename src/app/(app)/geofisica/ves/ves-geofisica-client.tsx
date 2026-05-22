@@ -41,12 +41,12 @@ import { forwardSchlumbergerPhysical } from "@/lib/geofisica/sev-forward-physica
 import { downloadTextFile } from "@/lib/field-export-kml-gpx";
 import { apiUrl } from "@/lib/api-url";
 
-const STORAGE_KEY = "soilsul-geofisica-ves-leituras-v1";
-const STORAGE_SCHLUM_ROWS = "soilsul-geofisica-ves-schlum-leituras-v1";
-const STORAGE_DIPOLO_ROWS = "soilsul-geofisica-ves-dipolo-rows-v1";
-const STORAGE_DIPOLO_A = "soilsul-geofisica-ves-dipolo-a-v1";
-const STORAGE_METODO = "soilsul-geofisica-ves-metodo-v1";
-const STORAGE_MODEL = "soilsul-geofisica-ves-modelo-v1";
+const STORAGE_KEY = "datageo-digital-geofisica-ves-leituras-v1";
+const STORAGE_SCHLUM_ROWS = "datageo-digital-geofisica-ves-schlum-leituras-v1";
+const STORAGE_DIPOLO_ROWS = "datageo-digital-geofisica-ves-dipolo-rows-v1";
+const STORAGE_DIPOLO_A = "datageo-digital-geofisica-ves-dipolo-a-v1";
+const STORAGE_METODO = "datageo-digital-geofisica-ves-metodo-v1";
+const STORAGE_MODEL = "datageo-digital-geofisica-ves-modelo-v1";
 
 type MetodoVES = "wenner" | "schlumberger" | "dipolo";
 type VesProjectDbItem = {

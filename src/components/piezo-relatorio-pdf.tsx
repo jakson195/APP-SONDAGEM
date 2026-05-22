@@ -763,7 +763,7 @@ export const PiezoRelatorioPdf = forwardRef<HTMLDivElement, Props>(
           meta.endereco?.trim() || "Rua Flávio Pires, 131, Araranguá - SC",
         contato:
           meta.rodapeContato?.trim() ||
-          "www.soilsul.com.br",
+          "www.datageodigital.com.br",
         equip: meta.equipamento?.trim() || "TRADO MECANIZADO",
         diamInst: meta.diametroInstalacao?.trim() || "—",
         nAgua: meta.nivelAgua?.trim() || "—",
@@ -836,11 +836,11 @@ export const PiezoRelatorioPdf = forwardRef<HTMLDivElement, Props>(
               marginBottom: "6px",
             }}
           >
-            <div style={{ flex: "0 0 auto", fontWeight: 800, fontSize: "13px" }}>
-              SOILS
-              <span style={{ fontWeight: 400 }}>UL</span>
+            <div style={{ flex: "0 0 auto", fontWeight: 800, fontSize: "12px" }}>
+              DataGeo
+              <span style={{ fontWeight: 400 }}> Digital</span>
               <div style={{ fontSize: "6px", fontWeight: 400, marginTop: "2px" }}>
-                SONDAGENS E GEOTECNIA
+                Sondagens e geotecnia
               </div>
             </div>
             <div style={{ flex: "1", textAlign: "center" }}>
@@ -1249,6 +1249,10 @@ export const PiezoRelatorioPdf = forwardRef<HTMLDivElement, Props>(
                 lat={meta.mapaLatitude}
                 lng={meta.mapaLongitude}
                 zoom={meta.mapaZoom ?? 16}
+                furoCodigo={meta.pocoCodigo}
+                furoDescricao={
+                  [meta.obra, meta.local].filter(Boolean).join(" · ") || undefined
+                }
               />
             </div>
           )}

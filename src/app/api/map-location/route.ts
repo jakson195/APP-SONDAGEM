@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
 
-import { buildMapPngFromTiles } from "@/lib/map-location-tiles";
+import type { MapLocationCaption } from "@/lib/map-location-caption";
+import {
+  appendMapCaptionPng,
+  buildMapPngFromTiles,
+} from "@/lib/map-location-tiles";
 
 export const dynamic = "force-dynamic";
 
-function buildPlaceholderSvg(lat: number, lng: number, zoom: number): string {
+function buildPlaceholderSvg(
+  lat: number,
+  lng: number,
+  zoom: number,
+  caption?: MapLocationCaption,
+): string {
   const esc = (s: string) =>
     s
       .replace(/&/g, "&amp;")
@@ -13,6 +22,10 @@ function buildPlaceholderSvg(lat: number, lng: number, zoom: number): string {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
   const coord = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  const titulo = esc(caption?.titulo ?? "Furo");
+  const desc = caption?.descricao?.trim()
+    ? `<text x="320" y="98" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#475569">${esc(caption.descricao.slice(0, 72))}</text>`
+    : "";
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
   <rect width="640" height="360" fill="#f1f5f9"/>
@@ -27,8 +40,10 @@ function buildPlaceholderSvg(lat: number, lng: number, zoom: number): string {
     }).join("")}
   </g>
   <text x="320" y="28" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="#0f172a">Mapa de localização (WGS84)</text>
-  <text x="320" y="50" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#475569">${esc(coord)} · zoom ${zoom}</text>
-  <text x="320" y="72" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" fill="#64748b">Vista esquemática — sem rede para tiles de mapa; opcional: chave Google Static Maps</text>
+  <text x="320" y="52" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">${titulo}</text>
+  ${desc}
+  <text x="320" y="118" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#475569">${esc(coord)} · zoom ${zoom}</text>
+  <text x="320" y="140" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" fill="#64748b">Sem ligação aos tiles de satélite — verifique rede do servidor</text>
   <circle cx="320" cy="200" r="10" fill="#0d9488" stroke="#ffffff" stroke-width="3"/>
   <circle cx="320" cy="200" r="3" fill="#ffffff"/>
 </svg>`;
@@ -56,7 +71,7 @@ async function fetchGoogleStatic(
       key: apiKey,
     }).toString();
   try {
-    const upstream = await fetch(gUrl, { next: { revalidate: 3600 } });
+    const upstream = await fetch(gUrl, { cache: "no-store" });
     if (!upstream.ok) return null;
     const buf = await upstream.arrayBuffer();
     if (buf.byteLength < 500) return null;
@@ -66,51 +81,34 @@ async function fetchGoogleStatic(
   }
 }
 
-/** Fallback sem chave Google: serviço de mapa estático da comunidade OSM. */
-async function fetchOsmStaticMap(
-  lat: number,
-  lng: number,
-  zoom: number,
-): Promise<ArrayBuffer | null> {
-  const z = Math.min(18, Math.max(1, zoom));
-  const params = new URLSearchParams({
-    center: `${lat},${lng}`,
-    zoom: String(z),
-    size: "640x360",
-    maptype: "mapnik",
-    markers: `${lat},${lng},red-pushpin`,
+function pngResponse(
+  body: Uint8Array | ArrayBuffer,
+  source: string,
+): NextResponse {
+  const bytes = body instanceof ArrayBuffer ? new Uint8Array(body) : body;
+  return new NextResponse(Buffer.from(bytes), {
+    headers: {
+      "Content-Type": "image/png",
+      "Cache-Control": "public, max-age=3600, s-maxage=3600",
+      "X-Map-Source": source,
+    },
   });
-  const url = `https://staticmap.openstreetmap.de/staticmap.php?${params}`;
-  try {
-    const r = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "APP-SONDAGEM/1.0 (geotechnical reports; static map fallback)",
-        Accept: "image/png,image/*,*/*",
-      },
-      next: { revalidate: 3600 },
-    });
-    if (!r.ok) return null;
-    const buf = await r.arrayBuffer();
-    if (buf.byteLength < 500) return null;
-    return buf;
-  } catch {
-    return null;
-  }
 }
 
 /**
  * Gera imagem para o ponto WGS84 no relatório PDF.
- * 1) Google Static Maps (se existir chave e a API responder)
- * 2) OpenStreetMap (staticmap.openstreetmap.de)
- * 3) Tiles (Esri imagem + OSM ruas) compostos com sharp
- * 4) SVG esquemático (sempre disponível)
+ * 1) Tiles Esri (satélite, estilo Google Earth)
+ * 2) Google Static Maps (se existir chave)
+ * 3) Tiles de rua (Carto/OSM)
+ * 4) SVG esquemático (último recurso)
  */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const latRaw = searchParams.get("lat");
   const lngRaw = searchParams.get("lng");
   const zoomRaw = searchParams.get("zoom");
+  const label = searchParams.get("label")?.trim() ?? "";
+  const desc = searchParams.get("desc")?.trim() ?? "";
 
   const lat = latRaw === null || latRaw === "" ? NaN : Number(latRaw);
   const lng = lngRaw === null || lngRaw === "" ? NaN : Number(lngRaw);
@@ -127,6 +125,22 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "zoom entre 1 e 21" }, { status: 400 });
   }
 
+  const caption: MapLocationCaption | undefined =
+    label || desc
+      ? { titulo: label || "Furo", descricao: desc || undefined, lat, lng }
+      : { titulo: "Furo", lat, lng };
+
+  /** Carto/OSM costumam responder melhor no servidor; depois satélite Esri. */
+  let tileBuf = await buildMapPngFromTiles(lat, lng, zoom, false, caption);
+  if (tileBuf && tileBuf.length > 500) {
+    return pngResponse(tileBuf, "tiles-street");
+  }
+
+  tileBuf = await buildMapPngFromTiles(lat, lng, zoom, true, caption);
+  if (tileBuf && tileBuf.length > 500) {
+    return pngResponse(tileBuf, "tiles-imagery");
+  }
+
   const apiKey =
     process.env.GOOGLE_MAPS_API_KEY ??
     process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ??
@@ -135,56 +149,30 @@ export async function GET(req: Request) {
   if (apiKey) {
     const googleBuf = await fetchGoogleStatic(lat, lng, zoom, apiKey);
     if (googleBuf) {
-      return new NextResponse(googleBuf, {
-        headers: {
-          "Content-Type": "image/png",
-          "Cache-Control": "public, max-age=3600, s-maxage=3600",
-          "X-Map-Source": "google-static",
-        },
-      });
+      let png: Buffer = Buffer.from(googleBuf);
+      if (caption) {
+        png = await appendMapCaptionPng(png, caption);
+      }
+      return pngResponse(new Uint8Array(png), "google-static");
     }
   }
 
-  const osmBuf = await fetchOsmStaticMap(lat, lng, zoom);
-  if (osmBuf) {
-    return new NextResponse(osmBuf, {
-      headers: {
-        "Content-Type": "image/png",
-        "Cache-Control": "public, max-age=3600, s-maxage=3600",
-        "X-Map-Source": "osm-static",
-      },
-    });
-  }
-
-  const tileBuf = await buildMapPngFromTiles(lat, lng, zoom, true);
-  if (tileBuf && tileBuf.length > 500) {
-    const body = Uint8Array.from(tileBuf);
-    return new NextResponse(body, {
-      headers: {
-        "Content-Type": "image/png",
-        "Cache-Control": "public, max-age=3600, s-maxage=3600",
-        "X-Map-Source": "tiles-esri-osm",
-      },
-    });
-  }
-
-  const svg = buildPlaceholderSvg(lat, lng, zoom);
+  const svg = buildPlaceholderSvg(lat, lng, zoom, caption);
   try {
     const png = await sharp(Buffer.from(svg)).png().toBuffer();
-    return new NextResponse(Uint8Array.from(png), {
-      headers: {
-        "Content-Type": "image/png",
-        "Cache-Control": "public, max-age=300, s-maxage=300",
-        "X-Map-Source": "placeholder",
-      },
-    });
+    return pngResponse(png, "placeholder");
   } catch {
-    return new NextResponse(svg, {
-      headers: {
-        "Content-Type": "image/svg+xml; charset=utf-8",
-        "Cache-Control": "public, max-age=300, s-maxage=300",
-        "X-Map-Source": "placeholder",
+    /** Sempre PNG para o <img> do relatório (evita SVG que falha em alguns browsers). */
+    const pngMin = await sharp({
+      create: {
+        width: 640,
+        height: 360,
+        channels: 3,
+        background: { r: 241, g: 245, b: 249 },
       },
-    });
+    })
+      .png()
+      .toBuffer();
+    return pngResponse(pngMin, "placeholder-minimal");
   }
 }

@@ -1,10 +1,10 @@
 export default function PrivacyPage() {
   return (
     <main style={{ padding: 40, maxWidth: 900, margin: '0 auto' }}>
-      <h1>Política de Privacidade - SOLODATA</h1>
+      <h1>Política de Privacidade — DataGeo Digital</h1>
 
       <p>
-        O SOLODATA coleta apenas informações necessárias para funcionamento da
+        O DataGeo Digital coleta apenas informações necessárias para funcionamento da
         plataforma, incluindo autenticação, localização GPS, imagens e dados
         técnicos utilizados em levantamentos geotécnicos, topográficos e
         inspeções de campo.
@@ -24,7 +24,7 @@ export default function PrivacyPage() {
         de suporte.
       </p>
 
-      <p>Email: suporte@solodata.com.br</p>
+      <p>Email: suporte@datageodigital.com.br</p>
     </main>
   )
 }

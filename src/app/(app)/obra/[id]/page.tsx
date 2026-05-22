@@ -555,7 +555,7 @@ export default function ObraDetalhe() {
     if (!obra || placemarksExport.length === 0) return;
     const slug = slugFieldExport(obra.nome, obra.id);
     const xml = buildGpx(placemarksExport, {
-      creator: "APP-SONDAGEM",
+      creator: "DataGeo Digital",
       trackName: `${obra.nome} — pontos`,
     });
     downloadTextFile(`${slug}_pontos.gpx`, xml, "application/gpx+xml");

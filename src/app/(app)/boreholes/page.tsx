@@ -36,7 +36,7 @@ export default function BoreholesPage() {
     const sync = () => setSaved(loadBoreholes());
     window.addEventListener(BOREHOLES_CHANGED_EVENT, sync);
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "vision-sondagem-boreholes") sync();
+      if (e.key === "datageo-digital-boreholes") sync();
     };
     window.addEventListener("storage", onStorage);
     return () => {

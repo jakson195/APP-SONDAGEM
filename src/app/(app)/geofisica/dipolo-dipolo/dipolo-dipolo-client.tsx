@@ -14,7 +14,7 @@ import type { Dipolo2DReading } from "@/lib/geofisica/dipolo2d/types";
 import { downloadTextFile } from "@/lib/field-export-kml-gpx";
 import { SolodataLinhaSheet } from "./solodata-linha-sheet";
 
-const STORAGE = "soilsul-geofisica-dipolo2d-v1";
+const STORAGE = "datageo-digital-geofisica-dipolo2d-v1";
 
 type TabId = "dados" | "pseudo" | "modelo" | "ajustes";
 

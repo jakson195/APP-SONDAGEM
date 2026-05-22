@@ -1,0 +1,574 @@
+ARTIGO CIENTÍFICO
+65 Este periódico está licenciado conforme Creative 
+Commons Atribuição 4.0 Internacional.
+Introdução
+As chuvas intensas causam problemas 
+de escoamento superficial e alagamento, 
+podendo resultar em prejuízos tanto no 
+meio urbano como no meio rural. Nas 
+áreas de produção agrícola, chuvas intensas ou o excesso de chuva causam 
+erosão hídrica e perdas de solo. A erosão, 
+além de degradar o solo, reduzindo sua 
+produtividade e a produção das culturas, 
+tem como problemas adicionais a contaminação das águas e o assoreamento de 
+rios e reservatórios (ALVES SOBRINHO et 
+al., 2011; ALMEIDA et al., 2012).
+Chuvas intensas para projetos de conservação do solo e da 
+água no estado de Santa Catarina
+Álvaro José Back¹; Leandro do Prado Wildner² e Jóri Ramos Pereira³
+Resumo – Para o dimensionamento de estruturas para conservação do solo e água é imprescindível conhecer o valor da chuva 
+intensa de cada local. O presente trabalho teve como objetivo determinar o valor representativo das chuvas intensas a ser 
+usado em projetos de conservação do solo e água para todos os municípios do estado de Santa Catarina. Foram utilizadas 
+séries históricas de 162 estações pluviométricas que possuíam mais de 30 anos de dados, incluindo o período após o ano 2000. 
+Para cada estação foram ajustados os parâmetros da distribuição GEV e Gumbel. Com a distribuição que apresentou melhor 
+ajuste foram estimados os valores de chuva máxima com período de retorno de 10 anos. Estes dados foram espacializados, 
+usando o método da Krigagem, e obtidos os valores médios representativos para cada município catarinense. Os resultados 
+mostram uma variação espacial da chuva intensa no Estado, com maiores valores nas Regiões do Extremo Oeste, Litoral Centro 
+e Litoral Norte, e menores no Alto Vale do Itajaí. Para o período de retorno de 10 anos a chuva máxima diária variou de 104,9 
+a 157,1mm, enquanto a intensidade da chuva com duração de 15 minutos variou de 93,2 a 139,5mm h-1.
+Termos de indexação: Terraços; Erosão; Drenagem agrícola; Terraceamento.
+Heavy rains for soil conservation projects in the state of Santa Catarina
+Abstract – In order to design structures for soil and water conservation, it is essential to know the value of intense rain in each 
+location. The present work had as objective to determine the representative value of the intense rains to be used in projects of 
+conservation of the soil and water for all the municipalities of the state of Santa Catarina. Series of 162 pluviometric stations 
+were used that had more than 30 years of data, including the period after the year 2000. For each station the parameters 
+of the GEV and Gumbel distribution were adjusted. With the distribution that showed the best adjustment, the maximum 
+rainfall values with a 10-year return period were estimated. These data were spatialized using the Krigagem method and the 
+representative average values were obtained for each municipality in Santa Catarina. The results show a spatial variation of 
+intense rain in the state, with higher values in the Regions of the Far West, Central Coast and North Coast, and lower in the Alto 
+Vale do Itajaí. For the 10-year return period, the maximum daily rainfall ranged from 104.9 to 157.1mm, and the intensity of 
+the rain lasting 15 minutes ranged from 93.2 to 139.5mm h-1.
+Index terms: Terraces; Erosion; Agricultural drainage; Terracing.
+Recebido em 9/3/2021. Aceito para publicação em 14/6/2021. http//:dx.doi.org/10.52945/rac.v34i2.1140
+¹ Engenheiro-agrônomo, Dr., Epagri/Estação Experimental de Urussanga, Rd. SC 108 – Km353,1563, Bairro Estação, Urussanga, SC, CEP 88840-000, e-mail: 
+ajb@epagri.sc.gov.br
+² Engenheiro-agrônomo, MSc., Epagri/Cepaf, Serv. Ferdinando Tusset, S/N, Bairro São Cristóvão, Chapecó, SC, CEP 89801-970, e-mail: lpwild@epagri.sc.gov.br
+³ Engenheiro agrimensor, MSc., Universidade do Extremo Sul Catarinense, Av. Universitária, 1105 - Universitário, Criciúma, SC, CEP 88806-000, e-mail: jori@
+unesc.net
+Para contornar estes problemas e 
+melhorar a qualidade do solo são recomendadas práticas de conservação 
+do solo que atuam diretamente na mitigação da ação da chuva sobre o solo, 
+tais como a cobertura permanente e a 
+diversificação de culturas, estruturadas 
+na sucessão, rotação e consorciação 
+de espécies, assim como práticas complementares que atuam na redução do 
+escoamento superficial, como o cultivo em contorno e o terraceamento. A 
+construção de terraços requer planejamento e dimensionamento adequado 
+(BERTONI & LOMBARDI NETO, 2012). 
+Quando planejados terraços em gradiente, deve-se também dimensionar o 
+canal escoadouro, bem como bueiros e 
+outros canais à jusante.
+Para cada tipo de estrutura ou obra 
+de engenharia existem diferentes critérios de dimensionamento que são 
+baseados em diferentes informações 
+da chuva intensa. O dimensionamento 
+dos terraços em nível, por exemplo, é 
+realizado com base na chuva máxima 
+com duração de 24 horas (ASAE, 2012). 
+Já para terraços em gradiente é comum 
+o uso da intensidade máxima da chuva 
+com duração de 15 minutos (DE MARIA 
+Agropecuária Catarinense, Florianópolis, v.34, n.2, p.65-72, maio/ago. 2021
+66
+et al., 2016). O período de retorno está 
+relacionado ao risco e ao custo da obra, 
+sendo indicado para projetos de conservação de solos e drenagem de superfície de áreas agrícolas, com valores da 
+ordem de 5 a 20 anos (GRIEBELER et 
+al., 2001; BERTONI & LOMBARDI NETO, 
+2012).
+Informações relativas a chuvas intensas do local da obra são fundamentais 
+para o planejamento e para o dimensionamento das estruturas de captação 
+e condução da água. A caracterização 
+da chuva local é realizada com base na 
+análise das frequências de eventos extremos observados nas séries históricas 
+de pluviosidade. 
+Na análise de frequências deve-se 
+ajustar uma distribuição teórica de probabilidades baseada na série de chuvas 
+máximas observadas no local. Existem 
+várias distribuições de probabilidade 
+que podem ser usadas, destacando-se a 
+Distribuição de Extremos Tipo I e a Distribuição Generalizada de Valores Extremos (GEV). A Distribuição de Extemos 
+Tipo I, também conhecida com Distribuição de Gumbel, é largamente usada 
+para a estimativa das chuvas máximas 
+(BACK, 2013; MARQUES et al., 2014; 
+MISTRY & SURYANARAYANA, 2019), 
+enquanto a distribuição GEV é adotada 
+para estimar eventos extremos de precipitação (MARRA et al., 2017). 
+Este trabalho teve como objetivo 
+determinar o valor representativo das 
+chuvas intensas a ser usado em projetos de conservação de solo e água para 
+todos os municípios do estado de Santa 
+Catarina.
+Material e métodos
+Foram analisadas as séries históricas 
+das estações pluviométricas localizadas 
+no estado de Santa Catarina pertencentes à rede de estações pluviométricas da 
+Agência Nacional de Águas – ANA (ANA, 
+2020) e à rede de estações pluviométricas da Empresa de Pesquisa Agropecuária e Extensão Rural de Santa Catarina 
+(EPAGRI, 2020). Algumas estações pluviométricas da Epagri, denominadas de 
+convencionais, em que a observação da 
+precipitação era realizada por pluviômetros, foram substituídas por estações 
+automáticas. Nestes casos, foi utilizada 
+a série existente, com dados convencionais, e complementada com a série das 
+estações automáticas. 
+As séries de máximas anuais de chuvas diárias foram determinadas considerando cada ano a partir do calendário 
+civil; os anos que apresentaram falhas 
+de dados foram excluídos da série de 
+máximas. 
+Neste estudo, foram consideradas 
+somente as estações com mais de 30 
+anos de dados, excluindo-se as estações 
+que tinham somente dados anteriores 
+ao ano 2000. Considerando este critério 
+foram, então, selecionadas 162 estações pluviométricas, sendo 20 estações 
+da Epagri e 142 da ANA (Figura 1).
+Para cada série foram ajustados os 
+parâmetros da distribuição Gumbel 
+e GEV pelos métodos dos Momentos 
+(KITE, 1978), Máxima Verossimilhança 
+(KITE, 1978) e L-Moments (HOSKING, 
+1990). Para a distribuição Gumbel ainda foram ajustados os parâmetros pelo 
+método de Chow (BACK, 2013), totalizando sete distribuições para cada série 
+de dados.
+Para testar a aderência das séries 
+às distribuições teóricas ajustadas, foram usados os testes de aderência de 
+Kolmogorov-Smirnov (KS) (KITE, 1978), 
+Anderson-Darling (AD) (BESKOW et al., 
+2015) e R de Filliben (RF) (FILLIBEN, 
+1975). Para avaliar a qualidade do ajuste ainda foi considerado o erro padrão 
+de estimativa (EP), conforme descrito 
+em Kite (1978). A seleção da melhor distribuição de probabilidades foi realizada 
+pelo ranqueamento das distribuições, 
+com valores de 1 a 7, em que os menores valores de KS, AD, EP e os maiores 
+valores de RF recebem o menor escore. 
+Dessa forma, cada série pode receber o 
+escore variando de 4 a 28, sendo selecionada a distribuição com o menor escore global. Com a melhor distribuição 
+de probabilidades foram estimadas as 
+chuvas máximas diárias para período de 
+retorno de 10 anos. 
+Para avaliar a variação espacial da 
+chuva extrema diária, foi gerado o mapa 
+de chuva máxima diária com o uso do 
+ArcGIS 10.2.1 – Spatial Analyst, que fornece um conjunto de ferramentas para 
+modelagens espaciais. Após a modelagem, foram obtidas as médias dos valores para cada município por meio da 
+ferramenta Zonal Statistics, cruzando as 
+informações espaciais entre o shapefile
+dos municípios e o raster resultado da 
+Krigagem. 
+Resultados e discussão
+Na Figura 2, pode-se visualizar a distribuição espacial das chuvas extremas 
+diárias com período e retorno de 10 
+anos no estado de Santa Catarina, em 
+que os valores variam de 100 a 160mm. 
+Este é o período de retorno recomendado para dimensionamento de obras de 
+conservação do solo e água, não só no 
+Figura 1. Distribuição espacial das 162 estações pluviométricas séries de dados superior a 
+30 anos, localizadas no estado de Santa Catarina, Brasil
+Figure 1. Spatial distribution of 162 pluviometric stations data series over 30 years, located 
+in the state of Santa Catarina, Brazil
+Agropecuária Catarinense, Florianópolis, v.34, p.65-72, n.2, maio/ago. 2021
+67
+Brasil (CRUCIANI, 1989; DE MARIA et 
+al., 2016) como em vários outros países 
+(KESSLER & RAAD, 1978; SCHWAB et al., 
+1981; RAMIREZ CRUZ et al., 2015). 
+Pode-se observar uma variação espacial relativamente bem definida, com 
+valores maiores no Extremo Oeste e 
+na região do litoral, especialmente na 
+região de Florianópolis, e menores no 
+Alto Vale do Itajaí. Resultados semelhantes foram descritos por Back et al. 
+(2016). Essa distribuição de chuvas máximas está de acordo com a variação 
+espacial de chuvas médias anuais no 
+Estado, descritas em vários trabalhos 
+(BACK, 2001; COAN et al., 2014; BACK 
+& POLETO, 2018; e GOTARDO et al., 
+2018). A variação espacial das chuvas 
+no estado de Santa Catarina é explicada 
+principalmente pela atuação diferenciada das massas de ar e, também, devido 
+ao relevo (ORSELLI, 1991; MONTEIRO & 
+FURTADO, 1995; MONTEIRO, 2001; REBIOTA et al., 2010). As regiões Nordeste 
+e Leste também foram marcadas por 
+altos índices pluviométricos devido às 
+condições geomorfológicas que favorecem a ocorrência de chuvas orográficas 
+(MONTEIRO, 2001).
+As perdas de solo por erosão dependem de cinco fatores principais: fator 
+chuva - R (Erosividade da chuva); fator 
+solo – K (erodibilidade do solo); fator topografia - LS (comprimento e inclinação 
+do terreno); fator cultivo e manejo do 
+solo – C; e, fator práticas conservacionistas – P (LAFLEN & MOLDENHAUER, 
+2003). Na inter-relação desses fatores, o 
+potencial erosivo da chuva e as características topográficas da área constituem 
+o componente energético capaz de produzir erosão; por isso o princípio básico 
+do controle da erosão hídrica está associado à dissipação da energia cinética da 
+gota da chuva e à redução da energia cinética cisalhante da enxurrada (DENARDIN et al., 2005). Para o controle da enxurrada é imperativo o uso de práticas 
+mecânicas, em especial o terraço, cujas 
+dimensões devem estar relacionadas à 
+ocorrência de chuvas intensas em cada 
+local específico de uso. Os resultados 
+obtidos neste estudo mostram que na 
+região do Extremo Oeste de Santa Catarina ocorrem eventos extremos com 
+maior frequência, e assim as dimensões 
+das estruturas de captação e armazenamento de água, tais como terraços e 
+canais de drenagem, devem ser maiores 
+quando comparadas àquelas das regiões do Alto Vale e Planalto Serrano.
+Na Tabela 1 constam os valores médios de chuvas máximas diárias anuais 
+com período de retorno de 10 anos por 
+município de Santa Catarina para uso 
+em projetos de conservação do solo e 
+da água. Os valores variam de 104,9 a 
+157,1mm. Os valores foram obtidos 
+por geoprocessamento e, assim, são 
+influenciados pelos valores observados 
+nas estações pluviométricas próximas. 
+Essa espacialização tem a vantagem de 
+obter um valor prático a ser usado em 
+municípios sem estações pluviométricas. Nos municípios em que existe mais 
+de uma estação, como, por exemplo, 
+Blumenau e Joinville, o uso do valor médio permite usar um valor único representativo do município.
+Para dimensionamento de terraços 
+em gradiente é recomendado o uso da 
+intensidade da chuva com duração de 
+15 minutos e período de retorno de 10 
+anos. Para chuvas de menor duração 
+pode-se utilizar os métodos de desagregação da chuva diária em chuva de menor duração (CETESB, 1986; BACK et al., 
+2013) ou por relações empíricas obtidas 
+desses coeficientes. Dessa forma a chuva com duração de 15 minutos é obtida 
+multiplicando-se a chuva máxima diária 
+por um coeficiente que depende das 
+relações entre as durações observadas. 
+Para as relações médias observadas no 
+Brasil (CETESB, 1986) esse coeficiente é 
+0,248, já para as relações médias observadas em Santa Catarina (BACK, 2013) 
+esse coeficiente é 0,222. Na Tabela 1 
+constam os valores médios de intensidade da chuva com duração de 15 minutos e período de retorno de 10 anos 
+aplicando-se o método das relações entre durações observadas em Santa Catarina. Os valores de intensidade da chuva 
+com duração de 15 minutos e período 
+de retorno de 10 anos variam de 93,2 a 
+135,5mm h-1. Esse procedimento pode 
+ser aplicado a outros períodos de retorno e/ou outras durações obtendo-se as 
+respectivas intensidades. 
+Figura 2. Chuva máxima diária com período de retorno de10 anos para o estado de Santa 
+Catarina, estimada com base em 162 estações pluviométricas com séries de dados superior 
+a 30 anos
+Figure 2. Maximum daily rainfall with a return period of 10 years for the state of Santa 
+Catarina, estimated based on 162 rainfall stations with data series over 30 years
+Agropecuária Catarinense, Florianópolis, v.34, n.2, p.65-72, maio/ago. 2021
+68
+Tabela 1. Altura da chuva máxima diária (P1dia) e intensidade da chuva máxima com duração de 15 minutos (I15) para período de retorno de 
+10 anos para os municípios catarinenses
+Table 1. Height of maximum daily rainfall (P1day) and intensity of maximum rainfall lasting 15 minutes (I15) for a 10-year return period for the 
+municipalities of Santa Catarina
+Município P1dia
+(mm) I
+15 (mm h-1) Município P1dia
+(mm) I
+15 (mm h-1)
+Abdon Batista 123,3 109,5 Bom Jardim Da Serra 118,1 104,9
+Abelardo Luz 132,0 117,2 Bom Jesus 131,6 116,9
+Agrolândia 108,9 96,7 Bom Jesus do Oeste 138,1 122,7
+Agronômica 105,7 93,9 Bom Retiro 112,7 100,1
+Água Doce 125,8 111,7 Bombinhas 147,1 130,6
+Águas de Chapecó 135,8 120,5 Botuverá 117,7 104,5
+Águas Frias 135,2 120,0 Braço do Norte 125,2 111,2
+Águas Mornas 143,5 127,5 Braço do Trombudo 108,7 96,6
+Alfredo Wagner 116,3 103,3 Brunópolis 115,9 103,0
+Alto Bela Vista 127,5 113,2 Brusque 127,0 112,8
+Anchieta 139,9 124,2 Caçador 118,6 105,3
+Angelina 130,0 115,4 Caibi 136,2 120,9
+Anita Garibaldi 122,7 108,9 Calmon 118,9 105,6
+Anitápolis 126,1 112,0 Camboriú 131,7 116,9
+Antônio Carlos 149,1 132,4 Campo Alegre 139,0 123,4
+Apiúna 108,0 95,9 Campo Belo do Sul 120,2 106,7
+Arabutã 129,4 114,9 Campo Erê 139,8 124,2
+Araquari 146,9 130,4 Campos Novos 122,6 108,8
+Araranguá 125,7 111,7 Canelinha 134,5 119,4
+Armazém 126,6 112,4 Canoinhas 122,2 108,5
+Arroio Trinta 122,1 108,4 Capão Alto 119,0 105,7
+Arvoredo 130,8 116,2 Capinzal 126,4 112,3
+Ascurra 110,7 98,3 Capivari de Baixo 127,2 113,0
+Atalanta 108,1 96,0 Catanduvas 126,3 112,2
+Aurora 105,1 93,3 Caxambu do Sul 135,4 120,2
+Bal. Arroio do Silva 126,0 111,9 Celso Ramos 124,2 110,2
+Bal. Barra do Sul 147,4 130,9 Cerro Negro 120,5 107,0
+Balneário Camboriú 131,7 116,9 Chapadão do Lageado 108,4 96,3
+Balneário Gaivota 125,9 111,8 Chapecó 132,2 117,4
+Balneário Piçarras 134,0 119,0 Cocal do Sul 124,0 110,2
+Balneário Rincão 125,8 111,7 Concórdia 128,2 113,9
+Bandeirante 141,0 125,2 Cordilheira Alta 133,2 118,3
+Barra Bonita 139,5 123,9 Coronel Freitas 134,5 119,4
+Barra Velha 138,0 122,6 Coronel Martins 135,8 120,6
+Bela Vista do Toldo 122,0 108,3 Correia Pinto 114,7 101,8
+Belmonte 141,0 125,2 Corupá 129,7 115,1
+Benedito Novo 113,3 100,6 Criciúma 123,7 109,9
+Biguaçu 149,8 133,0 Cunha Porã 137,3 121,9
+Blumenau 120,2 106,7 Cunhataí 135,8 120,6
+Continua....
+Agropecuária Catarinense, Florianópolis, v.34, p.65-72, n.2, maio/ago. 2021
+69
+Tabela 1. Continuação
+Município P1dia
+(mm) I
+15 (mm h-1) Município P1dia
+(mm) I
+15 (mm h-1)
+Bocaina do Sul 109,6 97,3 Ipuaçu 133,5 118,6
+Curitibanos 114,1 101,3 Ipumirim 130,2 115,6
+Descanso 139,5 123,9 Iraceminha 138,5 123,0
+Dionísio Cerqueira 141,1 125,3 Irani 127,7 113,4
+Dona Emma 107,5 95,5 Irati 136,2 120,9
+Doutor Pedrinho 115,4 102,5 Irineópolis 119,4 106,1
+Entre Rios 134,2 119,1 Itá 129,3 114,8
+Ermo 124,7 110,7 Itaiópolis 120,7 107,2
+Erval Velho 123,5 109,7 Itajaí 130,9 116,2
+Faxinal dos Guedes 131,1 116,4 Itapema 132,5 117,6
+Flor do Sertão 138,9 123,3 Itapiranga 139,6 124,0
+Florianópolis 157,2 139,6 Itapoá 145,9 129,6
+Formosa do Sul 135,8 120,6 Ituporanga 106,8 94,9
+Forquilhinha 123,2 109,4 Jaborá 127,2 112,9
+Fraiburgo 115,5 102,6 Jacinto Machado 124,9 110,9
+Frei Rogério 113,6 100,8 Jaguaruna 125,4 111,4
+Galvão 136,0 120,8 Jaraguá do Sul 136,1 120,8
+Garopaba 141,6 125,8 Jardinópolis 135,6 120,4
+Garuva 144,4 128,2 Joaçaba 125,2 111,1
+Gaspar 124,0 110,1 Joinville 144,4 128,2
+Gov. Celso Ramos 151,2 134,3 José Boiteux 109,0 96,8
+Grão Pará 120,5 107,0 Jupiá 137,0 121,6
+Gravatal 127,3 113,1 Lacerdópolis 125,4 111,3
+Guabiruba 120,4 106,9 Lages 116,6 103,6
+Guaraciaba 141,0 125,2 Laguna 129,6 115,1
+Guaramirim 144,6 128,4 Lajeado Grande 132,9 118,0
+Guarujá do Sul 141,1 125,3 Laurentino 106,4 94,5
+Guatambu 134,3 119,2 Lauro Muller 119,6 106,2
+Herval D'Oeste 123,0 109,2 Lebon Régis 115,5 102,6
+Ibiam 120,2 106,7 Leoberto Leal 116,7 103,6
+Ibicaré 122,4 108,7 Lindóia Do Sul 129,4 114,9
+Ibirama 106,9 94,9 Lontras 105,2 93,4
+Içara 124,8 110,8 Luiz Alves 134,5 119,5
+Ilhota 129,1 114,6 Luzerna 124,6 110,6
+Imaruí 131,3 116,6 Macieira 122,9 109,1
+Imbituba 134,4 119,4 Mafra 122,5 108,8
+Imbuia 109,7 97,5 Major Gercino 126,7 112,6
+Indaial 114,8 101,9 Major Vieira 123,1 109,3
+Iomerê 121,0 107,5 Maracajá 125,2 111,2
+Ipira 126,9 112,7 Maravilha 138,0 122,5
+Iporã do Oeste 139,4 123,8 Marema 134,0 119,0
+Continua....
+Agropecuária Catarinense, Florianópolis, v.34, n.2, p.65-72, maio/ago. 2021
+70
+Tabela 1. Continuação
+Município P1dia
+(mm) I
+15 (mm h-1) Município P1dia
+(mm) I
+15 (mm h-1)
+Massaranduba 135,6 120,4 Ponte Alta 111,7 99,2
+Matos Costa 120,4 106,9 Ponte Alta do Norte 114,2 101,4
+Meleiro 123,5 109,7 Ponte Serrada 128,1 113,7
+Mirim Doce 111,9 99,3 Porto Belo 141,1 125,3
+Modelo 136,8 121,5 Porto União 120,0 106,6
+Mondai 137,9 122,4 Pouso Redondo 109,7 97,4
+Monte Carlo 114,9 102,1 Praia Grande 125,7 111,7
+Monte Castelo 121,1 107,6 Pres. Castello Branco 126,9 112,7
+Morro da Fumaça 124,2 110,3 Presidente Getúlio 106,6 94,7
+Morro Grande 121,9 108,3 Presidente Nereu 107,5 95,5
+Navegantes 133,7 118,8 Princesa 141,2 125,4
+Nova Erechim 135,7 120,5 Quilombo 134,9 119,8
+Nova Itaberaba 135,1 120,0 Rancho Queimado 128,2 113,8
+Nova Trento 124,3 110,4 Rio das Antas 119,4 106,0
+Nova Veneza 121,3 107,7 Rio do Campo 113,7 100,9
+Novo Horizonte 136,9 121,6 Rio do Oeste 107,9 95,8
+Orleans 120,5 107,0 Rio do Sul 105,0 93,2
+Otacílio Costa 109,3 97,1 Rio dos Cedros 123,1 109,3
+Ouro 126,6 112,4 Rio Fortuna 122,6 108,8
+Ouro Verde 131,3 116,6 Rio Negrinho 122,7 109,0
+Paial 130,6 116,0 Rio Rufino 111,2 98,7
+Painel 113,9 101,1 Riqueza 138,1 122,6
+Palhoça 155,0 137,6 Rodeio 113,2 100,5
+Palma Sola 141,2 125,4 Romelândia 139,4 123,8
+Palmeira 111,2 98,7 Salete 112,3 99,8
+Palmitos 135,8 120,6 Saltinho 138,1 122,7
+Papanduva 122,0 108,3 Salto Veloso 122,9 109,1
+Paraíso 141,4 125,5 Sangão 124,8 110,8
+Passo de Torres 125,8 111,7 Santa Cecília 115,9 103,0
+Passos Maia 128,8 114,4 Santa Helena 140,5 124,7
+Paulo Lopes 142,8 126,8 Santa Rosa de Lima 123,1 109,3
+Pedras Grandes 125,1 111,1 Santa Rosa do Sul 125,8 111,7
+Penha 133,8 118,8 Santa Terezinha 119,8 106,4
+Peritiba 127,1 112,8 Santa Ter. do Progresso 138,4 122,9
+Pescaria Brava 129,4 115,0 Santiago do Sul 135,6 120,4
+Petrolândia 108,5 96,3 S. Amaro da Imperatriz 151,6 134,6
+Pinhalzinho 135,7 120,5 São Bento do Sul 135,6 120,5
+Pinheiro Preto 119,2 105,9 São Bernardino 138,7 123,2
+Piratuba 127,2 112,9 São Bonifácio 136,0 120,8
+Planalto Alegre 135,3 120,1 São Carlos 135,8 120,6
+Pomerode 123,0 109,3 São Cristóvão do Sul 113,5 100,8
+Continua....
+Agropecuária Catarinense, Florianópolis, v.34, p.65-72, n.2, maio/ago. 2021
+71
+Tabela 1. Continuação
+Município P1dia
+(mm) I
+15 (mm h-1) Município P1dia
+(mm) I
+15 (mm h-1)
+São Domingos 134,9 119,8 Timbé do Sul 122,3 108,6
+São Francisco do Sul 147,4 130,9 Timbó 117,2 104,0
+São João Batista 138,4 122,9 Timbó Grande 119,1 105,8
+São João do Itaperiú 141,1 125,3 Três Barras 122,9 109,2
+São João do Oeste 139,1 123,5 Treviso 119,9 106,5
+São João do Sul 125,8 111,7 Treze de Maio 124,7 110,8
+São Joaquim 116,9 103,8 Treze Tílias 123,2 109,4
+São José 152,9 135,7 Trombudo Central 106,5 94,5
+São José do Cedro 141,3 125,4 Tubarão 126,2 112,1
+São José do Cerrito 116,9 103,8 Tunápolis 140,0 124,3
+S. Lourenço do Oeste 137,7 122,3 Turvo 123,8 109,9
+São Ludgero 125,4 111,3 União do Oeste 135,2 120,0
+São Martinho 128,0 113,7 Urubici 114,9 102,0
+S. Miguel da Boa Vista 137,8 122,4 Urupema 112,5 99,9
+São Miguel do Oeste 140,7 125,0 Urussanga 123,4 109,6
+São Pedro de Alcântara 148,5 131,8 Vargeão 130,9 116,2
+Saudades 135,8 120,6 Vargem 119,8 106,4
+Schroeder 143,7 127,6 Vargem Bonita 126,7 112,5
+Seara 130,4 115,8 Vidal Ramos 110,4 98,1
+Serra Alta 137,7 122,2 Videira 119,6 106,2
+Siderópolis 120,8 107,2 Vitor Meireles 115,2 102,3
+Sombrio 125,9 111,8 Witmarsum 110,1 97,8
+Sul Brasil 136,5 121,2 Xanxerê 131,6 116,9
+Taió 111,3 98,8 Xavantina 130,7 116,0
+Tangará 119,0 105,7 Xaxim 132,2 117,4
+Tigrinhos 137,8 122,4 Zortéa 125,2 111,2
+Tijucas 140,0 124,4
+Conclusões
+A espacialização dos valores de chuva máxima diária com período de retorno de 10 anos mostrou maiores valores 
+nas regiões do Extremo Oeste catarinense e Litoral Centro e Norte, e menores valores no Alto Vale do Itajaí.
+A chuva máxima diária média por 
+município catarinense apresentou valores variando de 104,9 a 157,1mm. 
+A intensidade da chuva com duração 
+de 15 minutos e período de retorno de 
+10 anos varia de 93,2 a 139,5mm h-1. 
+Referências
+Agência Nacional de Águas. Hidroweb: sistemas de informações hidrológicas. 2020. 
+Available at:. 
+Access on: Jun. 24, 2020.
+ALMEIDA, C.O.S.; AMORIM, R.S.S.; ELTZ, 
+F.L.F.; COUTO, E.G.; JORDANI, S.A. Erosividade da chuva em municípios do Mato Grosso: Distribuição sazonal e correlações com 
+dados pluviométricos. Revista Brasileira 
+de Engenharia Agrícola e Ambiental, v.16, 
+n. 2, p.142- 152, 2012. DOI: https://doi.
+org/10.1590/S1415-43662012000200003.
+ALVES SOBRINHO, T.; PERTUSSATTI, C.A.; REBUCCI, L.C.S.; OLIVEIRA, P.T.S. de; Estimativa 
+da erosividade local das chuvas, utilizando 
+redes neurais artificiais. Revista Ambiente & 
+Água, v.6, n. 2, p.246-254, 2011. DOI: http://
+dx.doi.org/10.4136/ambi-agua.197
+ASAE Standards. S268.5 JAN2012. Design, 
+Layout, Construction and Maintenance of 
+Terrace Systems. American Society of Agricultural Engineers, St. Joseph, Michigan. 
+2012. 10p.
+BERTONI, J.; LOMBARDI NETO, F. Conservação do solo. São Paulo: Ícone, 2012. 335p. 
+Agropecuária Catarinense, Florianópolis, v.34, n.2, p.65-72, maio/ago. 2021
+72
+BACK, Á.J.; POLETO, C. Distribuição espacial e temporal da erosividade das chuvas 
+no estado de Santa Catarina, Brasil. Revista 
+Brasileira de Climatologia, v. 22, p.381-403, 
+2018. DOI: http://dx.doi.org/10.5380/abclima.v22i0.56914
+BACK, Á.J. Chuvas intensas e chuva para 
+dimensionamento de estruturas de drenagem para o Estado de Santa Catarina (com 
+programa HidroChuSC para cálculos). Florianópolis, Epagri. 2013. 193p.
+BACK, Á.J. Frequência de chuvas em Santa 
+Catarina. Tecnologia e Ambiente, Criciúma, 
+v.7, n.2, p. 63-72, 2001. 
+BACK, Á.J.; MIGUEL, L.P.; ZAMBRANO, G.J.D.; 
+LADWIG, N.I. Variação espacial da chuva máxima diária no estado de Santa Catarina. Revista Iniciação Científica, Criciúma, v. 14, n. 
+1, p.59-72. 2016.
+BESKOW, S.; CALDEIRA, T.L.; MELLO, 
+C.R., FARIA L.C.; GUEDES, H.AS. Multiparameter probability distributions for 
+heavy rainfall modeling in Extreme Southern Brazil. Journal of Hydrology: Regional Studies, v.4, p.123–133, 2015. 
+DOI: https://doi.org/10.1016/j.
+ejrh.2015.06.007
+CETESB – COMPANHIA DE TECNOLOGIA DE 
+SANEAMENTO AMBIENTAL. Drenagem urbana: manual de projetos. São Paulo. DAEE/
+CETESB, 1986. 466p.
+COAN, B.D.P.; BACK, Á.J.; BONETTI, A.V. Precipitação mensal e anual provável no estado de Santa Catarina. Revista Brasileira 
+de Climatologia, v. 15, p. 122- 142, 2014. 
+DOI: http://dx.doi.org/10.5380/abclima.
+v15i0.38348
+CRUCIANI, D.E. A drenagem na agricultura. 
+São Paulo: Ed. Nobel, 1989. 337 p.
+DE MARIA, I.C.; DRUGOWICH, M.I.; BORTOLETTI, J.O.; VITTI, A.C.; ROSSETTO, R.; FONTES, J.L.; TCATCHENCO, J.; MARGATHO, S.F. 
+Recomendações gerais para a conservação do solo na cultura da cana-de-açúcar. 
+Campinas: Instituto Agronômico, Campinas, 
+2016. 100p. (Série Tecnologia APTA. Boletim 
+Técnico IAC, 216).
+DENARDIN, J.E.; KOCHHANN, R. A.; FLORES, 
+C.A.; FERREIRA, T.N.; CASSOL, E.A.; MONDARDO, A.; SCHWARZ, R.A. Energia da gota 
+de chuva e da enxurrada. In: DENARDIN, 
+J.E.; KOCHHANN, R.A.; FLORES, C.A.; FERREIRA, T.N.; CASSOL, E.A.; MONDARDO, A.; 
+SCHWARZ, R.A. Manejo da enxurrada em 
+Sistema Plantio Direto. Porto Alegre: Fórum 
+Estadual de Solo e Água, 2005. p.37-42.
+EPAGRI. Empresa de Pesquisa Agropecuária 
+e Extensão Rural de Santa Catarina. Banco 
+de dados de variáveis ambientais de Santa 
+Catarina. Florianópolis: Epagri, 2020. 20p. 
+(Epagri. Documentos, 310).
+FILLIBEN, J.J. The probability plot correlation 
+coefficient test for normality. Technometrics. v.17, p.11-117, 1975.
+GRIEBELER, N.P.; PRUSKI, F.F.; MARTINS JUNIOR, D.; SILVA, D.D. Avaliação de um modelo para a estimativa da lâmina máxima de 
+escoamento superficial. Revista Brasileira 
+de Ciência do Solo, Viçosa, v.25, n.2, p.411-
+417, 2001.
+GOTARDO, R.; PIAZZA, G.A.; TORRES, E.; SEVERO, D.L.; KAUFAMANN, V. Distribuição espacial e temporal das chuvas no estado de 
+Santa Catarina. Geosul, Florianópolis, v.33, 
+n.67, p.253-276, 2018. DOI: https://doi.
+org/10.5007/2177-5230.2018v33n67p253
+HOSKING, J.R.M. L-moments: Analysis and 
+Estimation of Distributions using Linear 
+Combinations of Order Statistic. Journal of 
+the Royal Statistical Society Series B, v.52, 
+n.1, p.105-124, 1990.
+KESSLER, J; RAAD, S.J. Análisis de dados pluviométricos. In: INTERNATIONAL FOR LAND 
+RECLAMATION AND IMPROVEMENT. Principios y aplicaciones del drenaje. Wageningen, 1978. Publication 16, v.3, p.16-57.
+KITE, G.W. Frequency and risk analyses in 
+Hydrology. Water Resources publications. 
+Colorado. 1978. 224 p.
+LAFLEN, J.M.; MOLDENHAUER, W.C. Pioneering Soil Erosion Prediction: the USLE 
+Story. WASWC, Thailand, 2003. 54p. (WASWC Special Publication n.1).
+MARQUES, R. F. DE P.V.; MELLO, C.R.; SILVA, 
+A. M.; CAMILA SILVA FRANCO, C.S.; OLIVEIRA, 
+A.S. Desempenho de distribuições de probabilidades aplicadas a eventos extremos de 
+precipitação diária. Ciênc. Agrotec., Lavras, 
+v.38, n.4, p.335-342, 2014. DOI: https://doi.
+org/10.1590/S1413-70542014000400003.
+MARRA, F.; MORIN, E.; PELEG, N.; MEI, Y.; 
+ANAGNOSTOU, E.N. Intensity–duration–frequency curves from remote sensing rainfall 
+estimates: comparing satellite and weather 
+radar over the eastern Mediterranean. Hydrol. Earth Syst. Sci., v. 21, n.5, p. 2389–
+2404, 2017. DOI: https://doi.org/10.5194/
+hess-21-2389-2017
+MISTRY, P. B.; SURYANARAYANA, M. V. Estimation of Annual One Day Maximum Rainfall using Probability Distributions for Waghodia Taluka, Vadodara. Global Research 
+and Development Journal for Engineering, 
+p.296-300, 2019.
+MONTEIRO, M. A. Caracterização climática 
+do estado de Santa Catarina: uma abordagem dos principais sistemas atmosféricos 
+que atuam durante o ano. Geosul, Florianópolis, v. 16, n.31, p. 69-78, 2001.
+MONTEIRO, M.A.; FURTADO, S.M.de A. O clima no trecho Florianópolis – Porto Alegre: 
+uma abordagem dinâmica. Geosul, n.19/20, 
+p.116 – 133, 1995.
+NAGHETTINI, M.; PINTO, E.J.A. Hidrologia 
+Estatística. Belo Horizonte: CPRM, 2007. 
+552p.
+ORSELLI, L. Clima. In: Atlas de Santa Catarina. Rio de Janeiro: Secretaria de Estado de 
+Coordenação Geral e Planejamento, 1991. 
+96p.
+RAMIREZ CRUZ, H.; VELASCO, O. L.; CASTILLO, L.A.I. Estimación mensual de intensidad de la lluvia en 30 minutos a partir de datos pluviométricos. Terra Latinoamericana,
+v.33, n.2, p.151-1159, 2015.
+REBOITA, M. S.; GAN, M. A, ROCHA, R. P.; 
+AMBRIZI, T. Regimes de precipitação na 
+América do Sul: Uma revisão bibliográfica. 
+Revista Brasileira de Meteorologia, v.25, n. 
+2, p.185-204, 2010.
+SCHWAB, G.O.; FREVERT, R.K.; DMINSTER, 
+T.W. & BARNES, K.K. Soil and water conservation engineering. 2. ed. New York: John 
+Wiley, 1966. 683p. (The Ferguson Foundation Agricultural Engineering Series). 
+Agropecuária Catarinense, Florianópolis, v.34, p.65-72, n.2, maio/ago. 2021

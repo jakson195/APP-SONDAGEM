@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     if (!user) {
       user = await prisma.user.create({
         data: {
-          email: `demo-${Date.now()}@soilsul.local`,
+          email: `demo-${Date.now()}@datageodigital.local`,
           password: "-",
         },
       });

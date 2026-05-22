@@ -1,56 +1,31 @@
 import { fromBlob } from "geotiff";
 
+import {
+  crsLabel,
+  resolveGeotiffWgs84Bounds,
+  type GeotiffCrsInfo,
+} from "@/lib/geotiff-crs";
+
 const MAX_EDGE_PX = 4096;
 
-function bboxLooksLikeWgs84Degrees(bb: number[]): boolean {
-  const [minX, minY, maxX, maxY] = bb;
-  if (![minX, minY, maxX, maxY].every((n) => Number.isFinite(n))) return false;
-  if (Math.abs(minX) > 180 || Math.abs(maxX) > 180) return false;
-  if (Math.abs(minY) > 90 || Math.abs(maxY) > 90) return false;
-  return true;
-}
-
-/**
- * Lê um GeoTIFF no browser, gera PNG (data URL) para `L.imageOverlay` e limites em graus.
- * Só CRS em graus (ex.: EPSG:4326 do QGIS); rasters projetados (UTM, etc.) não são
- * reprojetados aqui — exporte em WGS 84.
- */
-export async function geotiffToPngDataUrlAndBounds(file: File): Promise<{
+export type GeotiffLeafletImport = {
   dataUrl: string;
   bounds: { south: number; west: number; north: number; east: number };
   imgSize: { w: number; h: number };
-}> {
+  crs: GeotiffCrsInfo;
+};
+
+/**
+ * Lê um GeoTIFF no browser, identifica CRS/geokeys, converte limites para WGS84
+ * (UTM/SIRGAS/etc. via proj4) e gera PNG para `L.imageOverlay`.
+ */
+export async function geotiffToPngDataUrlAndBounds(
+  file: File,
+): Promise<GeotiffLeafletImport> {
   const tiff = await fromBlob(file);
   try {
     const image = await tiff.getImage();
-    let bbox: number[];
-    try {
-      bbox = image.getBoundingBox();
-    } catch {
-      throw new Error(
-        "Este TIFF não tem georreferenciação (transformação) legível. No QGIS exporte como GeoTIFF com CRS e extensão corretos.",
-      );
-    }
-
-    const geoKeys = image.getGeoKeys();
-    const pcs = geoKeys?.ProjectedCSTypeGeoKey;
-    if (pcs != null && pcs !== 32767 && !bboxLooksLikeWgs84Degrees(bbox)) {
-      throw new Error(
-        "Este GeoTIFF está num CRS projetado (ex.: UTM). Para ir direto ao sítio certo, exporte em WGS 84: camada → Exportar → Guardar como raster → CRS EPSG:4326. Alternativa: use PDF e marque os cantos no mapa.",
-      );
-    }
-
-    if (!bboxLooksLikeWgs84Degrees(bbox)) {
-      throw new Error(
-        "Os limites do TIFF não parecem ser graus WGS84. Exporte o raster em EPSG:4326 ou use PDF com marcação de cantos.",
-      );
-    }
-
-    const [minX, minY, maxX, maxY] = bbox;
-    const west = Math.min(minX, maxX);
-    const east = Math.max(minX, maxX);
-    const south = Math.min(minY, maxY);
-    const north = Math.max(minY, maxY);
+    const { bounds, crs } = await resolveGeotiffWgs84Bounds(image);
 
     const iw = image.getWidth();
     const ih = image.getHeight();
@@ -104,10 +79,21 @@ export async function geotiffToPngDataUrlAndBounds(file: File): Promise<{
 
     return {
       dataUrl,
-      bounds: { south, west, north, east },
+      bounds,
       imgSize: { w, h },
+      crs,
     };
   } finally {
     await tiff.close();
   }
 }
+
+/** Mensagem curta após importação bem-sucedida. */
+export function geotiffImportSuccessMessage(fileName: string, crs: GeotiffCrsInfo): string {
+  const geo = crs.reprojected
+    ? `Georreferência: ${crs.label} → WGS84`
+    : `Georreferência: ${crs.label}`;
+  return `GeoTIFF «${fileName}» carregado. ${geo}.`;
+}
+
+export { crsLabel };

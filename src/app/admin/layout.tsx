@@ -34,7 +34,7 @@ export default async function AdminLayout({
         <aside className="hidden w-64 shrink-0 border-r border-slate-200/80 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 md:flex md:flex-col">
           <div className="border-b border-slate-200 px-5 py-6 dark:border-slate-800">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-600 dark:text-teal-400">
-              SOILSUL
+              DataGeo Digital
             </p>
             <p className="mt-1 text-lg font-semibold tracking-tight">Administração</p>
             <p className="mt-2 truncate text-xs text-slate-500 dark:text-slate-400" title={user.email}>
@@ -66,7 +66,7 @@ export default async function AdminLayout({
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80 md:hidden">
-            <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">SOILSUL Admin</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">DataGeo Digital Admin</p>
             <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
               {nav.map(({ href, label }) => (
                 <Link

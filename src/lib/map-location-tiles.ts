@@ -1,12 +1,20 @@
 import sharp from "sharp";
 
+import {
+  buildMapCaptionOverlaySvg,
+  type MapLocationCaption,
+} from "@/lib/map-location-caption";
+import {
+  mapTileProvidersForServer,
+  type MapTileProvider,
+} from "@/lib/map-location-providers";
+
 const OUT_W = 640;
 const OUT_H = 360;
 
-/** Identificação exigida pela política de tiles OSM. */
 const TILE_FETCH_HEADERS = {
   "User-Agent":
-    "APP-SONDAGEM/1.0 (geotechnical reports; contact via app maintainer)",
+    "DataGeo-Digital/1.0 (geotechnical reports; contact via app maintainer)",
   Accept: "image/png,image/webp,*/*",
 };
 
@@ -22,29 +30,16 @@ function lngLatToWorldPx(lng: number, lat: number, z: number) {
   return { x, y };
 }
 
-async function fetchOsmTile(z: number, x: number, y: number): Promise<Buffer | null> {
-  const url = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+async function fetchTileFromProvider(
+  provider: MapTileProvider,
+  z: number,
+  x: number,
+  y: number,
+): Promise<Buffer | null> {
   try {
-    const r = await fetch(url, {
+    const r = await fetch(provider.url(z, x, y), {
       headers: TILE_FETCH_HEADERS,
-      next: { revalidate: 86400 },
-    });
-    if (!r.ok) return null;
-    const ab = await r.arrayBuffer();
-    if (ab.byteLength < 100) return null;
-    return Buffer.from(ab);
-  } catch {
-    return null;
-  }
-}
-
-/** Esri World Imagery — mesmo esquema z/y/x que o Leaflet usa no projeto. */
-async function fetchEsriTile(z: number, x: number, y: number): Promise<Buffer | null> {
-  const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
-  try {
-    const r = await fetch(url, {
-      headers: TILE_FETCH_HEADERS,
-      next: { revalidate: 86400 },
+      cache: "no-store",
     });
     if (!r.ok) return null;
     const ab = await r.arrayBuffer();
@@ -61,14 +56,10 @@ async function fetchOneTile(
   y: number,
   preferImagery: boolean,
 ): Promise<Buffer | null> {
-  if (preferImagery) {
-    const esri = await fetchEsriTile(z, x, y);
-    if (esri) return esri;
-  }
-  const osm = await fetchOsmTile(z, x, y);
-  if (osm) return osm;
-  if (!preferImagery) {
-    return fetchEsriTile(z, x, y);
+  const providers = mapTileProvidersForServer(preferImagery);
+  for (const p of providers) {
+    const buf = await fetchTileFromProvider(p, z, x, y);
+    if (buf) return buf;
   }
   return null;
 }
@@ -84,11 +75,21 @@ async function markerOverlayPng(): Promise<Buffer> {
  * Monta PNG 640×360 centrado em WGS84 a partir de tiles (OSM ou Esri).
  * @param preferImagery — tenta satélite Esri primeiro (alinhado ao PDF com Google satellite).
  */
+export async function appendMapCaptionPng(
+  png: Buffer,
+  caption: MapLocationCaption,
+): Promise<Buffer> {
+  const overlaySvg = buildMapCaptionOverlaySvg(OUT_W, OUT_H, caption);
+  const overlay = await sharp(Buffer.from(overlaySvg)).png().toBuffer();
+  return sharp(png).composite([{ input: overlay, left: 0, top: 0 }]).png().toBuffer();
+}
+
 export async function buildMapPngFromTiles(
   lat: number,
   lng: number,
   zoom: number,
   preferImagery = true,
+  caption?: MapLocationCaption,
 ): Promise<Buffer | null> {
   const z = Math.min(19, Math.max(1, Math.round(zoom)));
   const n = 2 ** z;
@@ -132,7 +133,7 @@ export async function buildMapPngFromTiles(
   });
 
   try {
-    return await sharp({
+    let png = await sharp({
       create: {
         width: OUT_W,
         height: OUT_H,
@@ -143,6 +144,10 @@ export async function buildMapPngFromTiles(
       .composite(composites)
       .png()
       .toBuffer();
+    if (caption) {
+      png = await appendMapCaptionPng(png, caption);
+    }
+    return png;
   } catch {
     return null;
   }

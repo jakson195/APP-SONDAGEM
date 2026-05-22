@@ -1,21 +1,25 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
-const isDev = process.env.NODE_ENV === "development";
+/** URL do Next em dev. Desative com CAP_DISABLE_LIVE=1 ao fazer build de produção nativo. */
+const liveReloadUrl = process.env.CAP_DISABLE_LIVE
+  ? undefined
+  : (process.env.CAP_SERVER_URL?.trim() || "http://localhost:3000");
 
 const config: CapacitorConfig = {
-  appId: "com.solodata",
-  appName: "SOILSUL",
+  appId: "com.datageo.digital",
+  appName: "DataGeo Digital",
 
   // Next `.next` has no root index.html; use a minimal folder so `cap sync` can copy assets.
-  // Dev: rely on `server.url`; production static builds can replace contents with `next export` → `out` if you add export.
   webDir: "www",
 
-  ...(isDev && {
+  ...(liveReloadUrl && {
     server: {
-      url: "http://10.1.1.163:3000", // 👈 seu IP
-      cleartext: true
-    }
-  })
+      // Browser / iOS Simulator: localhost. Android Emulator: CAP_SERVER_URL=http://10.0.2.2:3000
+      // Telemóvel na Wi‑Fi: CAP_SERVER_URL=http://IP_DO_PC:3000
+      url: liveReloadUrl,
+      cleartext: true,
+    },
+  }),
 };
 
 export default config;

@@ -279,6 +279,14 @@ export function FieldCampaignMap({
     iconAnchor: [7, 7],
   });
 
+  const furoMarkerIcon = (selected: boolean) =>
+    L.divIcon({
+      className: "field-furo-pin-icon",
+      html: `<span style="display:block;width:${selected ? 16 : 12}px;height:${selected ? 16 : 12}px;border-radius:9999px;background:${selected ? "#0d9488" : "#64748b"};border:${selected ? 3 : 2}px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)"></span>`,
+      iconSize: [selected ? 16 : 12, selected ? 16 : 12],
+      iconAnchor: [selected ? 8 : 6, selected ? 8 : 6],
+    });
+
   const toolbarBtn =
     "rounded-lg border px-3 py-2 text-sm font-medium transition-colors";
   const toolbarBtnIdle =
@@ -468,14 +476,20 @@ export function FieldCampaignMap({
           ) {
             return null;
           }
+          const emEdicao =
+            mapMode === "furo" &&
+            selectedFuroId != null &&
+            f.id === selectedFuroId;
           return (
             <Marker
               key={f.id}
               position={[f.latitude, f.longitude]}
               title={`Furo ${f.codigo}`}
+              icon={furoMarkerIcon(emEdicao)}
+              zIndexOffset={emEdicao ? 400 : 0}
             >
-              <Tooltip permanent direction="top" offset={[0, -8]}>
-                {f.codigo.length > 8 ? `${f.codigo.slice(0, 7)}…` : f.codigo}
+              <Tooltip permanent direction="top" offset={[0, -10]}>
+                {f.codigo.length > 12 ? `${f.codigo.slice(0, 11)}…` : f.codigo}
               </Tooltip>
             </Marker>
           );

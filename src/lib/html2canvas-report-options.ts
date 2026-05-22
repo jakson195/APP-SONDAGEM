@@ -4,7 +4,7 @@ import type { Options } from "html2canvas";
 export const PDF_REPORT_WIDTH_PX = 794;
 
 /**
- * Opções de html2canvas para relatórios SOILSUL: evita windowWidth/Height (causam
+ * Opções de html2canvas para relatórios DataGeo Digital: evita windowWidth/Height (causam
  * grelhas desalinhadas) e força largura fixa no clone.
  */
 export function html2canvasReportOptions(

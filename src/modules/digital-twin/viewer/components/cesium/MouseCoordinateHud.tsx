@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  type Cartesian2,
   Cartographic,
   Math as CesiumMath,
   ScreenSpaceEventHandler,
@@ -19,7 +20,7 @@ export function MouseCoordinateHud() {
 
     const handler = new ScreenSpaceEventHandler(viewer.canvas);
 
-    handler.setInputAction((movement) => {
+    handler.setInputAction((movement: { endPosition: Cartesian2 }) => {
       const ellipsoid = viewer.scene.globe.ellipsoid;
       const picked = viewer.camera.pickEllipsoid(movement.endPosition, ellipsoid);
       if (!picked) {

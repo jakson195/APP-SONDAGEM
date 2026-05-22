@@ -56,7 +56,7 @@ export function buildGpx(
   placemarks: FieldPlacemark[],
   meta: { creator?: string; trackName?: string },
 ): string {
-  const creator = escapeXml(meta.creator ?? "APP-SONDAGEM");
+  const creator = escapeXml(meta.creator ?? "DataGeo Digital");
   const trkName = escapeXml(meta.trackName ?? "Pontos de campo");
   const wpts = placemarks
     .map((p) => {

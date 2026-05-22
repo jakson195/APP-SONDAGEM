@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SOILSUL — Sondagem geotécnica",
-  description: "Sistema de sondagem e operações de campo.",
+  title: "DataGeo Digital — Sondagem geotécnica",
+  description: "DataGeo Digital — sondagem e operações de campo.",
 };
 
 export default function RootLayout({

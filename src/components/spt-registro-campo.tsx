@@ -4,14 +4,16 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  FieldCampaignMap,
-  type FieldFuroPin,
-} from "@/lib/mapa";
+import { FieldCampaignMap } from "@/lib/mapa";
+import type { FieldFuroPin } from "@/components/field-campaign-map-types";
+import { LabeledInput } from "@/components/labeled-field";
 import { RelatorioFotosCampo } from "@/components/relatorio-fotos-campo";
 import { SptRelatorioSoilsulPdf } from "@/components/spt-relatorio-soilsul-pdf";
 import { aguardarMapaPdfNoDom } from "@/lib/aguardar-mapa-pdf-dom";
 import { html2canvasReportOptions } from "@/lib/html2canvas-report-options";
+import { CoordenadasUtmFuroPanel } from "@/components/coordenadas-utm-furo-panel";
+import { SoloNomenclaturaCampo } from "@/components/solo-nomenclatura-campo";
+import { utmDeWgs84, wgs84DeUtm } from "@/lib/coordenadas-utm-campo";
 import { corSoloSpt } from "@/lib/spt-solo-cor";
 import { wgsPairFromInputs } from "@/lib/spt-map-coords";
 import { LS_SPT_LOCAL_DRAFT, LS_SPT_NOME } from "@/lib/sondagem-nome-storage";
@@ -19,11 +21,18 @@ import { waitReportImagesLoaded } from "@/lib/wait-report-images";
 import { apiUrl } from "@/lib/api-url";
 import {
   avancoPadraoParaProfSpt,
+  exibirSomaGolpes30cm,
+  golpesParaSomas30cmNaLinha,
+  golpesSptNum,
   inferNumeroCliquesSptDeContagemLinhas,
+  numeroAmostraSpt,
   parProfundidadesSptParaClique,
   profDesdeMetroESuplemento,
   profParaMetroESuplemento,
   round2ProfSpt,
+  rowSpanGrupoAmostraSpt,
+  somasGolpes30cm,
+  temGolpesParaColuna30cm,
 } from "@/lib/spt-profundidade-tabela";
 import {
   FIELD_GPS_OPTIONS,
@@ -98,9 +107,9 @@ function mapApiToLinha(s: ApiSptRow): Linha {
   return {
     id: typeof s.id === "number" && Number.isFinite(s.id) ? s.id : undefined,
     prof: round2ProfSpt(s.prof),
-    g1: s.g1,
-    g2: s.g2,
-    g3: s.g3,
+    g1: golpesSptNum(s.g1),
+    g2: golpesSptNum(s.g2),
+    g3: golpesSptNum(s.g3),
     cm1: parseCmApi(s.cm1),
     cm2: parseCmApi(s.cm2),
     cm3: parseCmApi(s.cm3),
@@ -222,12 +231,16 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
   const [coordE, setCoordE] = useState("");
   const [fuso, setFuso] = useState("22S");
   const [responsavel, setResponsavel] = useState("");
+  const [crea, setCrea] = useState("");
+  const [sondador, setSondador] = useState("");
+  const [revestimentoComprimento, setRevestimentoComprimento] = useState("");
+  const [rodapeContato, setRodapeContato] = useState("");
   const [enderecoEmpresa, setEnderecoEmpresa] = useState(
     "Rua Flávio Pires, 131, Araranguá - SC",
   );
   const [obraIdMapa, setObraIdMapa] = useState<number | null>(null);
-  /** Referência WGS84 da obra (centro / contexto no mapa). */
-  const [obraRefMapa, setObraRefMapa] = useState<MapLngLat | null>(null);
+  /** Furos SPT da mesma obra (SPT01, SPT02, …) para o mapa de localização. */
+  const [furosSptObra, setFurosSptObra] = useState<FieldFuroPin[]>([]);
   const [mapRecenterKey, setMapRecenterKey] = useState(0);
   const [userGpsSpt, setUserGpsSpt] = useState<MapLngLat | null>(null);
   const [userGpsSptIsStored, setUserGpsSptIsStored] = useState(false);
@@ -247,20 +260,40 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
   } | null>(null);
   const rascunhoLocalCarregado = useRef(false);
 
+  const profundidadesTabela = useMemo(
+    () => dados.map((l) => l.prof),
+    [dados],
+  );
+
+  const linhasPdf = useMemo(
+    () =>
+      dados.map((l) => ({
+        prof: l.prof,
+        g1: golpesSptNum(l.g1),
+        g2: golpesSptNum(l.g2),
+        g3: golpesSptNum(l.g3),
+        cm1: l.cm1,
+        cm2: l.cm2,
+        cm3: l.cm3,
+        solo: l.solo,
+        soloDetalhe: l.soloDetalhe,
+        obs: l.obs,
+        avanco: l.avanco,
+        reves: l.reves,
+        consistencia: l.consistencia,
+        cor: l.cor,
+      })),
+    [dados],
+  );
+
   const mapCoordsForPdf = useMemo(() => {
     const manual = wgsPairFromInputs(mapaRelLatStr, mapaRelLngStr);
     if (manual) return manual;
-    if (obraRefMapa) return { lat: obraRefMapa.lat, lng: obraRefMapa.lng };
+    const fromUtm = wgs84DeUtm(coordN, coordE, fuso);
+    if (fromUtm) return { lat: fromUtm.lat, lng: fromUtm.lng };
     if (userGpsSpt) return { lat: userGpsSpt.lat, lng: userGpsSpt.lng };
     return null;
-  }, [mapaRelLatStr, mapaRelLngStr, obraRefMapa, userGpsSpt]);
-  const mapCoordsSourceForPdf = useMemo(() => {
-    if (wgsPairFromInputs(mapaRelLatStr, mapaRelLngStr)) return "manual";
-    if (obraRefMapa) return "obra";
-    if (userGpsSpt) return "gps";
-    return null;
-  }, [mapaRelLatStr, mapaRelLngStr, obraRefMapa, userGpsSpt]);
-
+  }, [mapaRelLatStr, mapaRelLngStr, coordN, coordE, fuso, userGpsSpt]);
   useEffect(() => {
     const p = readStoredUserLatLng();
     if (!p) return;
@@ -269,32 +302,158 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
     setMapRecenterKey((k) => k + 1);
   }, []);
 
+  const mapaFuroId = furoId ?? 0;
+
+  const carregarFurosSptObra = useCallback(async () => {
+    if (obraIdMapa == null || !Number.isFinite(obraIdMapa)) {
+      setFurosSptObra([]);
+      return;
+    }
+    try {
+      const r = await fetch(
+        apiUrl(`/api/furo?obraId=${obraIdMapa}&tipo=spt`),
+      );
+      const json = (await r.json()) as
+        | {
+            id: number;
+            codigo: string;
+            latitude?: number | null;
+            longitude?: number | null;
+          }[]
+        | { error?: string };
+      if (!r.ok || !Array.isArray(json)) {
+        setFurosSptObra([]);
+        return;
+      }
+      setFurosSptObra(
+        json.map((f) => ({
+          id: f.id,
+          codigo: String(f.codigo ?? "").trim() || `SPT ${f.id}`,
+          latitude:
+            f.latitude != null && Number.isFinite(f.latitude)
+              ? f.latitude
+              : null,
+          longitude:
+            f.longitude != null && Number.isFinite(f.longitude)
+              ? f.longitude
+              : null,
+        })),
+      );
+    } catch {
+      setFurosSptObra([]);
+    }
+  }, [obraIdMapa]);
+
+  useEffect(() => {
+    void carregarFurosSptObra();
+  }, [carregarFurosSptObra]);
+
   const furosParaMapa = useMemo((): FieldFuroPin[] => {
-    if (furoId === undefined || !Number.isFinite(furoId)) return [];
     const p = wgsPairFromInputs(mapaRelLatStr, mapaRelLngStr);
+    const idAtual =
+      furoId !== undefined && Number.isFinite(furoId) ? furoId : mapaFuroId;
+    const codigoAtual = codigoFuro.trim() || "Furo";
+
+    if (furosSptObra.length > 0) {
+      const lista = furosSptObra.map((f) =>
+        f.id === idAtual
+          ? {
+              ...f,
+              codigo: codigoAtual || f.codigo,
+              latitude: p?.lat ?? f.latitude,
+              longitude: p?.lng ?? f.longitude,
+            }
+          : f,
+      );
+      if (
+        furoId !== undefined &&
+        Number.isFinite(furoId) &&
+        !lista.some((f) => f.id === furoId)
+      ) {
+        lista.push({
+          id: furoId,
+          codigo: codigoAtual,
+          latitude: p?.lat ?? null,
+          longitude: p?.lng ?? null,
+        });
+      }
+      return lista;
+    }
+
     return [
       {
-        id: furoId,
-        codigo: codigoFuro.trim() || "Furo",
+        id: idAtual,
+        codigo: codigoAtual,
         latitude: p?.lat ?? null,
         longitude: p?.lng ?? null,
       },
     ];
-  }, [furoId, codigoFuro, mapaRelLatStr, mapaRelLngStr]);
+  }, [
+    furosSptObra,
+    furoId,
+    mapaFuroId,
+    codigoFuro,
+    mapaRelLatStr,
+    mapaRelLngStr,
+  ]);
 
-  const guardarClickMapaFuro = useCallback(
-    async (_fid: number, lng: number, lat: number) => {
-      if (furoId === undefined || !Number.isFinite(furoId)) return;
-      setAGuardarFuroGps(true);
-      setMapaFuroMsg(null);
-      try {
-        const r = await fetch(apiUrl(`/api/furo/${furoId}`), {
+  const atualizarPinFuroNoMapaObra = useCallback(
+    (fid: number, lat: number | null, lng: number | null) => {
+      setFurosSptObra((prev) =>
+        prev.map((f) =>
+          f.id === fid
+            ? { ...f, latitude: lat, longitude: lng }
+            : f,
+        ),
+      );
+    },
+    [],
+  );
+
+  const aplicarUtmDeWgs = useCallback(
+    (lat: number, lng: number) => {
+      const utm = utmDeWgs84(lat, lng, fuso);
+      if (utm) {
+        setCoordN(utm.norte);
+        setCoordE(utm.este);
+        setFuso(utm.fuso);
+      }
+    },
+    [fuso],
+  );
+
+  const aplicarPosicaoWgsNoMapa = useCallback(
+    (lat: number, lng: number, persistirApi: boolean) => {
+      setMapaRelLatStr(lat.toFixed(6));
+      setMapaRelLngStr(lng.toFixed(6));
+      aplicarUtmDeWgs(lat, lng);
+      setMapRecenterKey((k) => k + 1);
+      if (
+        persistirApi &&
+        furoId !== undefined &&
+        Number.isFinite(furoId)
+      ) {
+        return fetch(apiUrl(`/api/furo/${furoId}`), {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ latitude: lat, longitude: lng }),
         });
-        const data = (await r.json().catch(() => ({}))) as { error?: string };
-        if (!r.ok) {
+      }
+      return Promise.resolve(new Response(null, { status: 200 }));
+    },
+    [aplicarUtmDeWgs, furoId],
+  );
+
+  const guardarClickMapaFuro = useCallback(
+    async (_fid: number, lng: number, lat: number) => {
+      setAGuardarFuroGps(true);
+      setMapaFuroMsg(null);
+      try {
+        const r = await aplicarPosicaoWgsNoMapa(lat, lng, true);
+        if (r && !r.ok) {
+          const data = (await r.json().catch(() => ({}))) as {
+            error?: string;
+          };
           setMapaFuroMsg(
             typeof data.error === "string"
               ? data.error
@@ -302,39 +461,46 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
           );
           return;
         }
-        setMapaRelLatStr(lat.toFixed(6));
-        setMapaRelLngStr(lng.toFixed(6));
-        setMapRecenterKey((k) => k + 1);
+        if (furoId !== undefined && Number.isFinite(furoId)) {
+          atualizarPinFuroNoMapaObra(furoId, lat, lng);
+        }
+        setMapaFuroMsg(null);
       } catch {
         setMapaFuroMsg("Falha de rede ao guardar GPS");
       } finally {
         setAGuardarFuroGps(false);
       }
     },
-    [furoId],
+    [aplicarPosicaoWgsNoMapa, furoId, atualizarPinFuroNoMapaObra],
   );
 
   async function limparGpsFuroSpt() {
-    if (furoId === undefined || !Number.isFinite(furoId)) return;
     setAGuardarFuroGps(true);
     setMapaFuroMsg(null);
     try {
-      const r = await fetch(apiUrl(`/api/furo/${furoId}`), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latitude: null, longitude: null }),
-      });
-      const data = (await r.json().catch(() => ({}))) as { error?: string };
-      if (!r.ok) {
-        setMapaFuroMsg(
-          typeof data.error === "string"
-            ? data.error
-            : "Erro ao limpar posição",
-        );
-        return;
+      if (furoId !== undefined && Number.isFinite(furoId)) {
+        const r = await fetch(apiUrl(`/api/furo/${furoId}`), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ latitude: null, longitude: null }),
+        });
+        const data = (await r.json().catch(() => ({}))) as { error?: string };
+        if (!r.ok) {
+          setMapaFuroMsg(
+            typeof data.error === "string"
+              ? data.error
+              : "Erro ao limpar posição",
+          );
+          return;
+        }
       }
       setMapaRelLatStr("");
       setMapaRelLngStr("");
+      setCoordN("");
+      setCoordE("");
+      if (furoId !== undefined && Number.isFinite(furoId)) {
+        atualizarPinFuroNoMapaObra(furoId, null, null);
+      }
       setMapRecenterKey((k) => k + 1);
     } catch {
       setMapaFuroMsg("Falha de rede");
@@ -382,7 +548,6 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
 
   /** Obtém GPS do dispositivo e grava como posição do furo (marcação automática). */
   function marcarFuroComGpsAutomatico() {
-    if (furoId === undefined || !Number.isFinite(furoId)) return;
     setMapaFuroMsg(null);
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setMapaFuroMsg("Geolocalização não disponível neste dispositivo.");
@@ -398,15 +563,15 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
         setUserGpsSpt({ lat, lng });
         void (async () => {
           try {
-            const r = await fetch(apiUrl(`/api/furo/${furoId}`), {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ latitude: lat, longitude: lng }),
-            });
-            const data = (await r.json().catch(() => ({}))) as {
-              error?: string;
-            };
-            if (!r.ok) {
+            const r = await aplicarPosicaoWgsNoMapa(
+              lat,
+              lng,
+              furoId !== undefined && Number.isFinite(furoId),
+            );
+            if (r && !r.ok) {
+              const data = (await r.json().catch(() => ({}))) as {
+                error?: string;
+              };
               setMapaFuroMsg(
                 typeof data.error === "string"
                   ? data.error
@@ -414,9 +579,9 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
               );
               return;
             }
-            setMapaRelLatStr(lat.toFixed(6));
-            setMapaRelLngStr(lng.toFixed(6));
-            setMapRecenterKey((k) => k + 1);
+            if (furoId !== undefined && Number.isFinite(furoId)) {
+              atualizarPinFuroNoMapaObra(furoId, lat, lng);
+            }
             setMapaFuroMsg(null);
           } catch {
             setMapaFuroMsg("Falha de rede ao guardar GPS");
@@ -514,6 +679,7 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
       ) {
         setMapaRelLatStr(fLat.toFixed(6));
         setMapaRelLngStr(fLng.toFixed(6));
+        aplicarUtmDeWgs(fLat, fLng);
       } else if (
         oLat != null &&
         oLng != null &&
@@ -522,31 +688,18 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
       ) {
         setMapaRelLatStr(oLat.toFixed(6));
         setMapaRelLngStr(oLng.toFixed(6));
+        aplicarUtmDeWgs(oLat, oLng);
       }
 
       if (json.obra) {
         setCliente(String(json.obra.cliente ?? ""));
         setObra(String(json.obra.nome ?? ""));
         setLocalObra(String(json.obra.local ?? ""));
-        const olat = json.obra.latitude;
-        const olng = json.obra.longitude;
-        if (
-          olat != null &&
-          olng != null &&
-          Number.isFinite(olat) &&
-          Number.isFinite(olng)
-        ) {
-          setObraRefMapa({ lat: olat, lng: olng });
-        } else {
-          setObraRefMapa(null);
-        }
-      } else {
-        setObraRefMapa(null);
       }
     } catch {
       /* cabeçalho PDF continua editável manualmente */
     }
-  }, [furoId]);
+  }, [furoId, aplicarUtmDeWgs]);
 
   const guardarNomeSondagemNoFuro = useCallback(async () => {
     if (furoId === undefined || !Number.isFinite(furoId)) return;
@@ -615,14 +768,27 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
       const j = JSON.parse(raw) as {
         codigoFuro?: string;
         dados?: Linha[];
+        coordN?: string;
+        coordE?: string;
+        fuso?: string;
+        mapaRelLatStr?: string;
+        mapaRelLngStr?: string;
       };
       rascunhoLocalCarregado.current = true;
       if (typeof j.codigoFuro === "string" && j.codigoFuro.trim())
         setCodigoFuro(j.codigoFuro);
+      if (typeof j.coordN === "string") setCoordN(j.coordN);
+      if (typeof j.coordE === "string") setCoordE(j.coordE);
+      if (typeof j.fuso === "string" && j.fuso.trim()) setFuso(j.fuso);
+      if (typeof j.mapaRelLatStr === "string") setMapaRelLatStr(j.mapaRelLatStr);
+      if (typeof j.mapaRelLngStr === "string") setMapaRelLngStr(j.mapaRelLngStr);
       if (Array.isArray(j.dados) && j.dados.length > 0) {
         const rows = j.dados.map((row) => {
           const { id: _id, ...rest } = row;
           const r = { ...rest } as Linha;
+          r.g1 = golpesSptNum(r.g1);
+          r.g2 = golpesSptNum(r.g2);
+          r.g3 = golpesSptNum(r.g3);
           if (!String(r.avanco ?? "").trim()) {
             r.avanco = avancoPadraoParaProfSpt(round2ProfSpt(r.prof));
           }
@@ -720,6 +886,11 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
       const payload = {
         v: 1 as const,
         codigoFuro: codigoFuro.trim(),
+        coordN,
+        coordE,
+        fuso,
+        mapaRelLatStr,
+        mapaRelLngStr,
         dados: dados.map((l) => {
           const { id: _id, ...rest } = l;
           return rest;
@@ -812,6 +983,8 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
           solo: s,
           cor: s.trim() ? corSoloSpt(s) : COR_SOLO_PADRAO,
         };
+      } else if (campo === "g1" || campo === "g2" || campo === "g3") {
+        novo[index] = { ...cur, [campo]: golpesSptNum(valor) };
       } else {
         novo[index] = { ...cur, [campo]: valor };
       }
@@ -849,10 +1022,6 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
     });
   }
 
-  function calcN(l: Linha) {
-    return l.g2 + l.g3;
-  }
-
   async function gerarPDF() {
     const el = pdfRef.current;
     if (!el || dados.length === 0) {
@@ -862,16 +1031,21 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
     setPdfErro(null);
     setPdfLoading(true);
     try {
-      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      const mapHost = el.querySelector("[data-spt-pdf-has-map]");
+      if (mapHost) {
+        mapHost.scrollIntoView({ block: "center", behavior: "smooth" });
+      } else {
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
       const esperaMapa = mapCoordsForPdf != null;
       const esperaFotos = fotosRelatorio.length > 0;
       await new Promise((r) =>
-        setTimeout(r, esperaMapa || esperaFotos ? 1100 : 500),
+        setTimeout(r, esperaMapa ? 2500 : esperaFotos ? 1100 : 500),
       );
       await new Promise<void>((r) =>
         requestAnimationFrame(() => requestAnimationFrame(() => r())),
       );
-      await aguardarMapaPdfNoDom(el, 25_000);
+      await aguardarMapaPdfNoDom(el, 35_000);
       await waitReportImagesLoaded(el, 30_000);
       const canvas = await html2canvas(el, html2canvasReportOptions());
       if (canvas.width < 2 || canvas.height < 2) {
@@ -1000,86 +1174,119 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
         1/30.
       </p>
 
-      {furoId !== undefined && Number.isFinite(furoId) && (
-        <section
-          id="mapa-furo-spt"
-          className="mb-8 print:hidden"
-          aria-label="Localização do furo no mapa"
-        >
-          <h2 className="mb-2 text-lg font-semibold text-[var(--text)]">
-            Localização do furo (mapa)
-          </h2>
-          <p className="mb-3 max-w-3xl text-sm text-[var(--muted)]">
-            <strong className="text-[var(--text)]">Automático:</strong> use «Marcar
-            com GPS» para gravar a posição atual do telemóvel neste furo.{" "}
-            <strong className="text-[var(--text)]">Manual:</strong> toque no mapa no
-            ponto exato do furo (também grava na hora). «Ver só a minha posição»
-            mostra o ponto azul sem gravar — útil para afinar antes de tocar no mapa.
-            O marcador «Obra» é a referência da obra, se existir.
-          </p>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={aGuardarFuroGps}
-              onClick={marcarFuroComGpsAutomatico}
-              className="rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-700 disabled:opacity-50"
-            >
-              Marcar com GPS (automático)
-            </button>
-            <button
-              type="button"
-              disabled={aGuardarFuroGps}
-              onClick={verMinhaPosicaoNoMapa}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface)] disabled:opacity-50"
-            >
-              Ver só a minha posição
-            </button>
-            <button
-              type="button"
-              disabled={
-                aGuardarFuroGps ||
-                !wgsPairFromInputs(mapaRelLatStr, mapaRelLngStr)
-              }
-              onClick={() => void limparGpsFuroSpt()}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--muted)] hover:text-red-600 disabled:opacity-50 dark:hover:text-red-400"
-            >
-              Limpar posição do furo
-            </button>
-            {aGuardarFuroGps && (
-              <span className="text-sm text-[var(--muted)]">A guardar…</span>
-            )}
-          </div>
-          {mapaFuroMsg && (
-            <p
-              className="mb-3 text-sm text-red-600 dark:text-red-400"
-              role="alert"
-            >
-              {mapaFuroMsg}
-            </p>
+      <section
+        id="mapa-furo-spt"
+        className="mb-8 print:hidden"
+        aria-label="Localização do furo no mapa"
+      >
+        <h2 className="mb-2 text-lg font-semibold text-[var(--text)]">
+          Localização do furo (mapa)
+        </h2>
+        <p className="mb-3 max-w-3xl text-sm text-[var(--muted)]">
+          Mostra os furos <strong className="text-[var(--text)]">SPT</strong> desta
+          obra (ex.: SPT01, SPT02) — sem pino da obra. O furo em edição destaca-se a
+          verde. <strong className="text-[var(--text)]">Automático:</strong> «Marcar
+          com GPS» grava a posição neste furo.{" "}
+          <strong className="text-[var(--text)]">Manual:</strong> toque no mapa no
+          ponto do furo em edição.
+        </p>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={aGuardarFuroGps}
+            onClick={marcarFuroComGpsAutomatico}
+            className="rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-700 disabled:opacity-50"
+          >
+            Marcar com GPS (automático)
+          </button>
+          <button
+            type="button"
+            disabled={aGuardarFuroGps}
+            onClick={verMinhaPosicaoNoMapa}
+            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface)] disabled:opacity-50"
+          >
+            Ver só a minha posição
+          </button>
+          <button
+            type="button"
+            disabled={
+              aGuardarFuroGps ||
+              !wgsPairFromInputs(mapaRelLatStr, mapaRelLngStr)
+            }
+            onClick={() => void limparGpsFuroSpt()}
+            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--muted)] hover:text-red-600 disabled:opacity-50 dark:hover:text-red-400"
+          >
+            Limpar posição do furo
+          </button>
+          {aGuardarFuroGps && (
+            <span className="text-sm text-[var(--muted)]">A guardar…</span>
           )}
-          <FieldCampaignMap
-            obraPosition={obraRefMapa}
-            furos={furosParaMapa}
-            mapMode="furo"
-            selectedFuroId={furoId}
-            userPosition={userGpsSpt}
-            userPositionTitle={
-              userGpsSptIsStored
-                ? "A sua posição (última guardada neste dispositivo)"
-                : "A sua posição (GPS)"
-            }
-            recenterKey={mapRecenterKey}
-            onObraMapClick={() => {}}
-            onFuroMapClick={(id, lng, lat) => void guardarClickMapaFuro(id, lng, lat)}
-            hint={
-              <p className="mt-2 text-xs text-[var(--muted)]">
-                <strong className="text-[var(--text)]">Manual:</strong> toque no mapa
-                para definir ou corrigir o pino do furo.
-              </p>
-            }
-          />
-        </section>
-      )}
+        </div>
+        {mapaFuroMsg && (
+          <p
+            className="mb-3 text-sm text-red-600 dark:text-red-400"
+            role="alert"
+          >
+            {mapaFuroMsg}
+          </p>
+        )}
+        <FieldCampaignMap
+          obraPosition={null}
+          furos={furosParaMapa}
+          mapMode="furo"
+          selectedFuroId={mapaFuroId}
+          userPosition={userGpsSpt}
+          userPositionTitle={
+            userGpsSptIsStored
+              ? "A sua posição (última guardada neste dispositivo)"
+              : "A sua posição (GPS)"
+          }
+          recenterKey={mapRecenterKey}
+          onObraMapClick={() => {}}
+          onFuroMapClick={(id, lng, lat) => void guardarClickMapaFuro(id, lng, lat)}
+          hint={
+            <p className="mt-2 text-xs text-[var(--muted)]">
+              <strong className="text-[var(--text)]">Manual:</strong> toque no mapa
+              para definir ou corrigir o pino do furo.
+            </p>
+          }
+        />
+        <CoordenadasUtmFuroPanel
+          coordN={coordN}
+          coordE={coordE}
+          fuso={fuso}
+          latStr={mapaRelLatStr}
+          lngStr={mapaRelLngStr}
+          onCoordN={setCoordN}
+          onCoordE={setCoordE}
+          onFuso={setFuso}
+          onLatStr={setMapaRelLatStr}
+          onLngStr={setMapaRelLngStr}
+          onMapRecenter={() => setMapRecenterKey((k) => k + 1)}
+          onPersistirWgs={
+            furoId !== undefined && Number.isFinite(furoId)
+              ? async (lat, lng) => {
+                  const r = await fetch(apiUrl(`/api/furo/${furoId}`), {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ latitude: lat, longitude: lng }),
+                  });
+                  if (!r.ok) {
+                    const data = (await r.json().catch(() => ({}))) as {
+                      error?: string;
+                    };
+                    throw new Error(
+                      typeof data.error === "string"
+                        ? data.error
+                        : "Erro ao guardar",
+                    );
+                  }
+                  aplicarUtmDeWgs(lat, lng);
+                }
+              : undefined
+          }
+        />
+      </section>
 
       {loadError && (
         <p className="mb-3 text-sm text-red-600 dark:text-red-400" role="alert">
@@ -1122,51 +1329,105 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
         <table className="w-full border-collapse border border-[var(--border)] text-sm">
           <thead className="bg-[var(--surface)]">
             <tr className="text-[var(--text)]">
-              <th className="border border-[var(--border)] p-2 font-semibold">
+              <th
+                className="border border-[var(--border)] p-2 font-semibold"
+                rowSpan={2}
+              >
                 <span className="block">Metro (m)</span>
                 <span className="block text-[10px] font-normal text-[var(--muted)]">
                   Parte inteira (0, 1, 2…)
                 </span>
               </th>
-              <th className="border border-[var(--border)] p-2 font-semibold">
+              <th
+                className="border border-[var(--border)] p-2 font-semibold"
+                rowSpan={2}
+              >
                 <span className="block">+ (m)</span>
                 <span className="block text-[10px] font-normal text-[var(--muted)]">
                   Complemento: 0; 0,05; 0,45…
                 </span>
               </th>
-              <th className="border border-[var(--border)] p-2 font-semibold">
+              <th
+                className="w-14 border border-[var(--border)] p-2 font-semibold"
+                rowSpan={2}
+              >
+                <span className="block">Nº Amost.</span>
+                <span className="block text-[10px] font-normal text-[var(--muted)]">
+                  0 m→0; 1–2 m→1…
+                </span>
+              </th>
+              <th
+                className="border border-[var(--border)] p-2 font-semibold"
+                rowSpan={2}
+              >
                 Avanço
               </th>
-              <th className="w-14 border border-[var(--border)] p-2 font-semibold">
+              <th
+                className="w-14 border border-[var(--border)] p-2 font-semibold"
+                rowSpan={2}
+              >
                 Reves.
               </th>
-              <th className="w-16 border border-[var(--border)] p-2 font-semibold">
+              <th
+                className="w-16 border border-[var(--border)] p-2 font-semibold"
+                rowSpan={2}
+              >
                 Consist.
               </th>
-              <th className="border border-[var(--border)] p-1 font-semibold">
+              <th
+                className="border border-[var(--border)] p-1 font-semibold"
+                rowSpan={2}
+              >
                 <span className="block">1º</span>
                 <span className="block text-[10px] font-normal text-[var(--muted)]">
                   bat. / cm
                 </span>
               </th>
-              <th className="border border-[var(--border)] p-1 font-semibold">
+              <th
+                className="border border-[var(--border)] p-1 font-semibold"
+                rowSpan={2}
+              >
                 <span className="block">2º</span>
                 <span className="block text-[10px] font-normal text-[var(--muted)]">
                   bat. / cm
                 </span>
               </th>
-              <th className="border border-[var(--border)] p-1 font-semibold">
+              <th
+                className="border border-[var(--border)] p-1 font-semibold"
+                rowSpan={2}
+              >
                 <span className="block">3º</span>
                 <span className="block text-[10px] font-normal text-[var(--muted)]">
                   bat. / cm
                 </span>
               </th>
-              <th className="border border-[var(--border)] p-2 font-semibold">N</th>
-              <th className="w-64 border border-[var(--border)] p-2 font-semibold">
+              <th
+                className="border border-[var(--border)] px-1 py-2 text-center text-[10px] font-semibold leading-tight"
+                colSpan={2}
+              >
+                Nº de Golpes de
+                <br />
+                Penetração 30 cm
+              </th>
+              <th
+                className="w-64 border border-[var(--border)] p-2 font-semibold"
+                rowSpan={2}
+              >
                 Descrição do Solo
               </th>
-              <th className="w-48 border border-[var(--border)] p-2 font-semibold">
+              <th
+                className="w-48 border border-[var(--border)] p-2 font-semibold"
+                rowSpan={2}
+              >
                 Observações
+              </th>
+            </tr>
+            <tr className="text-[var(--text)]">
+              <th className="border border-[var(--border)] p-1 text-xs font-semibold">
+                1º + 2º
+              </th>
+              <th className="border border-[var(--border)] p-1 text-xs font-semibold">
+                2º + 3º
               </th>
             </tr>
           </thead>
@@ -1174,6 +1435,15 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
           <tbody>
             {dados.map((l, i) => {
               const { metro, suplemento } = profParaMetroESuplemento(l.prof);
+              const avEfetivo =
+                (l.avanco ?? "").trim() || avancoPadraoParaProfSpt(l.prof);
+              const amostraSpan = rowSpanGrupoAmostraSpt(i, profundidadesTabela);
+              const golpesSoma = golpesParaSomas30cmNaLinha(dados, i);
+              const { s12, s23 } = somasGolpes30cm(
+                golpesSoma.g1,
+                golpesSoma.g2,
+                golpesSoma.g3,
+              );
               return (
               <tr
                 key={l.id != null ? `spt-${l.id}` : `spt-row-${i}`}
@@ -1211,6 +1481,16 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
                     aria-label={`Linha ${i + 1}: complemento (m)`}
                   />
                 </td>
+
+                {amostraSpan.exibir ? (
+                  <td
+                    rowSpan={amostraSpan.span}
+                    className="border border-[var(--border)] bg-[var(--surface)] p-2 align-middle font-semibold text-[var(--text)]"
+                    title="1 amostra por metro: 0 m→0; de 1 m a antes de 2 m→1; etc."
+                  >
+                    {numeroAmostraSpt(l.prof)}
+                  </td>
+                ) : null}
 
                 <td className="border border-[var(--border)] p-2">
                   <select
@@ -1336,8 +1616,33 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
                   </div>
                 </td>
 
-                <td className="border border-[var(--border)] bg-[var(--surface)] p-2 font-bold">
-                  {calcN(l)}
+                <td className="border border-[var(--border)] bg-[var(--surface)] p-2 font-bold tabular-nums">
+                  {exibirSomaGolpes30cm(
+                    s12,
+                    avEfetivo,
+                    "s12",
+                    "campo",
+                    temGolpesParaColuna30cm(
+                      golpesSoma.g1,
+                      golpesSoma.g2,
+                      golpesSoma.g3,
+                      "s12",
+                    ),
+                  )}
+                </td>
+                <td className="border border-[var(--border)] bg-[var(--surface)] p-2 font-bold tabular-nums">
+                  {exibirSomaGolpes30cm(
+                    s23,
+                    avEfetivo,
+                    "s23",
+                    "campo",
+                    temGolpesParaColuna30cm(
+                      golpesSoma.g1,
+                      golpesSoma.g2,
+                      golpesSoma.g3,
+                      "s23",
+                    ),
+                  )}
                 </td>
 
                 <td className="border border-[var(--border)] p-0 text-left align-top">
@@ -1349,29 +1654,14 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
                       aria-hidden
                     />
                     <div className="min-w-0 flex-1 p-2">
-                      <select
-                        value={l.solo}
-                        onChange={(e) =>
-                          atualizar(i, "solo", e.target.value)
+                      <SoloNomenclaturaCampo
+                        compact
+                        tipoPrincipal={l.solo}
+                        detalhe={l.soloDetalhe}
+                        onTipoChange={(tipo) => atualizar(i, "solo", tipo)}
+                        onDetalheChange={(d) =>
+                          atualizar(i, "soloDetalhe", d)
                         }
-                        className="w-full rounded border border-[var(--border)] bg-[var(--surface)] p-1 text-[var(--text)]"
-                      >
-                        <option value="">Selecionar</option>
-                        {TIPOS_SOLO.map((tipo) => (
-                          <option key={tipo} value={tipo}>
-                            {tipo}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        value={l.soloDetalhe}
-                        onChange={(e) =>
-                          atualizar(i, "soloDetalhe", e.target.value)
-                        }
-                        placeholder="Detalhar (ex: com pedregulho, úmida...)"
-                        className="mt-1 w-full rounded border border-[var(--border)] bg-[var(--surface)] p-1 text-left text-xs text-[var(--text)]"
-                        autoComplete="off"
                       />
                     </div>
                   </div>
@@ -1396,10 +1686,10 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
       {dados.length > 0 && (
         <section
           className="mt-10 border-t border-[var(--border)] pt-8"
-          aria-label="Relatório PDF SOILSUL"
+          aria-label="Relatório PDF DataGeo Digital"
         >
           <h2 className="mb-2 text-lg font-semibold text-[var(--text)]">
-            Relatório (PDF) — modelo SOILSUL / NBR 6484
+            Relatório (PDF) — DataGeo Digital / NBR 6484
           </h2>
           <p className="mb-4 text-sm text-[var(--muted)]">
             Cabeçalho técnico e grelha de campo. O gráfico usa 2º+3º (azul) e
@@ -1415,174 +1705,158 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
           </div>
 
           <div className="mb-4 grid gap-3 sm:grid-cols-2 print:hidden">
-            <input
-              placeholder="Cliente"
+            <LabeledInput
+              id="spt-pdf-cliente"
+              label="Cliente"
               value={cliente}
               onChange={(e) => setCliente(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
             />
-            <input
-              placeholder="Obra"
+            <LabeledInput
+              id="spt-pdf-obra"
+              label="Obra"
               value={obra}
               onChange={(e) => setObra(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
             />
-            <input
-              placeholder="Local"
+            <LabeledInput
+              id="spt-pdf-local"
+              label="Local"
               value={localObra}
               onChange={(e) => setLocalObra(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
             />
-            <input
-              placeholder="Data início"
+            <LabeledInput
+              id="spt-pdf-data-inicio"
+              label="Data início"
               value={dataInicio}
               onChange={(e) => setDataInicio(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
+              placeholder="dd/mm/aaaa"
             />
-            <input
-              placeholder="Data término"
+            <LabeledInput
+              id="spt-pdf-data-fim"
+              label="Data término"
               value={dataFim}
               onChange={(e) => setDataFim(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
+              placeholder="dd/mm/aaaa"
             />
-            <input
+            <LabeledInput
+              id="spt-pdf-pagina"
+              label="Página"
               type="number"
               min={1}
-              placeholder="Página"
               value={paginaPdf}
               onChange={(e) =>
                 setPaginaPdf(Math.max(1, Number(e.target.value) || 1))
               }
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
             />
-            <input
+            <LabeledInput
+              id="spt-pdf-total-paginas"
+              label="Total de páginas"
               type="number"
               min={1}
-              placeholder="Total páginas"
               value={totalPaginasPdf}
               onChange={(e) =>
                 setTotalPaginasPdf(Math.max(1, Number(e.target.value) || 1))
               }
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
             />
-            <input
-              placeholder="Amostrador Ø ext. (mm)"
+            <LabeledInput
+              id="spt-pdf-amostrador-ext"
+              label="Amostrador Ø ext. (mm)"
               value={amostradorExt}
               onChange={(e) => setAmostradorExt(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
             />
-            <input
-              placeholder="Amostrador Ø int. (mm)"
+            <LabeledInput
+              id="spt-pdf-amostrador-int"
+              label="Amostrador Ø int. (mm)"
               value={amostradorInt}
               onChange={(e) => setAmostradorInt(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
             />
-            <input
-              placeholder="Revestimento (mm)"
+            <LabeledInput
+              id="spt-pdf-revestimento"
+              label="Revestimento (mm)"
               value={revestimentoMeta}
               onChange={(e) => setRevestimentoMeta(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
             />
-            <input
-              placeholder="Trado (mm)"
+            <LabeledInput
+              id="spt-pdf-trado"
+              label="Trado (mm)"
               value={trado}
               onChange={(e) => setTrado(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
             />
-            <input
-              placeholder="Altura de queda"
+            <LabeledInput
+              id="spt-pdf-altura-queda"
+              label="Altura de queda"
               value={alturaQueda}
               onChange={(e) => setAlturaQueda(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
             />
-            <input
-              placeholder="Peso martelo"
+            <LabeledInput
+              id="spt-pdf-peso-martelo"
+              label="Peso martelo"
               value={pesoMartelo}
               onChange={(e) => setPesoMartelo(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
             />
-            <input
-              placeholder="Sistema (ex.: manual)"
+            <LabeledInput
+              id="spt-pdf-sistema"
+              label="Sistema"
               value={sistema}
               onChange={(e) => setSistema(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
+              placeholder="ex.: manual"
             />
-            <input
-              placeholder="Cota (m)"
+            <LabeledInput
+              id="spt-pdf-cota"
+              label="Cota (m)"
               value={cota}
               onChange={(e) => setCota(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
             />
-            <input
-              placeholder="Nível d'água (texto)"
+            <LabeledInput
+              id="spt-pdf-nivel-agua"
+              label="Nível d'água (texto)"
               value={nivelAgua}
               onChange={(e) => setNivelAgua(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
             />
-            <input
-              placeholder="Prof. N.A. para barra na grelha (m)"
+            <LabeledInput
+              id="spt-pdf-na-prof"
+              label="Prof. N.A. na grelha (m)"
               value={naProfundidade}
               onChange={(e) => setNaProfundidade(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
             />
-            <input
-              placeholder="Coord. Norte"
-              value={coordN}
-              onChange={(e) => setCoordN(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
+            <LabeledInput
+              id="spt-pdf-sondador"
+              label="Sondador"
+              value={sondador}
+              onChange={(e) => setSondador(e.target.value)}
             />
-            <input
-              placeholder="Coord. Este"
-              value={coordE}
-              onChange={(e) => setCoordE(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
-            />
-            <input
-              placeholder="Latitude mapa PDF (WGS84 °, ex. -27,59)"
-              value={mapaRelLatStr}
-              onChange={(e) => setMapaRelLatStr(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
-              inputMode="decimal"
-            />
-            <input
-              placeholder="Longitude mapa PDF (WGS84 °, ex. -48,55)"
-              value={mapaRelLngStr}
-              onChange={(e) => setMapaRelLngStr(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
-              inputMode="decimal"
-            />
-            <p className="text-xs text-[var(--muted)] sm:col-span-2 print:hidden">
-              O mapa no relatório usa estes dois campos (graus decimais). São
-              preenchidos automaticamente se o furo ou a obra tiver GPS; caso
-              contrário, indique manualmente ou defina a localização na página da
-              obra.
-            </p>
-            {mapCoordsForPdf && mapCoordsSourceForPdf !== "manual" && (
-              <p className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800 sm:col-span-2 print:hidden dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-200">
-                Mapa será gerado com fallback de{" "}
-                {mapCoordsSourceForPdf === "obra"
-                  ? "coordenadas da obra"
-                  : "posição GPS disponível"}
-                .
-              </p>
-            )}
-            <input
-              placeholder="Fuso"
-              value={fuso}
-              onChange={(e) => setFuso(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm"
-            />
-            <input
-              placeholder="Responsável técnico"
+            <LabeledInput
+              id="spt-pdf-responsavel"
+              label="Responsável técnico"
               value={responsavel}
               onChange={(e) => setResponsavel(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm sm:col-span-2"
             />
-            <input
-              placeholder="Endereço (rodapé)"
+            <LabeledInput
+              id="spt-pdf-crea"
+              label="CREA"
+              value={crea}
+              onChange={(e) => setCrea(e.target.value)}
+              placeholder="ex.: SC 137171-0"
+            />
+            <LabeledInput
+              id="spt-pdf-rev-comp"
+              label="Comprimento revestimento (m)"
+              value={revestimentoComprimento}
+              onChange={(e) => setRevestimentoComprimento(e.target.value)}
+            />
+            <LabeledInput
+              id="spt-pdf-endereco"
+              label="Endereço (rodapé)"
               value={enderecoEmpresa}
               onChange={(e) => setEnderecoEmpresa(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm sm:col-span-2"
+              wrapperClassName="sm:col-span-2"
+            />
+            <LabeledInput
+              id="spt-pdf-rodape"
+              label="Contacto rodapé"
+              value={rodapeContato}
+              onChange={(e) => setRodapeContato(e.target.value)}
+              placeholder="tel., e-mail, site"
+              wrapperClassName="sm:col-span-2"
             />
           </div>
 
@@ -1604,9 +1878,16 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
             </p>
           )}
 
+          {!mapCoordsForPdf && (
+            <p className="mb-4 text-sm text-amber-800 dark:text-amber-200 print:hidden">
+              Mapa de localização: defina o pino no mapa, use GPS ou preencha
+              Coord. Norte/Este e clique em «Atualizar mapa».
+            </p>
+          )}
+
           <SptRelatorioSoilsulPdf
             ref={pdfRef}
-            linhas={dados}
+            linhas={linhasPdf}
             meta={{
               furoCodigo: codigoFuro,
               cliente,
@@ -1619,6 +1900,7 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
               amostradorExt,
               amostradorInt,
               revestimento: revestimentoMeta,
+              revestimentoComprimento: revestimentoComprimento || undefined,
               trado,
               alturaQueda,
               pesoMartelo,
@@ -1629,8 +1911,11 @@ export function SptRegistroCampo({ furoId }: SptRegistroCampoProps) {
               coordN,
               coordE,
               fuso,
+              sondador: sondador || undefined,
               responsavel,
+              crea: crea || undefined,
               endereco: enderecoEmpresa,
+              rodapeContato: rodapeContato || undefined,
               mapaLatitude: mapCoordsForPdf?.lat,
               mapaLongitude: mapCoordsForPdf?.lng,
               mapaZoom: 16,

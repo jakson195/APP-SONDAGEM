@@ -16,13 +16,15 @@ type Props = {
 export function ObraLocationStaticPreview({ lat, lng, obraId, obraNome }: Props) {
   const [zoom, setZoom] = useState(16);
 
-  const src = useMemo(
-    () =>
-      apiUrl(
-        `/api/map-location?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}&zoom=${zoom}`,
-      ),
-    [lat, lng, zoom],
-  );
+  const src = useMemo(() => {
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lng: String(lng),
+      zoom: String(zoom),
+      label: obraNome.trim() || "Obra",
+    });
+    return apiUrl(`/api/map-location?${params.toString()}`);
+  }, [lat, lng, zoom, obraNome]);
 
   const safeName = obraNome.replace(/[^\w.-]+/g, "_").slice(0, 40) || "obra";
 
@@ -35,8 +37,8 @@ export function ObraLocationStaticPreview({ lat, lng, obraId, obraNome }: Props)
         Mapa de localização
       </h3>
       <p className="mt-1 text-sm text-[var(--muted)]">
-        Imagem gerada a partir do ponto definido acima (Google Static Maps). Útil para
-        anexar a relatórios ou impressão.
+        Vista de satélite (Esri, igual ao mapa de campo) centrada no ponto da obra.
+        Se a rede bloquear satélite, usa mapa de ruas (Carto) automaticamente.
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -82,16 +84,8 @@ export function ObraLocationStaticPreview({ lat, lng, obraId, obraNome }: Props)
       </div>
 
       <p className="mt-2 text-xs text-[var(--muted)]">
-        É necessária a API <strong className="text-[var(--text)]">Maps Static API</strong>{" "}
-        na chave Google (além do mapa interativo). Pode usar a mesma chave em{" "}
-        <code className="rounded bg-black/5 px-1 text-[11px] dark:bg-white/10">
-          NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-        </code>{" "}
-        ou definir{" "}
-        <code className="rounded bg-black/5 px-1 text-[11px] dark:bg-white/10">
-          GOOGLE_MAPS_API_KEY
-        </code>{" "}
-        só no servidor.
+        Coordenadas: {lat.toFixed(6)}, {lng.toFixed(6)} (WGS84). Opcional: variável
+        GOOGLE_MAPS_API_KEY para satélite Google na API.
       </p>
     </section>
   );

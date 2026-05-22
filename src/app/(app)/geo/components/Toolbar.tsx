@@ -1,6 +1,7 @@
 export type ToolbarProps = {
   onNovoFuro?: () => void;
   onMedir?: () => void;
+  onCalcularArea?: () => void;
   onLocalizacao?: () => void;
   onImportarMapa?: () => void;
   onExportarPontos?: () => void;
@@ -9,6 +10,7 @@ export type ToolbarProps = {
 export default function Toolbar({
   onNovoFuro,
   onMedir,
+  onCalcularArea,
   onLocalizacao,
   onImportarMapa,
   onExportarPontos,
@@ -28,6 +30,9 @@ export default function Toolbar({
       <button type="button" className={btnClass} onClick={onMedir}>
         📏 Medir
       </button>
+      <button type="button" className={btnClass} onClick={onCalcularArea}>
+        📐 Calcular área
+      </button>
       <button type="button" className={btnClass} onClick={onLocalizacao}>
         📡 Minha localização
       </button>
@@ -35,9 +40,9 @@ export default function Toolbar({
         type="button"
         className={btnClass}
         onClick={onImportarMapa}
-        title="PDF/TIFF georreferenciado ou KML/KMZ"
+        title="PDF, GeoTIFF (CRS/UTM detetado automaticamente) ou KML/KMZ"
       >
-        🗺️ Importar mapa (PDF / TIFF / KML / KMZ)
+        🗺️ Importar mapa (PDF / GeoTIFF / KML)
       </button>
       <button type="button" className={btnClass} onClick={onExportarPontos}>
         ⬇️ Exportar pontos (KML / KMZ)

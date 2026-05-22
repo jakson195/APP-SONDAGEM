@@ -1,8 +1,8 @@
 import type { BoreholeInput, SptReading } from "@/lib/types";
 
-const STORAGE_KEY = "vision-sondagem-boreholes";
+const STORAGE_KEY = "datageo-digital-boreholes";
 
-export const BOREHOLES_CHANGED_EVENT = "vision-sondagem-boreholes-changed";
+export const BOREHOLES_CHANGED_EVENT = "datageo-digital-boreholes-changed";
 
 export function notifyBoreholesChanged(): void {
   if (typeof window === "undefined") return;

@@ -4,7 +4,7 @@ export async function waitReportImagesLoaded(
   maxMs: number,
 ): Promise<void> {
   const imgs = container.querySelectorAll<HTMLImageElement>(
-    "img[data-spt-pdf-foto]",
+    "img[data-spt-pdf-foto], img[data-spt-pdf-map-img]",
   );
   if (imgs.length === 0) return;
   const t0 = Date.now();

@@ -826,7 +826,7 @@ export function PiezoRegistroCampo({ furoId }: PiezoRegistroCampoProps) {
           Relatório (PDF)
         </h2>
         <p className="mb-4 text-sm text-[var(--muted)]">
-          O PDF segue o modelo de boletim SOILSUL (poço de monitoramento): cabeçalho,
+          O PDF segue o modelo DataGeo Digital (poço de monitoramento): cabeçalho,
           perfis esquemáticos, grelha técnica, legenda, mapa, leituras e fotos.
         </p>
 

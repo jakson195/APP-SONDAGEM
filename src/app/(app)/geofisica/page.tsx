@@ -2,6 +2,12 @@ import Link from "next/link";
 
 const cards = [
   {
+    href: "/hidrologia/chuvas-sc",
+    title: "HidroChuSC — Chuvas máximas SC",
+    desc:
+      "Gumbel-Chow, períodos de retorno e relatório texto (compatível com o HidroChuSC clássico).",
+  },
+  {
     href: "/geofisica/ves?metodo=wenner",
     title: "SEV — Wenner",
     desc:

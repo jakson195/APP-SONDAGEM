@@ -47,7 +47,7 @@ function TwinShellInner({
 }) {
   const layoutRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
-  const obraRaw = searchParams.get("obraId");
+  const obraRaw = searchParams?.get("obraId") ?? null;
   const obraId =
     obraRaw != null &&
     obraRaw !== "" &&

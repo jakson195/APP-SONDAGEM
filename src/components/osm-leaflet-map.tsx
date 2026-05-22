@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { geotiffToPngDataUrlAndBounds } from "@/lib/geotiff-for-leaflet";
+import {
+  geotiffImportSuccessMessage,
+  geotiffToPngDataUrlAndBounds,
+} from "@/lib/geotiff-for-leaflet";
 import {
   parseGeoDecimal,
   renderPdfFirstPageToPngWithGeo,
@@ -76,7 +79,7 @@ export type OsmLeafletMapProps = {
   zoom?: number;
   /** Barra com modo «Ponto» (marcar sondagens ao clicar). */
   showPointToolbar?: boolean;
-  /** Importar PDF (1.ª página) ou GeoTIFF WGS84; TIFF usa limites embutidos. */
+  /** Importar PDF (1.ª página) ou GeoTIFF com CRS detetado automaticamente. */
   showPdfMapImport?: boolean;
   /** Marcador da sua posição (GPS + última posição guardada no dispositivo). */
   showMyLocation?: boolean;
@@ -93,7 +96,7 @@ const DEFAULT_ZOOM = 13;
  * OpenStreetMap tiles com Leaflet (só cliente; inicializa em `useEffect`).
  *
  * - **Ponto**: nome + descrição antes do marcador.
- * - **Mapa**: PDF (1.ª página → PNG + cantos) ou GeoTIFF EPSG:4326 (limites do ficheiro).
+ * - **Mapa**: PDF (1.ª página → PNG + cantos) ou GeoTIFF (CRS/UTM lido do ficheiro).
  * - **Minha posição**: círculo azul (GPS ou última guardada em `localStorage`).
  * - **Fundo**: satélite Esri (vista aérea), híbrido com nomes, ou ruas OSM.
  */
@@ -112,7 +115,9 @@ export function OsmLeafletMap({
   const baseLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const placementBlockedRef = useRef(false);
   const pdfImportOpenRef = useRef(false);
-  const pdfOverlaysRef = useRef<L.ImageOverlay[]>([]);
+  const importedOverlaysRef = useRef<
+    Map<string, { name: string; overlay: L.ImageOverlay }>
+  >(new Map());
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
   const geoTiffInputRef = useRef<HTMLInputElement | null>(null);
   const pdfPickMarkersRef = useRef<L.Layer[]>([]);
@@ -140,7 +145,9 @@ export function OsmLeafletMap({
   const [pdfSwLng, setPdfSwLng] = useState("");
   const [pdfNeLat, setPdfNeLat] = useState("");
   const [pdfNeLng, setPdfNeLng] = useState("");
-  const [pdfLayerCount, setPdfLayerCount] = useState(0);
+  const [importedMapLayers, setImportedMapLayers] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
   /** Dois cliques no mapa: sudoeste depois nordeste da área útil do PDF (norte em cima). */
   const [pdfBoundsPickStep, setPdfBoundsPickStep] = useState<"sw" | "ne" | null>(
     null,
@@ -285,6 +292,7 @@ export function OsmLeafletMap({
       draft: { dataUrl: string; name: string },
       bounds: L.LatLngBounds,
       imgSize: { w: number; h: number } | null,
+      successMsg?: string,
     ) => {
       const map = mapRef.current;
       if (!map) return;
@@ -320,12 +328,14 @@ export function OsmLeafletMap({
         interactive: false,
         className: "geo-pdf-overlay",
       }).addTo(map);
-      pdfOverlaysRef.current.push(overlay);
-      setPdfLayerCount((n) => n + 1);
+      const id = `import-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      importedOverlaysRef.current.set(id, { name: draft.name, overlay });
+      setImportedMapLayers((prev) => [...prev, { id, name: draft.name }]);
       map.fitBounds(bounds, { padding: [28, 28] });
-      setPdfStretchNote(stretchNote);
-      if (stretchNote) {
-        window.setTimeout(() => setPdfStretchNote(null), 20000);
+      const note = successMsg ?? stretchNote;
+      setPdfStretchNote(note);
+      if (note) {
+        window.setTimeout(() => setPdfStretchNote(null), successMsg ? 14_000 : 20_000);
       }
     },
     [],
@@ -546,13 +556,18 @@ export function OsmLeafletMap({
         "Mapa ainda não está pronto. Tente de novo dentro de momentos.",
       );
     }
-    const { dataUrl, bounds, imgSize } =
+    const { dataUrl, bounds, imgSize, crs } =
       await geotiffToPngDataUrlAndBounds(file);
     const leafletBounds = L.latLngBounds(
       L.latLng(bounds.south, bounds.west),
       L.latLng(bounds.north, bounds.east),
     );
-    aplicarPdfNoMapa({ dataUrl, name: file.name }, leafletBounds, imgSize);
+    aplicarPdfNoMapa(
+      { dataUrl, name: file.name },
+      leafletBounds,
+      imgSize,
+      geotiffImportSuccessMessage(file.name, crs),
+    );
     if (options?.fecharUiPdf) {
       encerrarModalPdfAposImportacaoOk();
     }
@@ -702,14 +717,27 @@ export function OsmLeafletMap({
     setPdfError(null);
   }
 
-  function removerCamadasPdf() {
+  function removerCamadaImportada(id: string) {
     const map = mapRef.current;
-    if (!map) return;
-    for (const layer of pdfOverlaysRef.current) {
-      map.removeLayer(layer);
+    const entry = importedOverlaysRef.current.get(id);
+    if (map && entry) map.removeLayer(entry.overlay);
+    importedOverlaysRef.current.delete(id);
+    setImportedMapLayers((prev) => prev.filter((l) => l.id !== id));
+  }
+
+  function removerTodasCamadasImportadas() {
+    const map = mapRef.current;
+    if (map) {
+      for (const { overlay } of importedOverlaysRef.current.values()) {
+        map.removeLayer(overlay);
+      }
     }
-    pdfOverlaysRef.current = [];
-    setPdfLayerCount(0);
+    importedOverlaysRef.current.clear();
+    setImportedMapLayers([]);
+  }
+
+  function removerCamadasPdf() {
+    removerTodasCamadasImportadas();
   }
 
   function atualizarMinhaPosicao() {
@@ -835,7 +863,7 @@ export function OsmLeafletMap({
                 type="button"
                 disabled={pdfBusy}
                 className={`${toolbarBtn} text-xs leading-tight`}
-                title="Limites lidos do ficheiro (EPSG:4326). Exporte assim no QGIS."
+                title="GeoTIFF: CRS detetado nas geokeys (UTM/SIRGAS/WGS84) e posicionado no mapa."
                 onClick={() => geoTiffInputRef.current?.click()}
               >
                 🛰️ Só GeoTIFF (automático)
@@ -856,14 +884,45 @@ export function OsmLeafletMap({
                 aria-hidden
                 onChange={(e) => void onGeoTiffAutomaticoFileChange(e)}
               />
-              {pdfLayerCount > 0 && (
-                <button
-                  type="button"
-                  className={toolbarBtn}
-                  onClick={removerCamadasPdf}
-                >
-                  Remover mapa importado
-                </button>
+              {importedMapLayers.length > 0 && (
+                <div className="flex flex-col gap-1 border-t border-neutral-200 pt-2 dark:border-zinc-600">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-zinc-400">
+                      Importados ({importedMapLayers.length})
+                    </span>
+                    <button
+                      type="button"
+                      className="text-[10px] font-medium text-red-700 hover:underline dark:text-red-300"
+                      onClick={removerTodasCamadasImportadas}
+                    >
+                      Remover todos
+                    </button>
+                  </div>
+                  <ul className="max-h-28 space-y-1 overflow-y-auto">
+                    {importedMapLayers.map((layer) => (
+                      <li
+                        key={layer.id}
+                        className="flex items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-1 dark:border-zinc-600 dark:bg-zinc-800"
+                      >
+                        <span
+                          className="min-w-0 flex-1 truncate text-xs"
+                          title={layer.name}
+                        >
+                          {layer.name}
+                        </span>
+                        <button
+                          type="button"
+                          className="shrink-0 rounded p-0.5 text-red-600 hover:bg-red-50 dark:text-red-400"
+                          title={`Remover ${layer.name}`}
+                          aria-label={`Remover ${layer.name}`}
+                          onClick={() => removerCamadaImportada(layer.id)}
+                        >
+                          🗑️
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </>
           )}
@@ -1001,7 +1060,7 @@ export function OsmLeafletMap({
                 Colocação automática
               </p>
               <p className="mt-1 text-xs leading-snug text-teal-950 dark:text-teal-100/95">
-                <strong>GeoTIFF</strong> WGS 84 (EPSG:4326) ou{" "}
+                <strong>GeoTIFF</strong> georreferenciado (UTM/SIRGAS/WGS84) ou{" "}
                 <strong>PDF GeoPDF</strong> (QGIS: exportar com georreferência ISO
                 / OGC). Os limites vêm do ficheiro. Se o PDF for só «desenho» sem
                 metadados geo, use a secção abaixo.

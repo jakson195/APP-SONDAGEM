@@ -1,4 +1,4 @@
-# SOILSUL — monólito modular
+# DataGeo Digital — monólito modular
 
 Uma única aplicação Next.js (`npm run dev` → **porta 3000**), um login, um deploy, um APK Android (Capacitor).
 

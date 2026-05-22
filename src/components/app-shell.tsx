@@ -10,6 +10,7 @@ import { useModuleNav } from "@/hooks/use-module-nav";
 
 const coreNav = [
   { href: "/dashboard", label: "📊 Painel" },
+  { href: "/hidrologia/chuvas-sc", label: "🌧️ Chuvas SC (HidroChu)" },
   { href: "/obras", label: "📁 Obras · mapas" },
   { href: "/obra", label: "🏗️ Nova obra" },
   { href: "/gestao-empresa", label: "🏢 Gestão · empresas" },
@@ -115,7 +116,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-gray-100 dark:bg-[var(--surface)]">
       {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 bg-gray-900 p-5 text-white print:hidden md:flex md:flex-col">
-        <h1 className="mb-6 text-xl font-bold tracking-tight">SOILSUL</h1>
+        <h1 className="mb-6 text-xl font-bold tracking-tight">DataGeo Digital</h1>
         <AppSidebarNav pathname={pathname} flatItems={flatNavItems} />
         {selectedObraId != null && (
           <ObraContextCard
@@ -143,7 +144,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         }`}
       >
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-lg font-bold">SOILSUL</h1>
+          <h1 className="text-lg font-bold">DataGeo Digital</h1>
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
@@ -183,7 +184,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <span className="text-sm font-semibold text-[var(--text)]">SOILSUL</span>
+          <span className="text-sm font-semibold text-[var(--text)]">DataGeo Digital</span>
         </header>
         <main className="flex-1 bg-gray-100 px-4 py-6 dark:bg-[var(--surface)] print:bg-white print:px-2 print:py-2 sm:px-6 lg:px-8">
           {children}

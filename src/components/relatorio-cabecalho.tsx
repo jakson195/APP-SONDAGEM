@@ -13,9 +13,9 @@ export function Cabecalho({
   return (
     <div className="mb-2 flex justify-between border border-black p-2 text-[10px]">
       <div>
-        <strong>SOILSUL</strong>
+        <strong>DataGeo Digital</strong>
         <br />
-        Sondagens e Geotecnia
+        Sondagens e geotecnia
       </div>
 
       <div className="text-center">

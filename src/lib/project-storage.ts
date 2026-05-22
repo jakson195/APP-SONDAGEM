@@ -1,8 +1,8 @@
 import type { Project } from "@/lib/types";
 
-const STORAGE_KEY = "vision-sondagem-custom-projects";
+const STORAGE_KEY = "datageo-digital-custom-projects";
 
-export const PROJECTS_CHANGED_EVENT = "vision-sondagem-projects-changed";
+export const PROJECTS_CHANGED_EVENT = "datageo-digital-projects-changed";
 
 export function notifyProjectsChanged(): void {
   if (typeof window === "undefined") return;

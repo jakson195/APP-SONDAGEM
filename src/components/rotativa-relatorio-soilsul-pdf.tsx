@@ -313,13 +313,13 @@ export const RotativaRelatorioSoilsulPdf = forwardRef<HTMLDivElement, Props>(
               marginBottom: "6px",
             }}
           >
-            <div style={{ fontWeight: 800, fontSize: "14px", letterSpacing: "-0.5px" }}>
-              SOILS
-              <span style={{ fontWeight: 400 }}>UL</span>
+            <div style={{ fontWeight: 800, fontSize: "12px", letterSpacing: "-0.3px" }}>
+              DataGeo
+              <span style={{ fontWeight: 400 }}> Digital</span>
             </div>
             <div style={{ textAlign: "center", flex: 1, padding: "0 8px" }}>
               <div style={{ fontWeight: 700, fontSize: "10px" }}>
-                SOILSUL SONDAGENS E GEOTECNIA
+                Sondagens e geotecnia
               </div>
               <div style={{ fontSize: "8px", marginTop: "2px" }}>
                 Sondagem de Reconhecimento Rotativa
@@ -408,6 +408,10 @@ export const RotativaRelatorioSoilsulPdf = forwardRef<HTMLDivElement, Props>(
                   lat={meta.mapaLatitude}
                   lng={meta.mapaLongitude}
                   zoom={meta.mapaZoom ?? 16}
+                  furoCodigo={meta.furoCodigo}
+                  furoDescricao={
+                    [meta.obra, meta.local].filter(Boolean).join(" · ") || undefined
+                  }
                 />
               </div>
             )}

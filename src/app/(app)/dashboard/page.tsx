@@ -67,7 +67,7 @@ export default async function DashboardPage({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
-            Painel SOILSUL
+            Painel DataGeo Digital
           </h1>
           <p className="mt-1 text-sm text-[var(--muted)]">
             Visão multiempresa: empresas contratantes e obras de campo.

@@ -1,10 +1,16 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useRef, useState } from "react";
-import { apiUrl } from "@/lib/api-url";
-import { drawMapLocationTilesOnCanvas } from "@/lib/map-location-tiles-browser";
-import { drawMapBlobOntoCanvas } from "@/lib/raster-map-blob-for-pdf";
+import { useEffect, useMemo, useState } from "react";
+import {
+  mapLocationCaptionLines,
+  type MapLocationCaption,
+} from "@/lib/map-location-caption";
+import {
+  loadMapPdfDataUrl,
+  MAP_PDF_HEIGHT,
+  MAP_PDF_WIDTH,
+} from "@/lib/map-pdf-data-url";
 
 const PDF_BORDER = "2px solid #000000";
 
@@ -12,116 +18,84 @@ type Props = {
   lat: number;
   lng: number;
   zoom?: number;
+  furoCodigo?: string;
+  furoDescricao?: string;
 };
 
-async function tryDrawWhenCanvasReady(
-  blob: Blob,
-  getCanvas: () => HTMLCanvasElement | null,
-): Promise<boolean> {
-  const canvas = getCanvas();
-  if (!canvas) return false;
-  delete canvas.dataset.sptStaticMapReady;
-  await drawMapBlobOntoCanvas(blob, canvas);
-  canvas.dataset.sptStaticMapReady = "1";
-  return true;
-}
-
-async function tryDrawTilesInBrowser(
-  lat: number,
-  lng: number,
-  zoom: number,
-  getCanvas: () => HTMLCanvasElement | null,
-): Promise<boolean> {
-  const canvas = getCanvas();
-  if (!canvas) return false;
-  delete canvas.dataset.sptStaticMapReady;
-  const ok = await drawMapLocationTilesOnCanvas(canvas, lat, lng, zoom, true);
-  if (ok) canvas.dataset.sptStaticMapReady = "1";
-  return ok;
-}
-
 /**
- * Mapa para o relatório: imagem servida por /api/map-location, rasterizada num
- * <canvas> (fiável com html2canvas; <img> com data URL costuma falhar).
+ * Mapa estático no relatório PDF — imagem em data URL (compatível com html2canvas).
  */
-export function SptPdfStaticMap({ lat, lng, zoom = 16 }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+export function SptPdfStaticMap({
+  lat,
+  lng,
+  zoom = 16,
+  furoCodigo,
+  furoDescricao,
+}: Props) {
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  const caption: MapLocationCaption = useMemo(
+    () => ({
+      titulo: furoCodigo?.trim() || "Furo",
+      descricao: furoDescricao?.trim() || undefined,
+      lat,
+      lng,
+    }),
+    [furoCodigo, furoDescricao, lat, lng],
+  );
+
+  const captionLines = useMemo(
+    () => mapLocationCaptionLines(caption),
+    [caption],
+  );
 
   useEffect(() => {
     let cancelled = false;
     setStatus("loading");
+    setDataUrl(null);
 
-    const c0 = canvasRef.current;
-    if (c0) {
-      delete c0.dataset.sptStaticMapReady;
-      const ctx = c0.getContext("2d");
-      if (ctx && c0.width > 0 && c0.height > 0) {
-        ctx.clearRect(0, 0, c0.width, c0.height);
-      }
-    }
-
-    const url = apiUrl(
-      `/api/map-location?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}&zoom=${zoom}`,
-    );
-
-    void (async () => {
-      let blob: Blob | null = null;
-      try {
-        const r = await fetch(url);
-        if (r.ok) {
-          const b = await r.blob();
-          const t = b.type || "";
-          const okType =
-            t.startsWith("image/") ||
-            t === "application/octet-stream" ||
-            t === "";
-          if (okType && b.size >= 32) blob = b;
-        }
-      } catch {
-        blob = null;
-      }
-
+    void loadMapPdfDataUrl(lat, lng, zoom, caption).then((url) => {
       if (cancelled) return;
-
-      if (blob) {
-        try {
-          let ok = await tryDrawWhenCanvasReady(blob, () => canvasRef.current);
-          if (!ok && !cancelled) {
-            await new Promise<void>((r) => requestAnimationFrame(() => r()));
-            ok = await tryDrawWhenCanvasReady(blob, () => canvasRef.current);
-          }
-          if (cancelled) return;
-          if (ok) {
-            setStatus("ready");
-            return;
-          }
-        } catch {
-          /* tentar tiles no browser */
-        }
+      if (url && url.startsWith("data:image/")) {
+        setDataUrl(url);
+        setStatus("ready");
+      } else {
+        setStatus("error");
       }
-
-      if (cancelled) return;
-      try {
-        const ok = await tryDrawTilesInBrowser(lat, lng, zoom, () => canvasRef.current);
-        if (cancelled) return;
-        if (ok) setStatus("ready");
-        else setStatus("error");
-      } catch {
-        if (!cancelled) setStatus("error");
-      }
-    })();
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [lat, lng, zoom]);
+  }, [lat, lng, zoom, caption]);
 
   const boxStyle: CSSProperties = {
     marginTop: "6px",
     border: PDF_BORDER,
     padding: "4px",
     backgroundColor: "#ffffff",
+    position: "relative",
+    width: "100%",
+    maxWidth: MAP_PDF_WIDTH,
+    minHeight: MAP_PDF_HEIGHT,
+  };
+
+  const captionStyle: CSSProperties = {
+    position: "absolute",
+    left: 12,
+    bottom: 10,
+    zIndex: 5,
+    maxWidth: "calc(100% - 24px)",
+    padding: "8px 10px",
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.94)",
+    border: "1px solid #cbd5e1",
+    fontSize: "11px",
+    lineHeight: 1.35,
+    color: "#0f172a",
+    textAlign: "left",
+    pointerEvents: "none",
   };
 
   if (status === "error") {
@@ -132,44 +106,80 @@ export function SptPdfStaticMap({ lat, lng, zoom = 16 }: Props) {
           ...boxStyle,
           fontSize: "7px",
           color: "#6b7280",
-          minHeight: "72px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "12px",
         }}
       >
-        Mapa de localização indisponível. Verifique a internet. No telemóvel com a app,
-        a URL do servidor (variável NEXT_PUBLIC_APP_URL) tem de apontar para o PC/serviço
-        onde corre o Next. Opcional: configurar Google Static Maps no servidor.
+        Não foi possível gerar o mapa. Defina o pino no mapa de campo e recarregue
+        a página.
       </div>
     );
   }
 
   return (
-    <div data-spt-pdf-map-status={status === "ready" ? "ready" : "loading"} style={boxStyle}>
+    <div
+      data-spt-pdf-map-status={status === "ready" ? "ready" : "loading"}
+      style={boxStyle}
+    >
       {status === "loading" && (
         <div
           style={{
-            fontSize: "7px",
-            color: "#6b7280",
-            minHeight: "48px",
+            position: "absolute",
+            inset: 0,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            fontSize: "7px",
+            color: "#6b7280",
+            zIndex: 2,
+            backgroundColor: "#f8fafc",
           }}
         >
           A carregar mapa de localização…
         </div>
       )}
-      <canvas
-        ref={canvasRef}
-        data-spt-static-map
-        width={640}
-        height={360}
-        style={{
-          width: "100%",
-          maxWidth: "640px",
-          height: "auto",
-          display: status === "ready" ? "block" : "none",
-        }}
-      />
+
+      {dataUrl ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={dataUrl}
+            alt={`Mapa de localização — ${caption.titulo}`}
+            width={MAP_PDF_WIDTH}
+            height={MAP_PDF_HEIGHT}
+            data-spt-pdf-map-img
+            data-spt-static-map="img"
+            decoding="sync"
+            style={{
+              width: "100%",
+              height: "auto",
+              display: "block",
+              minHeight: MAP_PDF_HEIGHT,
+              verticalAlign: "top",
+            }}
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              img.dataset.sptStaticMapReady = "1";
+              setStatus("ready");
+            }}
+          />
+          <div style={captionStyle} aria-hidden>
+            {captionLines.map((line, i) => (
+              <div
+                key={line}
+                style={{
+                  fontWeight: i === 0 ? 700 : 400,
+                  fontSize: i === 0 ? "12px" : "11px",
+                }}
+              >
+                {line}
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

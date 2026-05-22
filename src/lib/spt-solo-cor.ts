@@ -1,7 +1,8 @@
 import { CPRM_SOIL_FILL } from "@/lib/cprm-soil-palette";
+import { corPdfTipoPrincipal } from "@/lib/nomenclatura-geologica-solo";
 
-/** Cor de fundo (hex) para representação no PDF SPT — paleta CPRM / engenharia. */
-const POR_NOME_EXATO: Record<string, string> = {
+/** Legado + tipos antigos ainda em registos guardados. */
+const POR_NOME_LEGADO: Record<string, string> = {
   "Argila mole": "#BCAAA4",
   "Argila média": "#8D6E63",
   "Argila rija": "#5D4037",
@@ -24,7 +25,9 @@ const POR_NOME_EXATO: Record<string, string> = {
 export function corSoloSpt(nome: string): string {
   const k = nome.trim();
   if (!k) return "#ECEFF1";
-  if (POR_NOME_EXATO[k]) return POR_NOME_EXATO[k]!;
+  const daNomenclatura = corPdfTipoPrincipal(k);
+  if (daNomenclatura) return daNomenclatura;
+  if (POR_NOME_LEGADO[k]) return POR_NOME_LEGADO[k]!;
 
   const n = k.toLowerCase();
   if (n.includes("argila")) return "#8D6E63";

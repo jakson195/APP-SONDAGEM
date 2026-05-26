@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-/** Vercel Pro+: aumentar se SNAP demorar mais que o default (60s no Hobby). */
-export const maxDuration = 900;
+/** Limite compatível com Vercel para esta função. */
+export const maxDuration = 300;
 
 type Ctx = { params: Promise<{ jobId: string }> };
 

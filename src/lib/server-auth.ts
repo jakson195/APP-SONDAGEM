@@ -1,8 +1,17 @@
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
+import { createClient } from "@supabase/supabase-js";
 import type { SystemRole } from "@prisma/client";
 import { AUTH_TOKEN_COOKIE } from "@/lib/auth-constants";
+import { getLocalBypassAuthUser } from "@/lib/auth-bypass";
+import { syncUserFromSupabase } from "@/lib/auth-user-sync";
 import { prisma } from "@/lib/prisma";
+import {
+  assertSupabaseAuthConfigured,
+  isSupabaseAuthConfigured,
+} from "@/lib/supabase/config";
+import { enableLocalSupabaseTlsWorkaround } from "@/lib/supabase/server-runtime";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type JwtAuthPayload = {
   userId: number;
@@ -63,8 +72,68 @@ export async function getAuthPayloadFromRequest(
   return verifyAuthToken(token);
 }
 
+export async function getAuthPayloadFromCookies(): Promise<JwtAuthPayload | null> {
+  const jar = await cookies();
+  const token = jar.get(AUTH_TOKEN_COOKIE)?.value;
+  if (!token) return null;
+  return verifyAuthToken(token);
+}
+
 export async function getAuthUserFromRequest(req: Request) {
+  const bypassUser = await getLocalBypassAuthUser();
+  if (bypassUser) return bypassUser;
+  const supabaseUser = await getSupabaseUserFromRequest(req);
+  if (supabaseUser) {
+    return syncUserFromSupabase(supabaseUser);
+  }
   const payload = await getAuthPayloadFromRequest(req);
+  return getAuthUserFromPayload(payload);
+}
+
+export async function getAuthUserFromCookies() {
+  const bypassUser = await getLocalBypassAuthUser();
+  if (bypassUser) return bypassUser;
+  const supabaseUser = await getSupabaseUserFromCookies();
+  if (supabaseUser) {
+    return syncUserFromSupabase(supabaseUser);
+  }
+  const payload = await getAuthPayloadFromCookies();
+  return getAuthUserFromPayload(payload);
+}
+
+async function getSupabaseUserFromRequest(req: Request) {
+  if (!isSupabaseAuthConfigured()) return null;
+
+  const auth = req.headers.get("authorization");
+  if (auth?.startsWith("Bearer ")) {
+    const token = auth.slice(7).trim();
+    if (token) {
+      enableLocalSupabaseTlsWorkaround();
+      const { url, anonKey } = assertSupabaseAuthConfigured();
+      const supabase = createClient(url, anonKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { data, error } = await supabase.auth.getUser(token);
+      if (!error && data.user) return data.user;
+    }
+  }
+
+  return getSupabaseUserFromCookies();
+}
+
+async function getSupabaseUserFromCookies() {
+  if (!isSupabaseAuthConfigured()) return null;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.auth.getUser();
+    if (error) return null;
+    return data.user ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function getAuthUserFromPayload(payload: JwtAuthPayload | null) {
   if (!payload) return null;
   const user = await prisma.user.findUnique({
     where: { id: payload.userId },

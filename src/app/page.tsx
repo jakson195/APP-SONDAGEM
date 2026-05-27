@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
+import { isLocalAuthBypassEnabled } from "@/lib/auth-bypass";
 
 export default function Home() {
-  redirect("/obras");
+  redirect(isLocalAuthBypassEnabled() ? "/obras" : "/login");
 }

@@ -1,4 +1,8 @@
 import { nextResponseDbFailure } from "@/lib/db-route-error";
+import {
+  listAccessibleCompanyIdsForUser,
+  requireCompanyAccessFromRequest,
+} from "@/lib/client-portal-auth";
 import { serializeObraApi } from "@/lib/obra-api-serialize";
 import {
   defaultModulosProjetoTodosAtivos,
@@ -10,6 +14,7 @@ import { setObraTipoMonitoramentoSql } from "@/lib/obra-tipo-monitoramento-sql";
 import { parseObraStatus } from "@/lib/obra-status";
 import { syncProjectModules } from "@/lib/project-modules-db";
 import { prisma } from "@/lib/prisma";
+import { getAuthUserFromRequest } from "@/lib/server-auth";
 import type { ObraStatus, Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
@@ -17,6 +22,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
+    const user = await getAuthUserFromRequest(req);
+    if (!user) {
+      return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const rawCompany =
       searchParams.get("companyId") ?? searchParams.get("empresaId");
@@ -27,9 +37,18 @@ export async function GET(req: Request) {
     const q = (searchParams.get("q") ?? "").trim();
 
     const parts: Prisma.ObraWhereInput[] = [];
+    const accessibleIds = await listAccessibleCompanyIdsForUser(user);
 
     if (companyId !== null && Number.isFinite(companyId)) {
+      if (!accessibleIds.includes(companyId) && user.systemRole === "USER") {
+        return NextResponse.json(
+          { error: "Sem acesso a este cliente." },
+          { status: 403 },
+        );
+      }
       parts.push({ companyId });
+    } else if (user.systemRole === "USER") {
+      parts.push({ companyId: { in: accessibleIds.length > 0 ? accessibleIds : [-1] } });
     }
     if (statusFilter) {
       parts.push({ status: statusFilter });
@@ -157,6 +176,9 @@ export async function POST(req: Request) {
   }
 
   try {
+    const access = await requireCompanyAccessFromRequest(req, companyId, { write: true });
+    if (!access.ok) return access.response;
+
     const company = await prisma.company.findUnique({
       where: { id: companyId },
     });

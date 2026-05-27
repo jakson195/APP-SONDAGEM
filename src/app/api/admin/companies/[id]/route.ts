@@ -1,4 +1,9 @@
 import { garantirModulosPadraoEmpresa } from "@/lib/seed-empresa-modulos";
+import {
+  ensureUniqueCompanySlug,
+  normalizeClientSlugInput,
+  normalizePrimaryColor,
+} from "@/lib/client-slug";
 import { prisma } from "@/lib/prisma";
 import { requireMasterAdminApi } from "@/lib/require-master-admin";
 import type { SubscriptionStatus } from "@prisma/client";
@@ -48,13 +53,41 @@ export async function GET(req: Request, ctx: Ctx) {
             status: true,
           },
         },
+        reportShares: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            published: true,
+            createdAt: true,
+            furo: {
+              select: {
+                id: true,
+                codigo: true,
+                obra: { select: { id: true, nome: true } },
+              },
+            },
+          },
+        },
         _count: { select: { obras: true, memberships: true, equipes: true } },
       },
     });
     if (!company) {
       return NextResponse.json({ error: "Empresa não encontrada." }, { status: 404 });
     }
-    return NextResponse.json({ company });
+    const furos = await prisma.furo.findMany({
+      where: { obra: { companyId: id } },
+      orderBy: [{ obraId: "desc" }, { id: "desc" }],
+      take: 200,
+      select: {
+        id: true,
+        codigo: true,
+        tipo: true,
+        obra: { select: { id: true, nome: true } },
+      },
+    });
+    return NextResponse.json({ company: { ...company, furos } });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Erro ao carregar empresa." }, { status: 500 });
@@ -79,11 +112,15 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
   const data: {
     name?: string;
+    slug?: string;
     cnpj?: string | null;
     phone?: string | null;
     email?: string | null;
     address?: string | null;
     logo?: string | null;
+    primaryColor?: string | null;
+    portalEnabled?: boolean;
+    shareReportsEnabled?: boolean;
     plan?: string | null;
     status?: SubscriptionStatus;
     userId?: number;
@@ -91,6 +128,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
   if (typeof body.name === "string" && body.name.trim()) {
     data.name = body.name.trim();
+  }
+  if ("slug" in body) {
+    const rawSlug = normalizeClientSlugInput(body.slug);
+    data.slug = rawSlug
+      ? await ensureUniqueCompanySlug(rawSlug, id)
+      : await ensureUniqueCompanySlug(
+          typeof body.name === "string" && body.name.trim() ? body.name.trim() : "cliente",
+          id,
+        );
+  } else if (typeof body.name === "string" && body.name.trim()) {
+    data.slug = await ensureUniqueCompanySlug(body.name.trim(), id);
   }
   if ("cnpj" in body) {
     data.cnpj =
@@ -121,6 +169,18 @@ export async function PATCH(req: Request, ctx: Ctx) {
       typeof body.logo === "string" && body.logo.trim()
         ? body.logo.trim()
         : null;
+  }
+  if ("primaryColor" in body) {
+    data.primaryColor = normalizePrimaryColor(body.primaryColor);
+  }
+  if ("portalEnabled" in body && typeof body.portalEnabled === "boolean") {
+    data.portalEnabled = body.portalEnabled;
+  }
+  if (
+    "shareReportsEnabled" in body &&
+    typeof body.shareReportsEnabled === "boolean"
+  ) {
+    data.shareReportsEnabled = body.shareReportsEnabled;
   }
   if ("plan" in body) {
     data.plan =

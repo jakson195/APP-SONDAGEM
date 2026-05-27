@@ -1,7 +1,7 @@
 /**
  * URL PostgreSQL para Prisma.
  * No Windows, `DATABASE_URL` no ambiente do sistema (ex. placeholder `postgresql://x`)
- * tem prioridade sobre `.env.local` no Next.js — usamos fallbacks Neon da Vercel.
+ * tem prioridade sobre `.env.local` no Next.js — usamos fallbacks cloud (Neon/Supabase).
  */
 function isUsablePostgresUrl(url: string | undefined): url is string {
   if (!url?.trim()) return false;

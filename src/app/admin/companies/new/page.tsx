@@ -24,13 +24,20 @@ export default function NewCompanyPage() {
     }
     const payload = {
       name,
+      slug: String(fd.get("slug") ?? "").trim() || undefined,
       cnpj: String(fd.get("cnpj") ?? "").trim() || null,
       phone: String(fd.get("phone") ?? "").trim() || null,
       email: String(fd.get("email") ?? "").trim() || null,
       address: String(fd.get("address") ?? "").trim() || null,
       logo: String(fd.get("logo") ?? "").trim() || null,
+      primaryColor: String(fd.get("primaryColor") ?? "").trim() || null,
+      portalEnabled: fd.get("portalEnabled") === "on",
+      shareReportsEnabled: fd.get("shareReportsEnabled") === "on",
       plan: String(fd.get("plan") ?? "").trim() || null,
       status: String(fd.get("status") ?? "ACTIVE"),
+      ownerName: String(fd.get("ownerName") ?? "").trim() || undefined,
+      ownerEmail: String(fd.get("ownerEmail") ?? "").trim() || undefined,
+      ownerPassword: String(fd.get("ownerPassword") ?? "") || undefined,
       userId: (() => {
         const u = String(fd.get("userId") ?? "").trim();
         if (!u) return undefined;
@@ -76,8 +83,8 @@ export default function NewCompanyPage() {
       </Link>
       <h1 className="text-2xl font-bold tracking-tight">Nova empresa</h1>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-        O dono indicado recebe vínculo ADMIN. Se omitir o ID do utilizador, a empresa fica
-        associada à sua conta.
+        Pode vincular um utilizador existente pelo ID ou criar já o responsável com email e
+        palavra-passe via Supabase Auth.
       </p>
 
       {error && (
@@ -101,6 +108,20 @@ export default function NewCompanyPage() {
             id="name"
             name="name"
             required
+            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            O slug do portal pode ser gerado automaticamente.
+          </p>
+        </div>
+        <div>
+          <label htmlFor="slug" className="text-sm font-medium">
+            Slug do portal
+          </label>
+          <input
+            id="slug"
+            name="slug"
+            placeholder="gerado-automaticamente"
             className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
           />
         </div>
@@ -162,6 +183,78 @@ export default function NewCompanyPage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
+            <label htmlFor="primaryColor" className="text-sm font-medium">
+              Cor principal do portal
+            </label>
+            <input
+              id="primaryColor"
+              name="primaryColor"
+              type="color"
+              defaultValue="#0F766E"
+              className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+            />
+          </div>
+          <div className="rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-700">
+            <label className="flex items-center gap-3 text-sm font-medium">
+              <input
+                type="checkbox"
+                name="portalEnabled"
+                defaultChecked
+                className="h-4 w-4 rounded border-slate-300 text-teal-600"
+              />
+              Ativar portal do cliente
+            </label>
+            <label className="mt-3 flex items-center gap-3 text-sm font-medium">
+              <input
+                type="checkbox"
+                name="shareReportsEnabled"
+                defaultChecked
+                className="h-4 w-4 rounded border-slate-300 text-teal-600"
+              />
+              Permitir compartilhamento de relatórios
+            </label>
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="ownerName" className="text-sm font-medium">
+              Nome do responsável
+            </label>
+            <input
+              id="ownerName"
+              name="ownerName"
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+            />
+          </div>
+          <div>
+            <label htmlFor="ownerEmail" className="text-sm font-medium">
+              Email de acesso do responsável
+            </label>
+            <input
+              id="ownerEmail"
+              name="ownerEmail"
+              type="email"
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+            />
+          </div>
+        </div>
+        <div>
+          <label htmlFor="ownerPassword" className="text-sm font-medium">
+            Palavra-passe inicial do responsável
+          </label>
+          <input
+            id="ownerPassword"
+            name="ownerPassword"
+            type="password"
+            minLength={8}
+            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            Preencha estes campos para criar o utilizador dono no Supabase Auth.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
             <label htmlFor="plan" className="text-sm font-medium">
               Plano
             </label>
@@ -191,7 +284,7 @@ export default function NewCompanyPage() {
         </div>
         <div>
           <label htmlFor="userId" className="text-sm font-medium">
-            ID do utilizador dono (opcional)
+            ID do utilizador dono existente (opcional)
           </label>
           <input
             id="userId"

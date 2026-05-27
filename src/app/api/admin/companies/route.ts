@@ -1,6 +1,12 @@
 import { garantirModulosPadraoEmpresa } from "@/lib/seed-empresa-modulos";
+import {
+  ensureUniqueCompanySlug,
+  normalizeClientSlugInput,
+  normalizePrimaryColor,
+} from "@/lib/client-slug";
 import { prisma } from "@/lib/prisma";
 import { requireMasterAdminApi } from "@/lib/require-master-admin";
+import { provisionPlatformUser } from "@/lib/supabase/provision-user";
 import type { SubscriptionStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 
@@ -35,6 +41,7 @@ export async function GET(req: Request) {
     parts.push({
       OR: [
         { name: { contains: q, mode: "insensitive" as const } },
+        { slug: { contains: q, mode: "insensitive" as const } },
         { cnpj: { contains: q, mode: "insensitive" as const } },
         { email: { contains: q, mode: "insensitive" as const } },
         { phone: { contains: q, mode: "insensitive" as const } },
@@ -76,16 +83,41 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "name é obrigatório" }, { status: 400 });
   }
 
-  const ownerId =
+  const ownerEmail =
+    typeof body.ownerEmail === "string" ? body.ownerEmail.trim().toLowerCase() : "";
+  const ownerPassword =
+    typeof body.ownerPassword === "string" ? body.ownerPassword : "";
+  const ownerName =
+    typeof body.ownerName === "string" ? body.ownerName.trim() : "";
+
+  let ownerId =
     typeof body.userId === "number" && Number.isFinite(body.userId)
       ? body.userId
       : typeof body.userId === "string" && body.userId
         ? Number(body.userId)
         : user.id;
 
-  const owner = await prisma.user.findUnique({ where: { id: ownerId } });
+  let owner = await prisma.user.findUnique({ where: { id: ownerId } });
+  if (!owner && ownerEmail) {
+    try {
+      owner = await provisionPlatformUser({
+        email: ownerEmail,
+        password: ownerPassword,
+        name: ownerName || null,
+      });
+      ownerId = owner.id;
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Falha ao criar utilizador dono." },
+        { status: 400 },
+      );
+    }
+  }
   if (!owner) {
-    return NextResponse.json({ error: "Utilizador dono inválido." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Utilizador dono inválido. Informe um ID válido ou email/senha do responsável." },
+      { status: 400 },
+    );
   }
 
   const cnpj =
@@ -108,6 +140,14 @@ export async function POST(req: Request) {
     typeof body.logo === "string" && body.logo.trim()
       ? body.logo.trim()
       : null;
+  const slugInput = normalizeClientSlugInput(body.slug);
+  const primaryColor = normalizePrimaryColor(body.primaryColor);
+  const portalEnabled =
+    typeof body.portalEnabled === "boolean" ? body.portalEnabled : true;
+  const shareReportsEnabled =
+    typeof body.shareReportsEnabled === "boolean"
+      ? body.shareReportsEnabled
+      : true;
   const plan =
     typeof body.plan === "string" && body.plan.trim()
       ? body.plan.trim()
@@ -117,15 +157,20 @@ export async function POST(req: Request) {
   );
 
   try {
+    const slug = slugInput ?? (await ensureUniqueCompanySlug(name));
     const company = await prisma.company.create({
       data: {
         name,
+        slug,
         userId: ownerId,
         cnpj,
         phone,
         email,
         address,
         logo,
+        primaryColor,
+        portalEnabled,
+        shareReportsEnabled,
         plan,
         ...(status ? { status } : {}),
       },

@@ -1,5 +1,6 @@
 import type { ObraStatus, Prisma } from "@prisma/client";
 import type { Polygon } from "geojson";
+import { requireCompanyAccessFromRequest } from "@/lib/client-portal-auth";
 import { nextResponseDbFailure } from "@/lib/db-route-error";
 import { serializeObraApi } from "@/lib/obra-api-serialize";
 import { modulosProjetoFromUnknown } from "@/lib/modulos-projeto";
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(req: Request, ctx: Ctx) {
   const { id: idStr } = await ctx.params;
   const id = Number(idStr);
 
@@ -38,6 +39,9 @@ export async function GET(_req: Request, ctx: Ctx) {
   if (!obra) {
     return NextResponse.json({ error: "Obra não encontrada" }, { status: 404 });
   }
+
+  const access = await requireCompanyAccessFromRequest(req, obra.companyId);
+  if (!access.ok) return access.response;
 
   let areaOfInterestGeojson: Polygon | null = null;
   try {
@@ -71,6 +75,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (!existing) {
     return NextResponse.json({ error: "Obra não encontrada" }, { status: 404 });
   }
+
+  const access = await requireCompanyAccessFromRequest(req, existing.companyId, {
+    write: true,
+  });
+  if (!access.ok) return access.response;
 
   const modulesPayload = modulosProjetoFromUnknown(body.modules);
 
@@ -325,6 +334,11 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   if (!existing) {
     return NextResponse.json({ error: "Obra não encontrada" }, { status: 404 });
   }
+
+  const access = await requireCompanyAccessFromRequest(_req, existing.companyId, {
+    write: true,
+  });
+  if (!access.ok) return access.response;
 
   const resultado = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const furos = await tx.furo.findMany({

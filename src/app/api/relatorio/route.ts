@@ -1,3 +1,4 @@
+import { requireCompanyAccessFromRequest } from "@/lib/client-portal-auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
@@ -25,6 +26,9 @@ export async function GET(req: Request) {
   if (!furo) {
     return NextResponse.json({ error: "Furo não encontrado" }, { status: 404 });
   }
+
+  const access = await requireCompanyAccessFromRequest(req, furo.obra.companyId);
+  if (!access.ok) return access.response;
 
   return NextResponse.json(furo);
 }

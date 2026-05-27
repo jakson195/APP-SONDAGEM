@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcrypt";
 import { garantirModulosPadraoEmpresa } from "../src/lib/seed-empresa-modulos";
+import { provisionPlatformUser } from "../src/lib/supabase/provision-user";
 
 const prisma = new PrismaClient();
 
@@ -15,19 +15,11 @@ async function main() {
     return;
   }
 
-  const password = await bcrypt.hash(plain, 10);
-  await prisma.user.upsert({
-    where: { email },
-    create: {
-      email,
-      password,
-      name: "Administrador mestre",
-      systemRole: "MASTER_ADMIN",
-    },
-    update: {
-      password,
-      systemRole: "MASTER_ADMIN",
-    },
+  await provisionPlatformUser({
+    email,
+    password: plain,
+    name: "Administrador mestre",
+    systemRole: "MASTER_ADMIN",
   });
   console.log("ADM mestre garantido:", email);
 

@@ -1,10 +1,23 @@
 import { authCookieName, authCookieOptions } from "@/lib/server-auth";
+import { isSupabaseAuthConfigured } from "@/lib/supabase/config";
+import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route-handler";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
 export async function POST() {
+  let applyCookies = <T extends NextResponse>(response: T) => response;
+  if (isSupabaseAuthConfigured()) {
+    try {
+      const routeHandlerClient = await createSupabaseRouteHandlerClient();
+      applyCookies = routeHandlerClient.applyCookies;
+      const { supabase } = routeHandlerClient;
+      await supabase.auth.signOut();
+    } catch {
+      // também limpamos o cookie legado abaixo
+    }
+  }
   const res = NextResponse.json({ ok: true });
   res.cookies.set(authCookieName(), "", { ...authCookieOptions(), maxAge: 0 });
-  return res;
+  return applyCookies(res);
 }

@@ -3,7 +3,7 @@ import { intersecaoComModulosEmpresa, sanitizarListaModulos } from "@/lib/modulo
 import { parseOrgRole } from "@/lib/org-role";
 import { prisma } from "@/lib/prisma";
 import { garantirModulosPadraoEmpresa } from "@/lib/seed-empresa-modulos";
-import bcrypt from "bcrypt";
+import { provisionPlatformUser } from "@/lib/supabase/provision-user";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -72,6 +72,7 @@ export async function POST(req: Request, ctx: Ctx) {
     password?: unknown;
     modulosPermitidos?: unknown;
     equipeId?: unknown;
+    name?: unknown;
   };
   try {
     body = await req.json();
@@ -119,8 +120,8 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     let target = await prisma.user.findUnique({ where: { email } });
     if (!target) {
-      const plain =
-        typeof body.password === "string" ? body.password : "";
+      const plain = typeof body.password === "string" ? body.password : "";
+      const name = typeof body.name === "string" ? body.name.trim() : "";
       if (plain.length < 8) {
         return NextResponse.json(
           {
@@ -130,13 +131,10 @@ export async function POST(req: Request, ctx: Ctx) {
           { status: 400 },
         );
       }
-      const password = await bcrypt.hash(plain, 10);
-      target = await prisma.user.create({
-        data: {
-          email,
-          password,
-          name: email.split("@")[0]?.slice(0, 80) || null,
-        },
+      target = await provisionPlatformUser({
+        email,
+        password: plain,
+        name: name || email.split("@")[0]?.slice(0, 80) || null,
       });
     }
 

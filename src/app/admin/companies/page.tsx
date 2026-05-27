@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { Building2, Plus, Search } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
-import { AUTH_TOKEN_COOKIE } from "@/lib/auth-constants";
-import { verifyAuthToken } from "@/lib/server-auth";
+import { getAuthUserFromCookies } from "@/lib/server-auth";
 import { isPlatformSuperAdmin } from "@/lib/platform-admin";
 import { redirect } from "next/navigation";
 import type { SubscriptionStatus } from "@prisma/client";
@@ -29,15 +27,8 @@ export default async function AdminCompaniesPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const jar = await cookies();
-  const raw = jar.get(AUTH_TOKEN_COOKIE)?.value;
-  const payload = raw ? verifyAuthToken(raw) : null;
-  if (!payload) redirect("/login?next=/admin/companies");
-
-  const user = await prisma.user.findUnique({
-    where: { id: payload.userId },
-    select: { systemRole: true },
-  });
+  const user = await getAuthUserFromCookies();
+  if (!user) redirect("/login?next=/admin/companies");
   if (!user || !isPlatformSuperAdmin(user.systemRole)) redirect("/dashboard");
 
   const sp = await searchParams;
@@ -171,6 +162,7 @@ export default async function AdminCompaniesPage({
                     >
                       {c.name}
                     </Link>
+                    <p className="text-xs text-slate-500">/cliente/{c.slug}</p>
                     {c.email && (
                       <p className="text-xs text-slate-500">{c.email}</p>
                     )}

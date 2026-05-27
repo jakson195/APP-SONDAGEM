@@ -42,14 +42,18 @@ enum ObraStatus {
 }
 
 model User {
-  id         Int        @id @default(autoincrement())
-  email      String     @unique
-  password   String
-  name       String?
-  systemRole SystemRole @default(USER)
+  id             Int        @id @default(autoincrement())
+  email          String     @unique
+  supabaseAuthId String?    @unique @map("supabase_auth_id")
+  password       String?
+  name           String?
+  systemRole     SystemRole @default(USER)
 
-  companies   Company[]
-  memberships OrgMembership[]
+  companies           Company[]
+  memberships         OrgMembership[]
+  createdReportShares ClientReportShare[] @relation("ClientReportShareCreator")
+  geoPhotos           GeoPhoto[]
+  streetFrames        StreetFrame[]
 }
 
 /**
@@ -57,25 +61,32 @@ model User {
  * Modelo `Company` para alinhar com nomenclatura multi-tenant SaaS.
  */
 model Company {
-  id     Int  @id @default(autoincrement())
+  id     Int    @id @default(autoincrement())
   name   String @map("nome")
+  slug   String @unique
   userId Int
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   plan   String?              @map("planSlug")
   status SubscriptionStatus @default(ACTIVE) @map("subscriptionStatus")
 
-  cnpj    String? @unique
+  cnpj    String?  @unique
   phone   String?
   email   String?
   address String?
   logo    String?
+  primaryColor       String?  @map("primary_color")
+  portalEnabled      Boolean  @default(true) @map("portal_enabled")
+  shareReportsEnabled Boolean @default(true) @map("share_reports_enabled")
   createdAt DateTime @default(now())
 
-  obras       Obra[]
-  equipes     Equipe[]
-  memberships OrgMembership[]
-  modulos     EmpresaModulo[]
+  obras        Obra[]
+  equipes      Equipe[]
+  memberships  OrgMembership[]
+  modulos      EmpresaModulo[]
+  reportShares ClientReportShare[]
+  geoPhotos    GeoPhoto[]
+  streetFrames StreetFrame[]
 
   @@map("Empresa")
 }
@@ -157,6 +168,8 @@ model Obra {
   vesProjects    VESProject[]
   sentinel1Scenes Sentinel1CatalogEntry[]
   insarJobs       InsarPipelineJob[]
+  geoPhotos       GeoPhoto[]
+  streetFrames    StreetFrame[]
 }
 
 /** Estado grosso do job InSAR (sub-passos em `properties.stages`). */
@@ -253,7 +266,80 @@ model Furo {
   /** Grelhas, meta de PDF, fotos, etc. (módulos que não usam só a tabela `SPT`). */
   dadosCampo Json?
 
-  spt SPT[]
+  spt          SPT[]
+  reportShares ClientReportShare[]
+}
+
+model GeoPhoto {
+  id               Int       @id @default(autoincrement())
+  companyId        Int       @map("company_id")
+  obraId           Int?      @map("obra_id")
+  uploadedByUserId Int?      @map("uploaded_by_user_id")
+  latitude         Float
+  longitude        Float
+  altitude         Float?
+  imageUrl         String    @map("image_url") @db.Text
+  storagePath      String    @map("storage_path") @db.Text
+  originalName     String?   @map("original_name")
+  capturedAt       DateTime? @map("captured_at")
+  metadata         Json?
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  company        Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  obra           Obra?   @relation(fields: [obraId], references: [id], onDelete: SetNull)
+  uploadedByUser User?   @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([obraId, capturedAt])
+  @@map("geo_photos")
+}
+
+model StreetFrame {
+  id               String    @id @db.Text
+  companyId        Int       @map("company_id")
+  obraId           Int?      @map("obra_id")
+  uploadedByUserId Int?      @map("uploaded_by_user_id")
+  latitude         Float?
+  longitude        Float?
+  heading          Float?
+  imageUrl         String    @map("image_url") @db.Text
+  storagePath      String    @map("storage_path") @db.Text
+  videoId          String    @map("video_id") @db.Text
+  frameIndex       Int       @default(0) @map("frame_index")
+  timestamp        DateTime?
+  metadata         Json?
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  company        Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  obra           Obra?   @relation(fields: [obraId], references: [id], onDelete: SetNull)
+  uploadedByUser User?   @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, timestamp])
+  @@index([obraId, videoId])
+  @@index([videoId, frameIndex])
+  @@map("street_frames")
+}
+
+/** Relatórios publicados para o portal autenticado do cliente. */
+model ClientReportShare {
+  id              Int      @id @default(autoincrement())
+  empresaId       Int      @map("empresaId")
+  furoId          Int      @map("furoId")
+  slug            String   @unique
+  title           String
+  description     String?  @db.Text
+  published       Boolean  @default(true)
+  createdByUserId Int?     @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  company       Company @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  furo          Furo    @relation(fields: [furoId], references: [id], onDelete: Cascade)
+  createdByUser User?   @relation("ClientReportShareCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([empresaId, furoId])
+  @@index([empresaId, published])
+  @@map("ClientReportShare")
 }
 
 model SPT {

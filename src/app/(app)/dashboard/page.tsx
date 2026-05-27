@@ -1,34 +1,62 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   ArrowRight,
   Building2,
   FolderKanban,
   MapPin,
 } from "lucide-react";
+import { listAccessibleCompanyIdsForUser } from "@/lib/client-portal-auth";
 import { prisma } from "@/lib/prisma";
 import { OBRA_STATUS_LABEL, OBRA_STATUS_ORDER } from "@/lib/obra-status";
+import { getAuthUserFromCookies } from "@/lib/server-auth";
 
 export default async function DashboardPage({
   searchParams,
 }: {
   searchParams?: Promise<{ obraId?: string; projectId?: string }>;
 }) {
+  const user = await getAuthUserFromCookies();
+  if (!user) {
+    redirect("/login");
+  }
+
   const q = (await searchParams) ?? {};
   const filtroObraRaw = q.obraId ?? q.projectId ?? "";
   const filtroObraId = Number(filtroObraRaw);
+  const accessibleCompanyIds = await listAccessibleCompanyIdsForUser(user);
+  const companyScope =
+    user.systemRole === "USER"
+      ? { companyId: { in: accessibleCompanyIds.length > 0 ? accessibleCompanyIds : [-1] } }
+      : {};
 
   const [empresaCount, obraCount, companiesWithObras, statusRows, recent] =
     await Promise.all([
-      prisma.company.count(),
-      prisma.obra.count(),
-      prisma.company.count({ where: { obras: { some: {} } } }),
+      prisma.company.count({
+        where:
+          user.systemRole === "USER"
+            ? { id: { in: accessibleCompanyIds.length > 0 ? accessibleCompanyIds : [-1] } }
+            : undefined,
+      }),
+      prisma.obra.count({ where: companyScope }),
+      prisma.company.count({
+        where:
+          user.systemRole === "USER"
+            ? {
+                id: { in: accessibleCompanyIds.length > 0 ? accessibleCompanyIds : [-1] },
+                obras: { some: {} },
+              }
+            : { obras: { some: {} } },
+      }),
       prisma.obra.groupBy({
         by: ["status"],
+        where: companyScope,
         _count: { _all: true },
       }),
       prisma.obra.findMany({
         take: 10,
         orderBy: { id: "desc" },
+        where: companyScope,
         include: {
           company: { select: { id: true, name: true } },
         },
@@ -44,6 +72,14 @@ export default async function DashboardPage({
           },
         })
       : null;
+
+  if (
+    obraResumo &&
+    user.systemRole === "USER" &&
+    !accessibleCompanyIds.includes(obraResumo.companyId)
+  ) {
+    redirect("/dashboard");
+  }
 
   const [furosByTipo, sptRowsCount, vesCount] =
     obraResumo != null

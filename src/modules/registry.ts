@@ -6,6 +6,7 @@ import {
   Cloud,
   FileText,
   Globe,
+  Image,
   LayoutDashboard,
   MapPinned,
   Mountain,
@@ -84,6 +85,13 @@ export const platformModules: PlatformModuleDef[] = [
         label: "LiDAR",
         icon: Mountain,
         parent: "digital-twin",
+      },
+      {
+        href: `${DIGITAL_TWIN_BASE}/ortofotos`,
+        label: "Ortofotos",
+        icon: Image,
+        parent: "digital-twin",
+        description: "Comparação T0/T1 com heatmap e pontos de risco",
       },
       {
         href: `${DIGITAL_TWIN_BASE}/nuvem-pontos`,

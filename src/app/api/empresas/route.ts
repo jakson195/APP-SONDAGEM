@@ -1,28 +1,37 @@
 import { nextResponseDbFailure } from "@/lib/db-route-error";
+import { ensureUniqueCompanySlug, normalizeClientSlugInput } from "@/lib/client-slug";
+import { listAccessibleCompaniesForUser } from "@/lib/client-portal-auth";
 import { prisma } from "@/lib/prisma";
 import { garantirModulosPadraoEmpresa } from "@/lib/seed-empresa-modulos";
+import { getAuthUserFromRequest } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-/** Lista empresas (para escolher na Nova obra). */
-export async function GET() {
+/** Lista empresas acessíveis ao utilizador autenticado. */
+export async function GET(req: Request) {
+  const user = await getAuthUserFromRequest(req);
+  if (!user) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+
   try {
-    const rows = await prisma.company.findMany({
-      orderBy: { id: "asc" },
-      select: { id: true, name: true },
-    });
-    return NextResponse.json(rows.map((r) => ({ id: r.id, nome: r.name })));
+    const rows = await listAccessibleCompaniesForUser(user);
+    return NextResponse.json(
+      rows.map((r) => ({ id: r.id, nome: r.name, slug: r.slug })),
+    );
   } catch (e) {
     return nextResponseDbFailure(e);
   }
 }
 
-/**
- * Cria empresa. Se não existir nenhum User, cria um utilizador demo
- * (password placeholder — substituir por registo real mais tarde).
- */
+/** Cria cliente/empresa e vincula o utilizador autenticado como ADMIN. */
 export async function POST(req: Request) {
+  const authUser = await getAuthUserFromRequest(req);
+  if (!authUser) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+
   let body: { nome?: unknown };
   try {
     body = await req.json();
@@ -36,26 +45,20 @@ export async function POST(req: Request) {
   }
 
   try {
-    let user = await prisma.user.findFirst();
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: `demo-${Date.now()}@datageodigital.local`,
-          password: "-",
-        },
-      });
-    }
+    const slug =
+      normalizeClientSlugInput((body as Record<string, unknown>).slug) ??
+      (await ensureUniqueCompanySlug(nome));
 
     const company = await prisma.company.create({
-      data: { name: nome, userId: user.id },
+      data: { name: nome, slug, userId: authUser.id },
     });
 
     await prisma.orgMembership.upsert({
       where: {
-        userId_empresaId: { userId: user.id, empresaId: company.id },
+        userId_empresaId: { userId: authUser.id, empresaId: company.id },
       },
       create: {
-        userId: user.id,
+        userId: authUser.id,
         empresaId: company.id,
         orgRole: "ADMIN",
       },
@@ -64,7 +67,7 @@ export async function POST(req: Request) {
 
     await garantirModulosPadraoEmpresa(company.id);
 
-    return NextResponse.json({ id: company.id, nome: company.name });
+    return NextResponse.json({ id: company.id, nome: company.name, slug: company.slug });
   } catch (e) {
     return nextResponseDbFailure(e);
   }

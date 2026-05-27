@@ -1,11 +1,8 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Building2, LayoutDashboard, ChevronRight } from "lucide-react";
-import { AUTH_TOKEN_COOKIE } from "@/lib/auth-constants";
 import { isPlatformSuperAdmin } from "@/lib/platform-admin";
-import { prisma } from "@/lib/prisma";
-import { verifyAuthToken } from "@/lib/server-auth";
+import { getAuthUserFromCookies } from "@/lib/server-auth";
 
 const nav = [
   { href: "/admin/companies", label: "Empresas", icon: Building2 },
@@ -17,15 +14,8 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const jar = await cookies();
-  const raw = jar.get(AUTH_TOKEN_COOKIE)?.value;
-  const payload = raw ? verifyAuthToken(raw) : null;
-  if (!payload) redirect("/login?next=/admin/companies");
-
-  const user = await prisma.user.findUnique({
-    where: { id: payload.userId },
-    select: { systemRole: true, email: true, name: true },
-  });
+  const user = await getAuthUserFromCookies();
+  if (!user) redirect("/login?next=/admin/companies");
   if (!user || !isPlatformSuperAdmin(user.systemRole)) redirect("/dashboard");
 
   return (

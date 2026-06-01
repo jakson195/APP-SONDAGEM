@@ -8,6 +8,8 @@ import type {
 
 export type InvertEngineId = "proxy" | "physics";
 
+export type PhysicsForwardModelId = "fdm" | "fem";
+
 type PhysicsResponse = {
   ok: boolean;
   error?: string;
@@ -29,6 +31,10 @@ type PhysicsResponse = {
   excluded_indices?: number[];
   data_weights?: number[];
   message?: string;
+  forward_model?: PhysicsForwardModelId;
+  chi2_reduced?: number;
+  chi2_target?: number;
+  nd_data?: number;
 };
 
 function physicsMeshSize(p: Dipolo2DInvertParams): Pick<Dipolo2DInvertParams, "nx" | "nz"> {
@@ -44,6 +50,7 @@ function toPhysicsPayload(
   method: Dipolo2DInvertMethodId,
   topography: TopographyPoint[] | undefined,
   qcByRow: Map<number, { qualityScore: number; isSpike: boolean }> | undefined,
+  forwardModel: PhysicsForwardModelId = "fdm",
 ) {
   const mesh = physicsMeshSize(params);
   return {
@@ -80,7 +87,9 @@ function toPhysicsPayload(
       auto_exclude_outliers: true,
       outlier_score_threshold: 35,
       use_adaptive_mesh: true,
-      jacobian_mode: "adjoint" as const,
+      jacobian_mode: forwardModel === "fem" ? ("fd" as const) : ("adjoint" as const),
+      forward_model: forwardModel,
+      chi2_tolerance: 0.05,
     },
     method,
     topography: topography?.map((t) => ({
@@ -119,6 +128,10 @@ function mapPhysicsResponse(data: PhysicsResponse): Dipolo2DInvertResult | null 
     engine: "physics",
     physicsMessage: data.message,
     excludedReadingIndices: data.excluded_indices,
+    forwardModel: data.forward_model,
+    chi2Reduced: data.chi2_reduced,
+    chi2Target: data.chi2_target,
+    ndData: data.nd_data,
   };
 }
 
@@ -128,6 +141,7 @@ export async function invertDipolo2DPhysics(
   method: Dipolo2DInvertMethodId,
   topography?: TopographyPoint[],
   qcByRow?: Map<number, { qualityScore: number; isSpike: boolean }>,
+  forwardModel: PhysicsForwardModelId = "fdm",
 ): Promise<Dipolo2DInvertResult | null> {
   const active = readings.filter((r) => !r.excluded && r.rhoApparentOhmM > 0);
   if (active.length < 4) return null;
@@ -136,7 +150,7 @@ export async function invertDipolo2DPhysics(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(
-      toPhysicsPayload(readings, params, method, topography, qcByRow),
+      toPhysicsPayload(readings, params, method, topography, qcByRow, forwardModel),
     ),
   });
   const data = (await res.json()) as PhysicsResponse & { error?: string };

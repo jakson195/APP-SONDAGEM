@@ -1,0 +1,77 @@
+# DataGeo — Motor Geofísico (FastAPI)
+
+Inversão 2D ERT (dipolo-dipolo): **FDM** ou **FEM**, Jacobiana adjoint/FD, Occam com χ² rigoroso, malha adaptativa, pesos QC.
+
+## Local
+
+```bash
+cd python-engine/geophysics
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8092
+```
+
+Na raiz do Next.js (`app-web`):
+
+```bash
+npm run geophysics:engine
+```
+
+## Endpoints
+
+| Método | Path | Descrição |
+|--------|------|-----------|
+| GET | `/api/v1/geophysics/health` | Health check |
+| POST | `/api/v1/geophysics/invert/2d` | Inversão 2D FDM/FEM |
+
+Documentação interactiva: `http://127.0.0.1:8092/docs`
+
+## Parâmetros de inversão (destaques)
+
+| Campo | Valores | Descrição |
+|-------|---------|-----------|
+| `forward_model` | `fdm` \| `fem` | Poisson FDM 5-pt ou FEM triangular P1 |
+| `jacobian_mode` | `adjoint` \| `fd` | Adjoint só com FDM; FEM usa FD |
+| `use_adaptive_mesh` | bool | Refina em eletrodos e superfície |
+| `target_chi2` | float \| null | Alvo Occam (default = nd) |
+| `chi2_tolerance` | float | Tolerância relativa (default 5%) |
+
+## Deploy Fly.io
+
+```bash
+cd python-engine/geophysics
+fly launch --name datageo-geophysics --region gru --no-deploy
+fly deploy
+fly secrets set ALLOWED_ORIGINS=https://seu-dominio.vercel.app
+```
+
+URL pública: `https://datageo-geophysics.fly.dev`
+
+## Deploy Railway
+
+1. [railway.app](https://railway.app) → New Project → Deploy from GitHub
+2. Root directory: `python-engine/geophysics`
+3. Railway detecta `Dockerfile` ou `railway.toml`
+4. Porta: **8092**
+
+## Vercel (Next.js)
+
+Defina em **Project → Settings → Environment Variables**:
+
+```env
+GEOPHYSICS_ENGINE_URL=https://datageo-geophysics.fly.dev
+```
+
+Opcional (chamadas client-side volume 3D):
+
+```env
+NEXT_PUBLIC_GEOPHYSICS_ENGINE_URL=https://datageo-geophysics.fly.dev
+```
+
+Redeploy da Vercel após alterar variáveis.
+
+## Variáveis de ambiente (motor)
+
+| Variável | Default | Descrição |
+|----------|---------|-----------|
+| `PORT` | 8092 | Porta HTTP (Fly/Railway injectam) |
+| `ALLOWED_ORIGINS` | `*` | CORS origins (comma-separated) |

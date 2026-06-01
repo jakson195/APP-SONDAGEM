@@ -19,6 +19,7 @@ import { invertDipolo2D } from "@/lib/geofisica/dipolo2d/invert-methods-2d";
 import {
   invertDipolo2DPhysics,
   type InvertEngineId,
+  type PhysicsForwardModelId,
 } from "@/lib/geofisica/dipolo2d/physics-invert-2d";
 import { res2dinvDataPreset } from "@/lib/geofisica/dipolo2d/smooth-invert-2d";
 import { qcGradesByRowIndex } from "@/lib/geofisica/qc/qc-row-grades";
@@ -173,6 +174,8 @@ export function DipoloDipoloClient() {
   const [invertMethod, setInvertMethod] =
     useState<Dipolo2DInvertMethodId>("smoothness");
   const [invertEngine, setInvertEngine] = useState<InvertEngineId>("proxy");
+  const [physicsForwardModel, setPhysicsForwardModel] =
+    useState<PhysicsForwardModelId>("fdm");
   const [physicsResult, setPhysicsResult] = useState<
     import("@/lib/geofisica/dipolo2d/types").Dipolo2DInvertResult | null
   >(null);
@@ -510,6 +513,7 @@ export function DipoloDipoloClient() {
       invertMethod,
       topography,
       qcMap,
+      physicsForwardModel,
     )
       .then((r) => {
         if (!cancelled) setPhysicsResult(r);
@@ -530,6 +534,7 @@ export function DipoloDipoloClient() {
     };
   }, [
     invertEngine,
+    physicsForwardModel,
     activeReadings.length,
     readings,
     params,
@@ -1102,16 +1107,40 @@ export function DipoloDipoloClient() {
                   onChange={() => setInvertEngine("physics")}
                 />
                 <span>
-                  <strong>Físico (FDM)</strong>
+                  <strong>Físico (FDM/FEM)</strong>
                   <span className="block text-xs text-[var(--muted)]">
-                    Poisson 2D + Jacobiana + Gauss-Newton/Occam/L1/L2 + QC
+                    Poisson FDM ou FEM P1 + Jacobiana + Occam χ² + QC
                   </span>
                 </span>
               </label>
             </div>
+            {invertEngine === "physics" && (
+              <div className="mt-3 flex flex-wrap gap-3 text-xs">
+                <span className="self-center text-[var(--muted)]">Forward:</span>
+                <label className="flex cursor-pointer items-center gap-1.5 rounded border border-[var(--border)] px-2 py-1">
+                  <input
+                    type="radio"
+                    name="physics-forward"
+                    checked={physicsForwardModel === "fdm"}
+                    onChange={() => setPhysicsForwardModel("fdm")}
+                  />
+                  FDM (adjoint)
+                </label>
+                <label className="flex cursor-pointer items-center gap-1.5 rounded border border-[var(--border)] px-2 py-1">
+                  <input
+                    type="radio"
+                    name="physics-forward"
+                    checked={physicsForwardModel === "fem"}
+                    onChange={() => setPhysicsForwardModel("fem")}
+                  />
+                  FEM P1 (triangular)
+                </label>
+              </div>
+            )}
             {invertEngine === "physics" && physicsBusy && (
               <p className="mt-2 text-xs text-teal-700 dark:text-teal-300">
-                A calcular inversão FDM (motor Python :8092)…
+                A calcular inversão {physicsForwardModel.toUpperCase()} (motor
+                Python :8092)…
               </p>
             )}
             {physicsError && (
@@ -1297,7 +1326,11 @@ export function DipoloDipoloClient() {
                   <dd className="font-medium">
                     {invertResult.methodLabel}
                     <span className="ml-2 text-xs font-normal text-[var(--muted)]">
-                      ({invertResult.engine === "physics" ? "FDM" : "proxy"})
+                      (
+                      {invertResult.engine === "physics"
+                        ? (invertResult.forwardModel ?? "fdm").toUpperCase()
+                        : "proxy"}
+                      )
                     </span>
                   </dd>
                 </div>
@@ -1313,6 +1346,16 @@ export function DipoloDipoloClient() {
                     </dd>
                   </div>
                 )}
+                {invertResult.chi2Reduced != null &&
+                  invertResult.chi2Target != null && (
+                    <div>
+                      <dt className="text-[var(--muted)]">χ² Occam</dt>
+                      <dd className="font-mono">
+                        {invertResult.chi2Reduced.toFixed(1)} /{" "}
+                        {invertResult.chi2Target.toFixed(0)}
+                      </dd>
+                    </div>
+                  )}
                 <div>
                   <dt className="text-[var(--muted)]">Rugosidade L2</dt>
                   <dd className="font-mono">

@@ -118,8 +118,12 @@ export type Dipolo2DInvertResult = {
   nz: number;
   methodId: Dipolo2DInvertMethodId;
   methodLabel: string;
-  /** proxy = sensibilidade gaussiana (rápido); physics = FDM + Jacobiana. */
+  /** proxy = sensibilidade gaussiana (rápido); physics = FDM/FEM + Jacobiana. */
   engine?: "proxy" | "physics";
   physicsMessage?: string;
   excludedReadingIndices?: number[];
+  forwardModel?: "fdm" | "fem";
+  chi2Reduced?: number;
+  chi2Target?: number;
+  ndData?: number;
 };

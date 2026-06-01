@@ -534,8 +534,9 @@ export function invertDipolo2D(
   readings: Dipolo2DReading[],
   p: Dipolo2DInvertParams,
   method: Dipolo2DInvertMethodId = "smoothness",
+  qcByRow?: Map<number, { qualityScore: number; isSpike: boolean }>,
 ): Dipolo2DInvertResult | null {
-  const prob = prepareInvertProblem(readings, p);
+  const prob = prepareInvertProblem(readings, p, qcByRow);
   if (!prob) return null;
 
   switch (method) {

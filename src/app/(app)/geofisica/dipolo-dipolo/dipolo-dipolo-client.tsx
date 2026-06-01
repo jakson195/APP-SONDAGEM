@@ -16,7 +16,12 @@ import {
   type PseudoHit,
 } from "@/lib/geofisica/dipolo2d/dipolo-pseudo-draw";
 import { invertDipolo2D } from "@/lib/geofisica/dipolo2d/invert-methods-2d";
+import {
+  invertDipolo2DPhysics,
+  type InvertEngineId,
+} from "@/lib/geofisica/dipolo2d/physics-invert-2d";
 import { res2dinvDataPreset } from "@/lib/geofisica/dipolo2d/smooth-invert-2d";
+import { qcGradesByRowIndex } from "@/lib/geofisica/qc/qc-row-grades";
 import { loadSolodataLinha12Demo } from "@/lib/geofisica/dipolo2d/solodata-linha-demo";
 import {
   activeReadingsForInversion,
@@ -167,6 +172,12 @@ export function DipoloDipoloClient() {
   const [params, setParams] = useState<Dipolo2DInvertParams>(defaultParams);
   const [invertMethod, setInvertMethod] =
     useState<Dipolo2DInvertMethodId>("smoothness");
+  const [invertEngine, setInvertEngine] = useState<InvertEngineId>("proxy");
+  const [physicsResult, setPhysicsResult] = useState<
+    import("@/lib/geofisica/dipolo2d/types").Dipolo2DInvertResult | null
+  >(null);
+  const [physicsBusy, setPhysicsBusy] = useState(false);
+  const [physicsError, setPhysicsError] = useState<string | null>(null);
 
   const selectInvertMethod = useCallback((id: Dipolo2DInvertMethodId) => {
     setInvertMethod(id);
@@ -463,10 +474,72 @@ export function DipoloDipoloClient() {
     }
   }, []);
 
-  const invertResult = useMemo(() => {
+  const qcByRow = useMemo(
+    () => qcGradesByRowIndex(linha, aNum),
+    [linha, aNum],
+  );
+
+  const proxyInvertResult = useMemo(() => {
     if (activeReadings.length < 4) return null;
-    return invertDipolo2D(activeReadings, params, invertMethod);
-  }, [activeReadings, params, invertMethod]);
+    return invertDipolo2D(activeReadings, params, invertMethod, qcByRow);
+  }, [activeReadings, params, invertMethod, qcByRow]);
+
+  useEffect(() => {
+    if (invertEngine !== "physics" || activeReadings.length < 4) {
+      setPhysicsResult(null);
+      setPhysicsError(null);
+      setPhysicsBusy(false);
+      return;
+    }
+    let cancelled = false;
+    setPhysicsBusy(true);
+    setPhysicsError(null);
+    const qcMap = new Map<
+      number,
+      { qualityScore: number; isSpike: boolean }
+    >();
+    qcByRow.forEach((g, rowIdx) => {
+      qcMap.set(rowIdx, {
+        qualityScore: g.qualityScore,
+        isSpike: g.isSpike,
+      });
+    });
+    invertDipolo2DPhysics(
+      readings,
+      params,
+      invertMethod,
+      topography,
+      qcMap,
+    )
+      .then((r) => {
+        if (!cancelled) setPhysicsResult(r);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) {
+          setPhysicsResult(null);
+          setPhysicsError(
+            e instanceof Error ? e.message : "Erro na inversão FDM",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPhysicsBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    invertEngine,
+    activeReadings.length,
+    readings,
+    params,
+    invertMethod,
+    topography,
+    qcByRow,
+  ]);
+
+  const invertResult =
+    invertEngine === "physics" ? physicsResult : proxyInvertResult;
 
   useEffect(() => {
     const project = loadGeophysProject();
@@ -1004,6 +1077,52 @@ export function DipoloDipoloClient() {
         <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
           <fieldset>
             <legend className="mb-2 text-sm font-medium text-[var(--text)]">
+              Motor de inversão
+            </legend>
+            <div className="flex flex-wrap gap-3 text-sm">
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2">
+                <input
+                  type="radio"
+                  name="invert-engine"
+                  checked={invertEngine === "proxy"}
+                  onChange={() => setInvertEngine("proxy")}
+                />
+                <span>
+                  <strong>Rápido (proxy)</strong>
+                  <span className="block text-xs text-[var(--muted)]">
+                    Sensibilidade gaussiana — preview instantâneo
+                  </span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2">
+                <input
+                  type="radio"
+                  name="invert-engine"
+                  checked={invertEngine === "physics"}
+                  onChange={() => setInvertEngine("physics")}
+                />
+                <span>
+                  <strong>Físico (FDM)</strong>
+                  <span className="block text-xs text-[var(--muted)]">
+                    Poisson 2D + Jacobiana + Gauss-Newton/Occam/L1/L2 + QC
+                  </span>
+                </span>
+              </label>
+            </div>
+            {invertEngine === "physics" && physicsBusy && (
+              <p className="mt-2 text-xs text-teal-700 dark:text-teal-300">
+                A calcular inversão FDM (motor Python :8092)…
+              </p>
+            )}
+            {physicsError && (
+              <p className="mt-2 text-xs text-red-700 dark:text-red-300">
+                {physicsError}
+              </p>
+            )}
+          </fieldset>
+
+          <fieldset>
+            <legend className="mb-2 text-sm font-medium text-[var(--text)]">
               Método de inversão
             </legend>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -1077,8 +1196,21 @@ export function DipoloDipoloClient() {
             <>
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <p className="max-w-prose text-xs text-[var(--muted)]">
-                  {invertResult.methodLabel} — inversão interpretativa (não é
-                  RES2DINV). Interpolação bilinear + paleta P8–P92.
+                  {invertEngine === "physics" ? (
+                    <>
+                      {invertResult.methodLabel} — FDM Poisson 2D, Jacobiana por
+                      diferenças finitas, regularização L1/L2 e pesos QC.
+                      {invertResult.physicsMessage
+                        ? ` ${invertResult.physicsMessage}`
+                        : ""}
+                    </>
+                  ) : (
+                    <>
+                      {invertResult.methodLabel} — preview rápido com matriz de
+                      sensibilidade gaussiana (não é RES2DINV). Interpolação
+                      bilinear + paleta P8–P92.
+                    </>
+                  )}
                 </p>
                 <fieldset className="shrink-0 text-xs">
                   <legend className="mb-1 font-medium text-[var(--text)]">
@@ -1159,15 +1291,28 @@ export function DipoloDipoloClient() {
                 topography={topography}
                 showTopography={showTopography}
               />
-              <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
-                <div className="col-span-2 sm:col-span-5">
+              <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-6">
+                <div className="col-span-2 sm:col-span-6">
                   <dt className="text-[var(--muted)]">Método</dt>
-                  <dd className="font-medium">{invertResult.methodLabel}</dd>
+                  <dd className="font-medium">
+                    {invertResult.methodLabel}
+                    <span className="ml-2 text-xs font-normal text-[var(--muted)]">
+                      ({invertResult.engine === "physics" ? "FDM" : "proxy"})
+                    </span>
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-[var(--muted)]">RMS log₁₀ ρ</dt>
                   <dd className="font-mono">{invertResult.rmsLog10.toFixed(4)}</dd>
                 </div>
+                {invertResult.rmsPercent != null && (
+                  <div>
+                    <dt className="text-[var(--muted)]">RMS relativo</dt>
+                    <dd className="font-mono">
+                      {invertResult.rmsPercent.toFixed(2)}%
+                    </dd>
+                  </div>
+                )}
                 <div>
                   <dt className="text-[var(--muted)]">Rugosidade L2</dt>
                   <dd className="font-mono">

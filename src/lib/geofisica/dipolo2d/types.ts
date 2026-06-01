@@ -34,28 +34,28 @@ export const DIPOLO2D_INVERT_METHODS: {
 }[] = [
   {
     id: "least_squares",
-    label: "Mínimos quadrados (Least Squares)",
+    label: "Mínimos quadrados (proxy LS)",
     short: "LS",
   },
-  { id: "occam", label: "Occam", short: "Occam" },
+  { id: "occam", label: "Occam (proxy)", short: "Occam" },
   {
     id: "gauss_newton",
-    label: "Gauss-Newton",
+    label: "Gauss-Newton (proxy linear)",
     short: "G-N",
   },
   {
     id: "smoothness",
-    label: "Suavizada (Smoothness Constrained)",
+    label: "Suavizada (proxy Huber IRLS)",
     short: "Suave",
   },
   {
     id: "robust_l1",
-    label: "Robusta (norma L1)",
+    label: "Robusta L1 (proxy IRLS)",
     short: "L1",
   },
   {
     id: "hybrid",
-    label: "Híbrida L2/L1",
+    label: "Híbrida L2/L1 (proxy)",
     short: "Hybrid",
   },
 ];
@@ -107,6 +107,8 @@ export type Dipolo2DInvertResult = {
   yObsLog10: Float64Array;
   ySynLog10: Float64Array;
   rmsLog10: number;
+  /** RMS relativo médio em % (Ω·m). */
+  rmsPercent?: number;
   roughnessL2: number;
   iterations: number;
   /** Histórico por iteração (RMS, λ, φ, rugosidade). */
@@ -116,4 +118,8 @@ export type Dipolo2DInvertResult = {
   nz: number;
   methodId: Dipolo2DInvertMethodId;
   methodLabel: string;
+  /** proxy = sensibilidade gaussiana (rápido); physics = FDM + Jacobiana. */
+  engine?: "proxy" | "physics";
+  physicsMessage?: string;
+  excludedReadingIndices?: number[];
 };

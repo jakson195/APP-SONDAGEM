@@ -318,6 +318,13 @@ export function finalizeResult(
   }
   const rmsLog10 = Math.sqrt(sse / Math.max(1, nd));
   const rough = roughnessL2FromModel(m, nx, nz);
+  let rmsPercent = 0;
+  for (let d = 0; d < nd; d++) {
+    const obs = 10 ** yObs[d]!;
+    const syn = 10 ** ySyn[d]!;
+    rmsPercent += Math.abs(obs - syn) / Math.max(obs, 1e-6);
+  }
+  rmsPercent = (rmsPercent / Math.max(1, nd)) * 100;
 
   const xEdges = new Float64Array(nx + 1);
   const zEdges = new Float64Array(nz + 1);
@@ -333,6 +340,7 @@ export function finalizeResult(
     yObsLog10: Float64Array.from(yObs),
     ySynLog10: Float64Array.from(ySyn),
     rmsLog10,
+    rmsPercent,
     roughnessL2: rough,
     iterations: iterCount,
     iterationHistory: history,
@@ -340,6 +348,7 @@ export function finalizeResult(
     nz,
     methodId,
     methodLabel,
+    engine: "proxy",
   };
 }
 
@@ -359,9 +368,28 @@ export type InvertProblem = {
   ridge: number;
 };
 
+export function readingDataWeight(
+  reading: Dipolo2DReading,
+  qc?: { qualityScore: number; isSpike: boolean },
+): number {
+  let w = 1 / Math.sqrt(Math.max(1, reading.n));
+  if (qc) {
+    w *= Math.max(0.05, qc.qualityScore / 100);
+    if (qc.isSpike) w *= 0.15;
+  }
+  const iMa = reading.iMa;
+  if (iMa != null && iMa > 0) {
+    if (iMa >= 5) w *= 1;
+    else if (iMa >= 2) w *= 0.65;
+    else w *= 0.25;
+  }
+  return Math.max(w, 1e-4);
+}
+
 export function prepareInvertProblem(
   readings: Dipolo2DReading[],
   p: Dipolo2DInvertParams,
+  qcByRow?: Map<number, { qualityScore: number; isSpike: boolean }>,
 ): InvertProblem | null {
   const valid = readings.filter(
     (L) =>
@@ -401,7 +429,11 @@ export function prepareInvertProblem(
   const yObs = valid.map((L) => Math.log10(Math.max(1e-12, L.rhoApparentOhmM)));
   const Hreg: number[][] = Array.from({ length: nm }, () => new Array(nm).fill(0));
   accumulateRoughnessH(nx, nz, Hreg);
-  const wData = valid.map((L) => 1 / Math.sqrt(Math.max(1, L.n)));
+  const wData = valid.map((L) => {
+    const qc =
+      L.sourceRowIndex != null ? qcByRow?.get(L.sourceRowIndex) : undefined;
+    return readingDataWeight(L, qc);
+  });
 
   return {
     valid,

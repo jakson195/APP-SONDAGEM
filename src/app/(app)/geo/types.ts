@@ -57,3 +57,9 @@ export type GeoObraContext = {
     name: string;
   };
 };
+
+export type GeoObraOption = {
+  id: number;
+  nome: string;
+  companyId: number;
+};

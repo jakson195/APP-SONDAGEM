@@ -57,7 +57,7 @@ export default function GeoPage() {
         </div>
 
         <nav
-          className="flex gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1"
+          className="flex flex-wrap items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1"
           aria-label="Secções GEO"
         >
           <button
@@ -76,6 +76,12 @@ export default function GeoPage() {
           >
             Mídia georreferenciada
           </button>
+          <a
+            href="/geo/temporal"
+            className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--surface)] hover:text-[var(--text)]"
+          >
+            Imagens históricas
+          </a>
         </nav>
       </header>
 

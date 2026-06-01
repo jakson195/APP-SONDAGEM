@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack -p 3000",
+    "dev:3002": "next dev --webpack -p 3002",
+    "dev:3003": "next dev --webpack -p 3003",
     "dev:prisma": "prisma generate && next dev",
     "build": "prisma generate && next build --webpack",
     "build:vercel": "prisma migrate deploy && prisma generate && next build --webpack",
@@ -25,7 +27,8 @@
     "vercel": "vercel",
     "verce": "vercel",
     "vercel:prod": "vercel --prod",
-    "vercel:pull": "vercel env pull .env.local"
+    "vercel:pull": "vercel env pull .env.local",
+    "landsat:engine": "cd ../python-engine/landsat && uvicorn main:app --reload --port 8093"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -35,6 +38,11 @@
     "@capacitor/cli": "^8.3.1",
     "@capacitor/core": "^8.3.1",
     "@capacitor/ios": "^8.3.1",
+    "@deck.gl/aggregation-layers": "^9.3.2",
+    "@deck.gl/core": "^9.3.2",
+    "@deck.gl/layers": "^9.3.2",
+    "@deck.gl/react": "^9.3.2",
+    "@mapbox/mapbox-gl-draw": "^1.5.1",
     "@prisma/client": "6.19.0",
     "@react-google-maps/api": "^2.20.8",
     "@react-pdf/renderer": "^4.5.1",
@@ -42,6 +50,7 @@
     "@react-three/fiber": "^9.6.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",
+    "@tensorflow/tfjs": "^4.22.0",
     "adm-zip": "^0.5.17",
     "autoprefixer": "^10.5.0",
     "axios": "^1.16.1",
@@ -55,6 +64,7 @@
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.14.0",
+    "mapbox-gl": "^3.24.0",
     "mapillary-js": "^4.1.2",
     "next": "16.2.4",
     "pdfjs-dist": "^5.7.284",
@@ -65,6 +75,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-leaflet": "^5.0.0",
+    "react-map-gl": "^8.1.1",
     "recharts": "^3.8.1",
     "sharp": "^0.34.5",
     "tailwindcss": "^3.4.17",
@@ -77,6 +88,7 @@
     "@types/google.maps": "^3.64.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/leaflet": "^1.9.21",
+    "@types/mapbox-gl": "^3.4.1",
     "@types/node": "^20",
     "@types/pg": "^8.15.2",
     "@types/proj4": "^2.5.6",

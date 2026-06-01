@@ -17,7 +17,7 @@ import { html2canvasReportOptions } from "@/lib/html2canvas-report-options";
 import { LS_POCOS_NOME } from "@/lib/sondagem-nome-storage";
 import { wgsPairFromInputs } from "@/lib/spt-map-coords";
 import { waitReportImagesLoaded } from "@/lib/wait-report-images";
-import { TIPOS_ROCHA } from "@/lib/tipos-rocha";
+import { corTipoRocha, TIPOS_ROCHA } from "@/lib/tipos-rocha";
 import { apiUrl } from "@/lib/api-url";
 
 const PIEZO_DADOS_V = 1 as const;
@@ -83,7 +83,7 @@ function parseCamadaGeol(row: unknown): CamadaGeol | null {
     de: typeof r.de === "string" ? r.de : "",
     ate: typeof r.ate === "string" ? r.ate : "",
     tipo,
-    cor,
+    cor: (tipo && corTipoRocha(tipo)) || cor,
     descricao,
   };
 }
@@ -1126,7 +1126,8 @@ export function PiezoRegistroCampo({ furoId }: PiezoRegistroCampoProps) {
             <strong className="text-[var(--text)]">Perfil geológico</strong> (litologia
             da sondagem) — dados à parte do{" "}
             <strong className="text-[var(--text)]">perfil do poço</strong> (tubos e
-            anular), preenchido acima. Material e cores alinhados à rotativa (CPRM).
+            anular), preenchido acima. Material, nomenclatura, cores e hachuras
+            alinhados ao padrão completo do SPT.
           </p>
           <button
             type="button"

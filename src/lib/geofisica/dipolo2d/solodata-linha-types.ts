@@ -29,6 +29,10 @@ export type SolodataLinhaRow = {
   nSep: number | null;
   /** Entrada: ρa (Ω·m) para inversão 2D. */
   rap: number | null;
+  /** Cota do terreno na estação (m) — opcional, para topografia do perfil. */
+  cota?: number | null;
+  /** Excluir da inversão / pseudoseção ativa (ruído). */
+  excluded?: boolean;
 };
 
 export type SolodataLinhaMeta = {
@@ -65,6 +69,8 @@ export function emptySolodataLinhaRow(medida = 1): SolodataLinhaRow {
     esp: 15,
     nSep: null,
     rap: null,
+    cota: null,
+    excluded: false,
   };
 }
 

@@ -1,3 +1,5 @@
+import { geologiaVisual } from "@/lib/geologia-visual";
+
 export type CamadaEstratigrafica = {
   topo: number;
   base: number;
@@ -34,7 +36,7 @@ export function PerfilEstratigrafico({
             className="flex items-center justify-center border-b border-[var(--border)] text-xs text-[var(--text)]"
             style={{
               height: altura,
-              backgroundColor: camada.cor,
+              ...geologiaVisual(camada.material, camada.cor),
             }}
           >
             {camada.material}

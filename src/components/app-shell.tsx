@@ -1,8 +1,9 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { LogOut, Menu, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiUrl } from "@/lib/api-url";
 import { useObraModulos } from "@/components/obra-context";
 import { AppSidebarNav } from "@/components/sidebar/app-sidebar-nav";
@@ -11,6 +12,7 @@ import { useModuleNav } from "@/hooks/use-module-nav";
 const coreNav = [
   { href: "/dashboard", label: "📊 Painel" },
   { href: "/hidrologia/chuvas-sc", label: "🌧️ Chuvas SC (HidroChu)" },
+  { href: "/hidrologia/chuvas-br", label: "🇧🇷 HidroBrasil (ANA + IA)" },
   { href: "/obras", label: "📁 Obras · mapas" },
   { href: "/obra", label: "🏗️ Nova obra" },
   { href: "/gestao-empresa", label: "🏢 Gestão · empresas" },
@@ -76,8 +78,121 @@ function LogoutButton({ onClick }: { onClick?: () => void }) {
   );
 }
 
+function GlobalQuickActions({
+  selectedObraId,
+  setObraContext,
+  pathname,
+  search,
+}: {
+  selectedObraId: number | null;
+  setObraContext: (id: number | null) => void;
+  pathname: string;
+  search: string;
+}) {
+  const [obras, setObras] = useState<Array<{ id: number; nome: string }>>([]);
+  const [loadingObras, setLoadingObras] = useState(false);
+  const obraHref = hrefWithObra("/obra", selectedObraId);
+  const empresaHref = hrefWithObra("/gestao-empresa", selectedObraId);
+  const [copyMsg, setCopyMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingObras(true);
+    void (async () => {
+      try {
+        const response = await fetch(apiUrl("/api/obra"), { credentials: "include" });
+        const data = (await response.json().catch(() => [])) as
+          | Array<{ id: number; nome: string }>
+          | { error?: string };
+        if (cancelled) return;
+        if (!response.ok || !Array.isArray(data)) {
+          setObras([]);
+          return;
+        }
+        setObras(data.map((item) => ({ id: item.id, nome: item.nome })));
+      } catch {
+        if (!cancelled) setObras([]);
+      } finally {
+        if (!cancelled) setLoadingObras(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const copyLink = useCallback(async (includeObra: boolean) => {
+    const url = new URL(window.location.origin + pathname);
+    const params = new URLSearchParams(search);
+    if (includeObra && selectedObraId != null) {
+      params.set("obraId", String(selectedObraId));
+    }
+    url.search = params.toString();
+    await navigator.clipboard.writeText(url.toString());
+    setCopyMsg(includeObra ? "Weblink da aba + obra copiado." : "Weblink da aba copiado.");
+    window.setTimeout(() => setCopyMsg(null), 2500);
+  }, [pathname, search, selectedObraId]);
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-2 print:hidden">
+      <label className="flex min-w-[18rem] flex-col gap-1 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm">
+        <span className="text-xs font-medium text-[var(--muted)]">Obra (projeto)</span>
+        <select
+          value={selectedObraId ?? ""}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            if (!event.target.value || !Number.isFinite(next)) {
+              setObraContext(null);
+              return;
+            }
+            setObraContext(next);
+          }}
+          disabled={loadingObras}
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm text-[var(--text)]"
+        >
+          <option value="">— Escolher obra —</option>
+          {obras.map((obra) => (
+            <option key={obra.id} value={obra.id}>
+              {obra.nome}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Link
+        href={empresaHref}
+        className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--text)] transition hover:border-teal-500/50 hover:bg-teal-500/10"
+      >
+        Cadastrar empresa
+      </Link>
+      <Link
+        href={obraHref}
+        className="rounded-xl bg-teal-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-teal-500"
+      >
+        Criar obra
+      </Link>
+      <button
+        type="button"
+        onClick={() => void copyLink(false)}
+        className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--text)] transition hover:border-blue-500/50 hover:bg-blue-500/10"
+      >
+        Copiar weblink da aba
+      </button>
+      <button
+        type="button"
+        onClick={() => void copyLink(true)}
+        disabled={selectedObraId == null}
+        className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--text)] transition hover:border-indigo-500/50 hover:bg-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        Copiar weblink aba + projeto
+      </button>
+      {copyMsg && <span className="text-xs text-[var(--muted)]">{copyMsg}</span>}
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
+  const searchParams = useSearchParams();
   const [mobileOpen, setMobileOpen] = useState(false);
   const {
     selectedObraId,
@@ -187,6 +302,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <span className="text-sm font-semibold text-[var(--text)]">DataGeo Digital</span>
         </header>
         <main className="flex-1 bg-gray-100 px-4 py-6 dark:bg-[var(--surface)] print:bg-white print:px-2 print:py-2 sm:px-6 lg:px-8">
+          <GlobalQuickActions
+            selectedObraId={selectedObraId}
+            setObraContext={setObraContext}
+            pathname={pathname}
+            search={searchParams.toString()}
+          />
           {children}
         </main>
       </div>

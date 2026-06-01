@@ -1,11 +1,9 @@
 import type { SolodataLinhaRow } from "./solodata-linha-types";
 import { parseDipolo2DPaste } from "./parse-paste";
+import { parseNumCell } from "./solodata-grid-paste";
 
 function parseNum(raw: string): number | null {
-  const clean = raw.replace(",", ".").trim();
-  if (!clean) return null;
-  const n = Number(clean);
-  return Number.isFinite(n) ? n : null;
+  return parseNumCell(raw);
 }
 
 function splitRow(line: string): string[] {
@@ -44,6 +42,32 @@ function rowFromCells(cells: string[]): SolodataLinhaRow | null {
       rap: nums[23],
     };
   }
+  if (nums.length >= 11 && nums.length < 14) {
+    return {
+      medida: nums[0],
+      piquete: nums[1],
+      espM: nums[2],
+      a: nums[3],
+      b: nums[4],
+      m: nums[5],
+      nEl: nums[6],
+      nivel: nums[7],
+      spMv: nums[8],
+      vMv: nums[9],
+      iMa: nums[10],
+      g: null,
+      k: null,
+      rapCalc: null,
+      a2: null,
+      b2: null,
+      m2: null,
+      n2: null,
+      dist: null,
+      esp: nums[2],
+      nSep: nums[7],
+      rap: null,
+    };
+  }
   if (nums.length >= 14) {
     return {
       medida: nums[0],
@@ -70,7 +94,85 @@ function rowFromCells(cells: string[]): SolodataLinhaRow | null {
       rap: nums[13],
     };
   }
-  if (nums.length >= 4) {
+  if (nums.length >= 3 && nums.length < 4) {
+    return {
+      medida: null,
+      piquete: null,
+      espM: null,
+      a: null,
+      b: null,
+      m: null,
+      nEl: null,
+      nivel: null,
+      spMv: nums[0],
+      vMv: nums[1],
+      iMa: nums[2],
+      g: null,
+      k: null,
+      rapCalc: null,
+      a2: null,
+      b2: null,
+      m2: null,
+      n2: null,
+      dist: null,
+      esp: null,
+      nSep: null,
+      rap: null,
+    };
+  }
+  if (nums.length >= 8 && nums.length < 11) {
+    return {
+      medida: nums[0],
+      piquete: nums[1],
+      espM: nums[2],
+      a: nums[3],
+      b: nums[4],
+      m: nums[5],
+      nEl: nums[6],
+      nivel: nums[7],
+      spMv: null,
+      vMv: null,
+      iMa: null,
+      g: null,
+      k: null,
+      rapCalc: null,
+      a2: null,
+      b2: null,
+      m2: null,
+      n2: null,
+      dist: null,
+      esp: nums[2],
+      nSep: nums[7],
+      rap: null,
+    };
+  }
+  if (nums.length === 5) {
+    return {
+      medida: null,
+      piquete: null,
+      espM: null,
+      a: nums[0],
+      b: nums[1],
+      m: nums[2],
+      nEl: nums[3],
+      nivel: nums[4],
+      spMv: null,
+      vMv: null,
+      iMa: null,
+      g: null,
+      k: null,
+      rapCalc: null,
+      a2: null,
+      b2: null,
+      m2: null,
+      n2: null,
+      dist: null,
+      esp: null,
+      nSep: null,
+      rap: null,
+    };
+  }
+  if (nums.length >= 4 && nums.length < 8) {
     return {
       medida: null,
       piquete: null,

@@ -24,6 +24,7 @@ export const CESIUM_ROUTE_PREFIXES = [
   DIGITAL_TWIN_BASE,
   `${DIGITAL_TWIN_BASE}/insar`,
   `${DIGITAL_TWIN_BASE}/lidar`,
+  `${DIGITAL_TWIN_BASE}/taludes`,
   "/obra/nova",
 ] as const;
 
@@ -92,6 +93,14 @@ export const platformModules: PlatformModuleDef[] = [
         icon: Image,
         parent: "digital-twin",
         description: "Comparação T0/T1 com heatmap e pontos de risco",
+      },
+      {
+        href: `${DIGITAL_TWIN_BASE}/taludes`,
+        label: "Taludes · Drone",
+        icon: Shovel,
+        parent: "digital-twin",
+        description:
+          "Monitoramento temporal: optical flow, DSM, IA, mapa 2D/3D",
       },
       {
         href: `${DIGITAL_TWIN_BASE}/nuvem-pontos`,

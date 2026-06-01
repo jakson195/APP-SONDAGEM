@@ -12,9 +12,28 @@ export function isLocalAuthBypassEnabled(): boolean {
   return process.env.NODE_ENV !== "production" && process.env.AUTH_BYPASS_LOCAL === "1";
 }
 
+const LOCAL_BYPASS_FALLBACK_USER: AuthUser = {
+  id: 1,
+  email: "local-auth-bypass@datageodigital.local",
+  name: "Local Auth Bypass",
+  systemRole: "MASTER_ADMIN",
+};
+
 export async function getLocalBypassAuthUser(): Promise<AuthUser | null> {
   if (!isLocalAuthBypassEnabled()) return null;
 
+  try {
+    return await resolveLocalBypassAuthUser();
+  } catch (err) {
+    console.warn(
+      "[auth-bypass] Base de dados indisponível; a usar utilizador local de fallback.",
+      err,
+    );
+    return LOCAL_BYPASS_FALLBACK_USER;
+  }
+}
+
+async function resolveLocalBypassAuthUser(): Promise<AuthUser> {
   const admin = await prisma.user.findFirst({
     where: {
       systemRole: {
@@ -49,8 +68,8 @@ export async function getLocalBypassAuthUser(): Promise<AuthUser | null> {
 
   return prisma.user.create({
     data: {
-      email: "local-auth-bypass@datageodigital.local",
-      name: "Local Auth Bypass",
+      email: LOCAL_BYPASS_FALLBACK_USER.email,
+      name: LOCAL_BYPASS_FALLBACK_USER.name,
       password: null,
       systemRole: "MASTER_ADMIN",
     },

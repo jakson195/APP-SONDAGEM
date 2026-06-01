@@ -2,12 +2,6 @@ import Link from "next/link";
 
 const cards = [
   {
-    href: "/hidrologia/chuvas-sc",
-    title: "HidroChuSC — Chuvas máximas SC",
-    desc:
-      "Gumbel-Chow, períodos de retorno e relatório texto (compatível com o HidroChuSC clássico).",
-  },
-  {
     href: "/geofisica/ves?metodo=wenner",
     title: "SEV — Wenner",
     desc:
@@ -23,7 +17,19 @@ const cards = [
     href: "/geofisica/dipolo-dipolo",
     title: "Dipolo-Dipolo — RES2DINV-like",
     desc:
-      "Perfil 2D: colar dados (estação, n, ρa), pseudoseção aparente e inversão suavizada em log ρ (Huber + Laplaciano).",
+      "Perfil 2D: inversão RES2DINV-like, interpretação geológica por localização (mapa + IA opcional) e litologia na secção invertida.",
+  },
+  {
+    href: "/geofisica/qc",
+    title: "QC automático — qualidade de dados",
+    desc:
+      "Classificação verde/amarelo/vermelho por SNR, spikes, FFT 50/60 Hz, mapa colorido, gráfico de ruído e interpretação IA.",
+  },
+  {
+    href: "/geofisica/volume-3d",
+    title: "Modelo 3D — interpolação multi-secção",
+    desc:
+      "Voxel 3D entre linhas invertidas: IDW/Kriging/RBF (Python), nuvem XYZ, filtro por resistividade, fatias, iso-superfícies, clipping e IA.",
   },
 ] as const;
 

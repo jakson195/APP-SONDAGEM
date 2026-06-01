@@ -12,6 +12,18 @@ const nextConfig: NextConfig = {
         source: "/api/geo/api/v1/:path*",
         destination: "/api/geo/v1/:path*",
       },
+      {
+        source: "/geofisica/temporal",
+        destination: "/geo/temporal",
+      },
+      {
+        source: "/geofisica/temporal/:path*",
+        destination: "/geo/temporal/:path*",
+      },
+      {
+        source: "/api/geofisica/temporal/:path*",
+        destination: "/api/geo/temporal/:path*",
+      },
     ];
   },
   webpack: (config) => {

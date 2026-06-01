@@ -1,4 +1,5 @@
-import { CPRM_SOIL_FILL } from "@/lib/cprm-soil-palette";
+import { TIPOS_SOLO_PRINCIPAIS } from "@/lib/nomenclatura-geologica-solo";
+import { corSoloSpt } from "@/lib/spt-solo-cor";
 
 export type TipoRocha = {
   nome: string;
@@ -6,22 +7,24 @@ export type TipoRocha = {
 };
 
 /**
- * Materiais para sondagem rotativa / coluna esquemática.
- * Areias fina → média → grossa: cores da paleta CPRM (amarelos por granulometria),
- * alinhada à legenda gráfica habitual em relatórios de sondagem (ex.: SONDGEO e
- * normas de representação ABNT / perfis tipo CPRM).
+ * Catálogo unificado de materiais geológicos para todas as sondagens.
+ * Base: mesma nomenclatura do SPT + entradas legadas de rotativa/piezo.
  */
 export const TIPOS_ROCHA: TipoRocha[] = [
-  { nome: "Solo residual", cor: "#a3b18a" },
-  { nome: "Silte", cor: "#c2b280" },
-  { nome: "Areia fina", cor: CPRM_SOIL_FILL.areia_fina },
-  { nome: "Areia média", cor: CPRM_SOIL_FILL.areia_media },
-  { nome: "Areia grossa", cor: CPRM_SOIL_FILL.areia_grossa },
-  { nome: "Argila", cor: "#8d99ae" },
-  { nome: "Rocha alterada", cor: "#adb5bd" },
-  { nome: "Rocha fraturada", cor: "#6c757d" },
-  { nome: "Rocha sã", cor: "#343a40" },
-];
+  ...TIPOS_SOLO_PRINCIPAIS.map((nome) => ({
+    nome,
+    cor: corSoloSpt(nome),
+  })),
+  // Legado (nomes curtos antigos) para compatibilidade com dados já gravados:
+  { nome: "Argila", cor: corSoloSpt("Argila média") },
+  { nome: "Silte", cor: corSoloSpt("Silte médio") },
+  { nome: "Areia fina", cor: corSoloSpt("Areia fina média") },
+  { nome: "Areia média", cor: corSoloSpt("Areia média média") },
+  { nome: "Areia grossa", cor: corSoloSpt("Areia grossa média") },
+  { nome: "Rocha fraturada", cor: "#4b5563" },
+].filter(
+  (item, idx, arr) => arr.findIndex((x) => x.nome === item.nome) === idx,
+);
 
 /** Cor hex do tipo, ou undefined se o nome não existir na lista. */
 export function corTipoRocha(nome: string): string | undefined {

@@ -26,7 +26,7 @@ import { QUALIDADES_RQD, classificarRQD } from "@/lib/rqd";
 import { LS_ROTATIVA_NOME } from "@/lib/sondagem-nome-storage";
 import { wgsPairFromInputs } from "@/lib/spt-map-coords";
 import { waitReportImagesLoaded } from "@/lib/wait-report-images";
-import { TIPOS_ROCHA } from "@/lib/tipos-rocha";
+import { corTipoRocha, TIPOS_ROCHA } from "@/lib/tipos-rocha";
 import { apiUrl } from "@/lib/api-url";
 
 const COR_PADRAO = "#cccccc";
@@ -69,7 +69,10 @@ function parseLinha(row: unknown): Linha | null {
     de: Number(r.de) || 0,
     ate: Number(r.ate) || 0,
     tipo: typeof r.tipo === "string" ? r.tipo : "",
-    cor: typeof r.cor === "string" ? r.cor : COR_PADRAO,
+    cor:
+      (typeof r.tipo === "string" && corTipoRocha(r.tipo)) ||
+      (typeof r.cor === "string" ? r.cor : "") ||
+      COR_PADRAO,
     rqd: Math.min(100, Math.max(0, Number(r.rqd) || 0)),
     recuperacao: Math.min(100, Math.max(0, Number(r.recuperacao) || 0)),
     descricao: typeof r.descricao === "string" ? r.descricao : "",

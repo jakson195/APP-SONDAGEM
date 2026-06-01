@@ -28,7 +28,8 @@
     "verce": "vercel",
     "vercel:prod": "vercel --prod",
     "vercel:pull": "vercel env pull .env.local",
-    "landsat:engine": "cd ../python-engine/landsat && uvicorn main:app --reload --port 8093"
+    "landsat:engine": "cd ../python-engine/landsat && uvicorn main:app --reload --port 8093",
+    "geophysics:engine": "cd ../python-engine/geophysics && uvicorn main:app --reload --port 8092"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

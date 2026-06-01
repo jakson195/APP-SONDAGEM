@@ -79,6 +79,8 @@ function toPhysicsPayload(
       hybrid_alpha: params.hybridAlpha ?? 0.65,
       auto_exclude_outliers: true,
       outlier_score_threshold: 35,
+      use_adaptive_mesh: true,
+      jacobian_mode: "adjoint" as const,
     },
     method,
     topography: topography?.map((t) => ({

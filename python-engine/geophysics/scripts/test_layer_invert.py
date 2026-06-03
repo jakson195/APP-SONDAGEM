@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 
 from schemas.invert_2d import Invert2DRequest, InvertParamsIn, ReadingIn
 from services.inversion.invert_2d import run_invert_2d
+from services.inversion.pygimli_invert import is_pygimli_available
 from services.inversion.mesh import build_mesh, idx
 from services.inversion.fdm_forward import forward_log10_raw
 
@@ -75,6 +76,7 @@ def run_case(method: str, lam: float, max_iter: int = 8) -> bool:
         readings=readings,
         method=method,
         params=InvertParamsIn(**base),
+        invert_engine="legacy",
     )
     out = run_invert_2d(req)
     rho = np.array([10 ** v for v in out.m_log10])
@@ -90,9 +92,39 @@ def run_case(method: str, lam: float, max_iter: int = 8) -> bool:
 
 def main() -> int:
     ok = True
+    print(f"pyGIMLi instalado: {is_pygimli_available()}")
     for lam in (0.01, 0.03, 0.1):
         ok = run_case("gauss_newton", lam, max_iter=6) and ok
     ok = run_case("blocky_l1", 0.03, max_iter=6) and ok
+    if is_pygimli_available():
+        print("\n--- pyGIMLi (mesmo sintético) ---")
+        mesh = build_mesh(0, 120, 16, 10, 10, None, geometric_z=True)
+        m_true = build_two_layer(mesh, 100.0, 3000.0)
+        readings = synthetic_readings(mesh, m_true, n_stations=8)
+        req = Invert2DRequest(
+            readings=readings,
+            method="gauss_newton",
+            invert_engine="pygimli",
+            params=InvertParamsIn(
+                nx=16,
+                nz=10,
+                lambda_reg=0.03,
+                max_iter=8,
+                forward_model="fdm",
+                use_adaptive_mesh=False,
+                apply_coverage_mask=False,
+                auto_exclude_outliers=False,
+            ),
+        )
+        out = run_invert_2d(req)
+        rho = np.array([10 ** v for v in out.m_log10])
+        ratio = rho.max() / max(rho.min(), 1e-6)
+        pg_ok = ratio > 3 and rho.std() > 12
+        print(
+            f"[pygimli] engine={out.engine} rho {rho.min():.0f}-{rho.max():.0f} "
+            f"rms%={out.rms_percent:.1f} {'PASS' if pg_ok else 'FAIL'}"
+        )
+        ok = pg_ok and ok
     return 0 if ok else 1
 
 

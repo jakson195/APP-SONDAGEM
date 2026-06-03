@@ -25,6 +25,8 @@ class TopographyPointIn(BaseModel):
 
 ForwardModelId = Literal["fdm", "fem"]
 
+InvertEngineId = Literal["pygimli", "legacy"]
+
 
 class InvertParamsIn(BaseModel):
     nx: int = Field(default=32, ge=4, le=48)
@@ -109,8 +111,12 @@ MethodId = Literal[
 class Invert2DRequest(BaseModel):
     readings: list[ReadingIn]
     params: InvertParamsIn = Field(default_factory=InvertParamsIn)
-    method: MethodId = "robust_l1"
+    method: MethodId = "gauss_newton"
     topography: list[TopographyPointIn] | None = None
+    invert_engine: InvertEngineId | None = Field(
+        default=None,
+        description="pygimli (padrão) ou legacy (FDM/FEM interno). None = env GEOPHYS_INVERT_ENGINE",
+    )
 
 
 class IterationRecordOut(BaseModel):
@@ -132,7 +138,7 @@ class IterationRecordOut(BaseModel):
 
 class Invert2DResponse(BaseModel):
     ok: bool
-    engine: str = "physics_fdm"
+    engine: str = "pygimli"
     forward_model: ForwardModelId = "fdm"
     method: MethodId
     method_label: str

@@ -117,6 +117,7 @@ function toPhysicsPayload(
       chi2_tolerance: 0.05,
     },
     method,
+    invert_engine: "pygimli",
     topography: topography?.map((t) => ({
       station_m: t.stationM,
       elevation_m: t.elevationM,
@@ -188,7 +189,11 @@ function mapPhysicsResponse(data: PhysicsResponse): Dipolo2DInvertResult | null 
     methodId: data.method ?? "gauss_newton",
     methodLabel: data.method_label ?? "FDM físico",
     engine: "physics",
-    physicsMessage: data.message,
+    physicsMessage: data.message
+      ? `[${data.engine ?? "motor"}] ${data.message}`
+      : data.engine
+        ? `[${data.engine}]`
+        : undefined,
     excludedReadingIndices: data.excluded_indices,
     forwardModel: data.forward_model,
     chi2Reduced: data.chi2_reduced,

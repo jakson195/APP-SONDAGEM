@@ -1,6 +1,8 @@
 # DataGeo — Motor Geofísico (FastAPI)
 
-Inversão 2D ERT (dipolo-dipolo): **FDM** ou **FEM**, Jacobiana adjoint/FD, Occam com χ² rigoroso, malha adaptativa, pesos QC.
+Inversão 2D ERT (dipolo-dipolo): **pyGIMLi** (padrão, estilo RES2DINV) ou motor **legacy** FDM/FEM interno.
+
+Ver `docs/PYGIMLI_ENGINE.md` e `pip install -r requirements-pygimli.txt` (opcional).
 
 ## Prioridade RES2DINV (o que mais importa)
 

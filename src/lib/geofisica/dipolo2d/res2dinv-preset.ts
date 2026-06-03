@@ -40,7 +40,7 @@ export const BLOCKY_INVERT_PARAMS: Dipolo2DInvertParams = {
 export const LAMBDA_TEST_VALUES = [1.0, 0.3, 0.1, 0.03] as const;
 
 /** blocky_l1 = máximo contraste (reiniciar motor); robust_l1 como fallback. */
-export const RES2DINV_DEFAULT_METHOD: Dipolo2DInvertMethodId = "blocky_l1";
+export const RES2DINV_DEFAULT_METHOD: Dipolo2DInvertMethodId = "gauss_newton";
 
 /** Motor físico obrigatório para inversão real (FDM + Jacobiana adjoint + GN + L1). */
 export const RES2DINV_PREFER_PHYSICS_ENGINE = true;

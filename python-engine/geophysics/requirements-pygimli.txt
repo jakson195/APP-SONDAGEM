@@ -1,0 +1,3 @@
+# Motor pyGIMLi (opcional — padrão quando instalado)
+# Windows: preferir conda install -c gimli pygimli
+pygimli>=1.5.0

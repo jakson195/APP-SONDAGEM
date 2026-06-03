@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 export function ResetPasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const legacyToken = searchParams?.get("token");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -29,11 +31,14 @@ export function ResetPasswordForm() {
     }
 
     try {
-      const response = await fetch("/api/auth/update-password", {
+      const endpoint = legacyToken ? "/api/auth/reset-password" : "/api/auth/update-password";
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ password }),
+        body: JSON.stringify(
+          legacyToken ? { token: legacyToken, password } : { password },
+        ),
       });
       const data = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) {
@@ -103,7 +108,7 @@ export function ResetPasswordForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-[var(--accent)] py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-70"
+          className="dg-btn-primary w-full py-2.5 disabled:opacity-70"
         >
           {loading ? "A atualizar..." : "Definir nova palavra-passe"}
         </button>

@@ -26,6 +26,15 @@ def _interp_surface(x: float, topo_x: np.ndarray, topo_z: np.ndarray) -> float:
     return float(np.interp(x, topo_x, topo_z))
 
 
+def _z_edges_depth(nz: int, z_max: float, geometric: bool) -> np.ndarray:
+    """Camadas mais finas no topo (geométrico ≈ RES2DINV / XI2IP)."""
+    if geometric and nz > 1 and z_max > 0:
+        z_edges = np.geomspace(max(z_max / (2**nz), 0.05), z_max, nz + 1)
+        z_edges[0] = 0.0
+        return z_edges
+    return np.linspace(0.0, z_max, nz + 1)
+
+
 def build_mesh(
     x0: float,
     x1: float,
@@ -33,9 +42,11 @@ def build_mesh(
     nx: int,
     nz: int,
     topography: list[tuple[float, float]] | None = None,
+    *,
+    geometric_z: bool = True,
 ) -> Mesh2D:
     x_edges = np.linspace(x0, x1, nx + 1)
-    z_edges = np.linspace(0.0, z_max, nz + 1)
+    z_edges = _z_edges_depth(nz, z_max, geometric_z)
     x_centers = 0.5 * (x_edges[:-1] + x_edges[1:])
     z_centers = 0.5 * (z_edges[:-1] + z_edges[1:])
 
@@ -50,10 +61,10 @@ def build_mesh(
         topo_z = np.array([], dtype=float)
 
     surface_z = np.array([_interp_surface(x, topo_x, topo_z) for x in x_centers])
-    active = np.zeros((nx, nz), dtype=bool)
-    for i in range(nx):
-        for j in range(nz):
-            active[i, j] = z_centers[j] >= surface_z[i] - 1e-9
+    # z_centers = profundidade (m) abaixo da superfície local; surface_z = cota (m) só
+    # para visualização. NÃO comparar profundidade com cota — isso desactivava
+    # todas as células (ex.: 5 m >= 128 m) e a inversão ficava homogénea.
+    active = np.ones((nx, nz), dtype=bool)
 
     return Mesh2D(
         nx=nx,

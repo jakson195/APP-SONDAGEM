@@ -230,6 +230,9 @@ export async function attachTerrainSurfaceToVolumeAsync(
 
   try {
     const demGrid = await fetchDemSurfaceGridForVolume(volume);
+    if (!demGrid) {
+      return attachTerrainSurfaceToVolume(volume, lines, params);
+    }
     const lineTerrain = surveyHasTerrainData(lines)
       ? buildVolumeTerrainSurface(lines, volume, params.maxInfluenceM)
       : null;

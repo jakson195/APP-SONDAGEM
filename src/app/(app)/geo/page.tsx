@@ -22,7 +22,7 @@ function tabClass(active: boolean): string {
 
 export default function GeoPage() {
   const searchParams = useSearchParams();
-  const initialTab: GeoTab = searchParams.get("tab") === "midia" ? "midia" : "mapa";
+  const initialTab: GeoTab = searchParams?.get("tab") === "midia" ? "midia" : "mapa";
   const [tab, setTab] = useState<GeoTab>(initialTab);
 
   const [furos, setFuros] = useState<FuroMapa[]>([]);

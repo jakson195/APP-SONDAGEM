@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withGeophysicsApi } from "@/lib/geofisica/geophys-api-guard";
 import {
   GEOSGB_CATALOG,
   GEOSGB_MAP_OVERLAYS,
@@ -9,7 +10,7 @@ import { USGS_CATALOG, USGS_EARTHEXPLORER } from "@/lib/geofisica/geodata/usgs-c
 export const dynamic = "force-dynamic";
 
 /** Catálogo de fontes para UI e agentes (Cursor / IA). */
-export async function GET() {
+async function handleCatalogGet() {
   return NextResponse.json({
     ok: true,
     primary: "geosgb",
@@ -32,5 +33,11 @@ export async function GET() {
       services: USGS_CATALOG,
       earthExplorer: USGS_EARTHEXPLORER,
     },
+  });
+}
+
+export async function GET(req: Request) {
+  return withGeophysicsApi(req, async () => handleCatalogGet(), {
+    allowGlobalScope: true,
   });
 }

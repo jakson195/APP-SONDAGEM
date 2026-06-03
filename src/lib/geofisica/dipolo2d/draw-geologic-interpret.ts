@@ -48,7 +48,7 @@ function blitRaster(
   off.height = rh;
   const octx = off.getContext("2d");
   if (!octx) return;
-  octx.putImageData(new ImageData(rgba, rw, rh), 0, 0);
+  octx.putImageData(new ImageData(new Uint8ClampedArray(rgba), rw, rh), 0, 0);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   if (clip) {

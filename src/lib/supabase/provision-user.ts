@@ -18,6 +18,16 @@ export async function provisionPlatformUser(input: Input) {
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing?.supabaseAuthId) {
+    if (isSupabaseAuthConfigured() && input.password && input.password.length >= 8) {
+      const admin = createSupabaseAdminClient();
+      const { error } = await admin.auth.admin.updateUserById(existing.supabaseAuthId, {
+        password: input.password,
+        ...(input.name?.trim() ? { user_metadata: { name: input.name.trim() } } : {}),
+      });
+      if (error) {
+        throw new Error(error.message ?? "Falha ao atualizar palavra-passe no Supabase.");
+      }
+    }
     return prisma.user.update({
       where: { id: existing.id },
       data: {
@@ -40,8 +50,37 @@ export async function provisionPlatformUser(input: Input) {
       email_confirm: true,
       user_metadata: input.name?.trim() ? { name: input.name.trim() } : undefined,
     });
-    if (error || !data.user) {
-      throw new Error(error?.message ?? "Falha ao criar utilizador no Supabase Auth.");
+    if (error) {
+      const msg = error.message ?? "";
+      const alreadyExists =
+        msg.toLowerCase().includes("already") || msg.toLowerCase().includes("registered");
+      if (alreadyExists) {
+        const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000 });
+        const authUser = list?.users?.find((u) => u.email?.toLowerCase() === email);
+        if (!authUser) {
+          throw new Error(msg || "Utilizador já existe mas não foi encontrado no Supabase.");
+        }
+        const { error: updateErr } = await admin.auth.admin.updateUserById(authUser.id, {
+          password,
+          email_confirm: true,
+          ...(input.name?.trim() ? { user_metadata: { name: input.name.trim() } } : {}),
+        });
+        if (updateErr) {
+          throw new Error(updateErr.message ?? "Falha ao atualizar utilizador no Supabase.");
+        }
+        const local = await syncUserFromSupabase(authUser);
+        if (input.systemRole && local.systemRole !== input.systemRole) {
+          return prisma.user.update({
+            where: { id: local.id },
+            data: { systemRole: input.systemRole },
+          });
+        }
+        return local;
+      }
+      throw new Error(msg || "Falha ao criar utilizador no Supabase Auth.");
+    }
+    if (!data.user) {
+      throw new Error("Falha ao criar utilizador no Supabase Auth.");
     }
 
     const local = await syncUserFromSupabase(data.user);

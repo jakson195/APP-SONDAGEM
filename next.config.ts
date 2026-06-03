@@ -2,6 +2,15 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+        pathname: "/**",
+      },
+    ],
+  },
   output: "standalone",
   /** Next 16 usa Turbopack por defeito; o projeto tem webpack custom (Cesium). */
   turbopack: {},

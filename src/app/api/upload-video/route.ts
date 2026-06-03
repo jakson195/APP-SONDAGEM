@@ -10,6 +10,7 @@ import {
   buildStoredVideoPath,
   detectVideoToolAvailability,
   extractStreetFramesFromVideo,
+  type ExtractedStreetFrame,
   readTempFileBytes,
   removeTempDir,
 } from "@/lib/video-tools";
@@ -79,7 +80,10 @@ export async function POST(req: Request) {
       cacheControl: "3600",
     });
 
-    const uploadedFrames = [];
+    const uploadedFrames: {
+      frame: ExtractedStreetFrame;
+      storage: Awaited<ReturnType<typeof uploadToStorageBucket>>;
+    }[] = [];
     for (const frame of extraction.frames) {
       const storage = await uploadToStorageBucket({
         bucket: "street-frames",

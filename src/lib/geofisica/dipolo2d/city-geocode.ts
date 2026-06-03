@@ -202,7 +202,7 @@ export async function searchNominatim(query: string): Promise<GeocodeResult[]> {
   }>;
 
   return raw
-    .map((item) => {
+    .map((item): GeocodeResult | null => {
       const lat = Number(item.lat);
       const lng = Number(item.lon);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;

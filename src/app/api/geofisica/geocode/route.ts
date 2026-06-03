@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { withGeophysicsApi } from "@/lib/geofisica/geophys-api-guard";
 import { searchBrazilCity } from "@/lib/geofisica/dipolo2d/city-geocode";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+async function handleGeocodeGet(req: Request) {
   const q = new URL(req.url).searchParams.get("q")?.trim();
   if (!q || q.length < 2) {
     return NextResponse.json(
@@ -39,4 +40,10 @@ export async function GET(req: Request) {
     const msg = e instanceof Error ? e.message : "Erro na geocodificação";
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
+}
+
+export async function GET(req: Request) {
+  return withGeophysicsApi(req, async (_ctx, r) => handleGeocodeGet(r), {
+    allowGlobalScope: true,
+  });
 }

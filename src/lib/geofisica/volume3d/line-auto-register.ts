@@ -121,6 +121,7 @@ export function registerLineFromXyz(
       subArrayType: 0,
       readings: [],
       warnings: [],
+      topographyFromReadings: [],
     },
     lineIndex,
     parallelSpacingM,

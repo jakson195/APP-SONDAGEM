@@ -39,9 +39,10 @@ export async function POST(req: Request) {
       spectralMode: body.spectralMode ?? "rgb",
     });
     const safeKey = result.scene_id.replace(/\//g, "_").replace(/:/g, "_");
+    const { ok: _engineOk, ...rest } = result;
     return NextResponse.json({
+      ...rest,
       ok: true,
-      ...result,
       previewProxyUrl: `/api/geo/temporal/landsat/preview/${encodeURIComponent(safeKey)}?spectral_mode=${result.spectral_mode}`,
     });
   } catch (e) {

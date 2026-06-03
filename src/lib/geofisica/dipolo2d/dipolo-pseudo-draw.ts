@@ -6,8 +6,25 @@ import {
   type ResistivityColorScale,
 } from "./colormap";
 import {
+  buildAdaptiveContrastMapper,
+  makeHistogramEqualizeMapper,
+  makeStdStretchMapper,
+  resolveModelDisplayBounds,
+  rhoToNormalizedLinear,
+  validateModelForRender,
+  type ModelContrastMode,
+  type ModelDisplayScale,
+} from "./model-visual-scale";
+import {
+  res2dinvLegendLabels,
+  rhoToRes2dinvNormalized,
+} from "./res2dinv-colormap";
+import {
   buildModelZCoverProfile,
+  buildSensitivityZCoverProfile,
+  paintModelCellsOnCanvas,
   rasterizeModelSection,
+  type ModelRenderMode,
 } from "./model-section-render";
 import {
   pathTrapezoidCoverage,
@@ -91,17 +108,29 @@ export type ModelDrawOptions = {
   factorDepth?: number;
   iterations?: number;
   rmsLog10?: number;
+  /** RMS relativo médio em % (Ω·m) — compatível com RES2DINV «Abs. error». */
+  rmsPercent?: number;
   methodLabel?: string;
+  /** proxy = retroprojeção ρa; physics = inversão FDM/FEM. */
+  invertEngine?: "proxy" | "physics";
   /** Exagero horizontal do perfil (1 = natural). */
   scaleXM?: number;
   /** Exagero vertical / profundidade (1 = natural). */
   scaleZM?: number;
   /** Níveis discretos na paleta (RES2DINV ~16–24). */
   colorLevels?: number;
-  /** Passes de suavização só na exibição (0 = células brutas). */
+  /** Passes de suavização só na exibição (0 = células brutas, estilo RES2DINV). */
   displaySmoothPasses?: number;
+  /** Contraste da paleta (P5–P95 recomendado). */
+  logContrast?: ModelLogContrast;
+  /** Escala de cor: log₁₀(ρ) (RES2DINV) ou linear em Ω·m. */
+  displayScale?: ModelDisplayScale;
   /** full = sem trapézio (evita faixas brancas); coverage = máscara por profundidade. */
   maskMode?: "full" | "coverage";
+  /** Células discretas (FDM) vs bilinear (proxy). */
+  renderMode?: ModelRenderMode;
+  activeCells?: boolean[] | null;
+  zCoverM?: number[] | null;
   /** Renderização off-screen (exportação PNG). */
   exportWidthPx?: number;
   exportHeightPx?: number;
@@ -111,6 +140,8 @@ export type ModelDrawOptions = {
   /** Perfil topográfico (distância m, cota m). */
   topography?: TopographyPoint[];
   showTopography?: boolean;
+  /** Título superior (ex.: «Geofisica - GARUVA (LINHA 10)»). */
+  sectionTitle?: string;
 };
 
 const MODEL_PAD_L = 52;
@@ -454,51 +485,21 @@ export function findNearestPseudoHit(
   return best;
 }
 
-function logPercentile(sorted: number[], p: number): number {
-  if (!sorted.length) return 0;
-  const idx = Math.min(
-    sorted.length - 1,
-    Math.max(0, Math.floor(sorted.length * p)),
-  );
-  return Math.log10(Math.max(sorted[idx]!, 1e-6));
-}
+/** Contraste da paleta no modelo invertido. */
+export type ModelLogContrast = ModelContrastMode;
 
-/** Escala log focada nas células do modelo (realça camadas, ignora outliers). */
-export function resolveModelLogBounds(rhoCells: number[]): {
-  logLo: number;
-  logHi: number;
-  rhoMinOhmM: number;
-  rhoMaxOhmM: number;
-} {
-  const positive = rhoCells.filter((v) => v > 0 && Number.isFinite(v));
-  if (!positive.length) {
-    return { logLo: 1, logHi: 3, rhoMinOhmM: 10, rhoMaxOhmM: 1000 };
-  }
-
-  const sorted = [...positive].sort((a, b) => a - b);
-  let logLo = logPercentile(sorted, 0.08);
-  let logHi = logPercentile(sorted, 0.92);
-
-  const minSpan = 0.42;
-  let span = logHi - logLo;
-  if (span < minSpan) {
-    const mid = (logLo + logHi) / 2;
-    logLo = mid - minSpan / 2;
-    logHi = mid + minSpan / 2;
-    span = minSpan;
-  } else {
-    const pad = span * 0.07;
-    logLo -= pad;
-    logHi += pad;
-  }
-
-  if (!(logHi > logLo)) logHi = logLo + 0.15;
-  return {
-    logLo,
-    logHi,
-    rhoMinOhmM: 10 ** logLo,
-    rhoMaxOhmM: 10 ** logHi,
-  };
+/** @deprecated Use resolveModelDisplayBounds */
+export function resolveModelLogBounds(
+  rhoCells: number[],
+  contrast: ModelLogContrast = "percentile",
+) {
+  const mode =
+    contrast === "res2dinv"
+      ? "minmax"
+      : contrast === "standard"
+        ? "standard"
+        : contrast;
+  return resolveModelDisplayBounds(rhoCells, mode);
 }
 
 function maxPseudoDepthAtX(
@@ -515,6 +516,39 @@ function maxPseudoDepthAtX(
   return zMax;
 }
 
+/** Mensagem no canvas quando o modelo não pode ser desenhado. */
+export function drawModelCanvasMessage(
+  canvas: HTMLCanvasElement,
+  title: string,
+  detail?: string,
+) {
+  const layout = modelCanvasLayout(canvas, 1, 1, {});
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#fef2f2";
+  ctx.fillRect(0, 0, w, h);
+  const cx = layout ? MODEL_PAD_L + layout.plotW / 2 : w / 2;
+  const cy = layout ? layout.plotTop + layout.plotH / 2 : h / 2;
+  ctx.fillStyle = "#991b1b";
+  ctx.font = "bold 14px system-ui,sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(title, cx, cy - (detail ? 10 : 0));
+  if (detail) {
+    ctx.font = "12px system-ui,sans-serif";
+    ctx.fillStyle = "#7f1d1d";
+    const lines = detail.match(/.{1,72}(\s|$)/g) ?? [detail];
+    let y = cy + 12;
+    for (const line of lines.slice(0, 4)) {
+      ctx.fillText(line.trim(), cx, y);
+      y += 16;
+    }
+  }
+  ctx.textAlign = "left";
+}
+
 export function drawModelSection(
   canvas: HTMLCanvasElement,
   mLog: Float64Array,
@@ -525,6 +559,18 @@ export function drawModelSection(
   colorScale: ResistivityColorScale = defaultColorScale,
   opts: ModelDrawOptions = {},
 ) {
+  const validationErr = validateModelForRender(
+    mLog,
+    nx,
+    nz,
+    xEdges,
+    zEdges,
+  );
+  if (validationErr) {
+    drawModelCanvasMessage(canvas, "Modelo inválido", validationErr);
+    return;
+  }
+
   const layout = modelCanvasLayout(
     canvas,
     opts.scaleXM ?? 1,
@@ -549,14 +595,26 @@ export function drawModelSection(
   const z1 = zEdges[nz]!;
   const dx = (x1 - x0) / Math.max(1, nx);
   const dz = (z1 - z0) / Math.max(1, nz);
-  const nLevels = opts.colorLevels ?? 24;
+  const nLevels = opts.colorLevels ?? 16;
   const readings = opts.readings ?? [];
   const factorDepth = opts.factorDepth ?? 0.286;
-  const maskMode = opts.maskMode ?? "full";
+  const maskMode =
+    opts.maskMode ??
+    (opts.invertEngine === "physics" ? "coverage" : "full");
+  const renderMode: ModelRenderMode =
+    opts.renderMode ??
+    (opts.invertEngine === "physics" ? "fem_smooth" : "bilinear");
+  const isBlockCells = renderMode === "cells";
+  const useStrictCover =
+    opts.invertEngine === "physics" || isBlockCells;
   const zCoverProfile =
-    readings.length > 0
-      ? buildModelZCoverProfile(readings, x0, x1, nx, z1, factorDepth)
-      : null;
+    opts.zCoverM != null && opts.zCoverM.length === nx
+      ? Float64Array.from(opts.zCoverM)
+      : readings.length > 0
+        ? useStrictCover
+          ? buildSensitivityZCoverProfile(readings, x0, x1, nx, factorDepth)
+          : buildModelZCoverProfile(readings, x0, x1, nx, z1, factorDepth)
+        : null;
 
   const visibleRhos: number[] = [];
   for (let i = 0; i < nx; i++) {
@@ -567,22 +625,97 @@ export function drawModelSection(
     for (let j = 0; j < nz; j++) {
       const zCenter = z0 + (j + 0.5) * dz;
       if (maskMode === "coverage" && zCenter > zCover + dz * 0.5) continue;
-      visibleRhos.push(10 ** mLog[i * nz + j]!);
+      const rho = 10 ** mLog[i * nz + j]!;
+      if (rho > 0 && Number.isFinite(rho)) visibleRhos.push(rho);
     }
   }
   const allRhos: number[] = [];
-  for (let k = 0; k < mLog.length; k++) allRhos.push(10 ** mLog[k]!);
+  for (let k = 0; k < mLog.length; k++) {
+    const rho = 10 ** mLog[k]!;
+    if (rho > 0 && Number.isFinite(rho)) allRhos.push(rho);
+  }
   const rhoForScale = visibleRhos.length >= 4 ? visibleRhos : allRhos;
-  const modelBounds = resolveModelLogBounds(rhoForScale);
-  const { logLo, logHi } = colorScale.auto
-    ? { logLo: modelBounds.logLo, logHi: modelBounds.logHi }
-    : resolveLogBounds(rhoForScale, colorScale);
-  const rhoMinLabel = colorScale.auto
-    ? modelBounds.rhoMinOhmM
-    : 10 ** logLo;
-  const rhoMaxLabel = colorScale.auto
-    ? modelBounds.rhoMaxOhmM
-    : 10 ** logHi;
+  const finiteRhos =
+    rhoForScale.length > 0
+      ? rhoForScale
+      : allRhos.length > 0
+        ? allRhos
+        : [10, 100, 1000];
+  const contrastMode: ModelContrastMode = opts.logContrast ?? "auto";
+  let displayScale: ModelDisplayScale = opts.displayScale ?? "log";
+  let scaleAutoLabel: string;
+  let normalizeRho: (rho: number) => number;
+  let logLo: number;
+  let logHi: number;
+  let legendBounds = resolveModelDisplayBounds(finiteRhos, "percentile");
+
+  if (!colorScale.auto) {
+    legendBounds = resolveModelDisplayBounds(
+      finiteRhos,
+      "manual",
+      colorScale.rhoMinOhmM,
+      colorScale.rhoMaxOhmM,
+    );
+    logLo = legendBounds.logLo;
+    logHi = legendBounds.logHi;
+    scaleAutoLabel = legendBounds.scaleLabel;
+    normalizeRho = (rho) =>
+      displayScale === "linear"
+        ? rhoToNormalizedLinear(
+            rho,
+            legendBounds.rhoMinOhmM,
+            legendBounds.rhoMaxOhmM,
+          )
+        : rhoToNormalized(rho, logLo, logHi);
+  } else if (contrastMode === "auto") {
+    const adaptive = buildAdaptiveContrastMapper(finiteRhos);
+    normalizeRho = adaptive.normalizeRho;
+    scaleAutoLabel = adaptive.scaleLabel;
+    displayScale = opts.displayScale ?? adaptive.displayScale;
+    legendBounds = resolveModelDisplayBounds(finiteRhos, "percentile");
+    logLo = legendBounds.logLo;
+    logHi = legendBounds.logHi;
+  } else if (contrastMode === "equalize") {
+    normalizeRho = makeHistogramEqualizeMapper(finiteRhos);
+    scaleAutoLabel = "equalização de histograma";
+    legendBounds = resolveModelDisplayBounds(finiteRhos, "percentile");
+    logLo = legendBounds.logLo;
+    logHi = legendBounds.logHi;
+  } else if (contrastMode === "stdstretch") {
+    normalizeRho = makeStdStretchMapper(finiteRhos, 2);
+    displayScale = "linear";
+    scaleAutoLabel = "stretch ±2σ (linear)";
+    legendBounds = resolveModelDisplayBounds(finiteRhos, "percentile");
+    logLo = legendBounds.logLo;
+    logHi = legendBounds.logHi;
+  } else if (contrastMode === "res2dinv") {
+    legendBounds = resolveModelDisplayBounds(
+      finiteRhos,
+      "manual",
+      1,
+      5000,
+    );
+    logLo = legendBounds.logLo;
+    logHi = legendBounds.logHi;
+    scaleAutoLabel = "RES2DINV (classes discretas)";
+    displayScale = "log";
+    normalizeRho = (rho) => rhoToRes2dinvNormalized(rho);
+  } else {
+    legendBounds = resolveModelDisplayBounds(finiteRhos, contrastMode);
+    logLo = legendBounds.logLo;
+    logHi = legendBounds.logHi;
+    scaleAutoLabel = legendBounds.scaleLabel;
+    normalizeRho = (rho) =>
+      displayScale === "linear"
+        ? rhoToNormalizedLinear(
+            rho,
+            legendBounds.rhoMinOhmM,
+            legendBounds.rhoMaxOhmM,
+          )
+        : rhoToNormalized(rho, logLo, logHi);
+  }
+  const rhoMinLabel = legendBounds.rhoMinOhmM;
+  const rhoMaxLabel = legendBounds.rhoMaxOhmM;
 
   const rasterW = Math.max(64, Math.ceil(plotW * 2));
   const rasterH = Math.max(64, Math.ceil(plotH * 2));
@@ -608,113 +741,182 @@ export function drawModelSection(
     syDepth = (z: number) => plotTop + ((z - z0) / (z1 - z0 || 1)) * plotH;
   }
 
-  const rgba = topoMode
-    ? rasterizeModelWithTopography(
-        mLog,
-        nx,
-        nz,
-        xEdges,
-        zEdges,
-        rasterW,
-        rasterH,
-        topography,
-        elevBounds!,
-        {
-          logLo,
-          logHi,
-          colorScale,
-          colorLevels: nLevels,
-          displaySmoothPasses: opts.displaySmoothPasses ?? 2,
-          maskMode: "full",
-          zCoverProfile,
-          useCoverageMask:
-            maskMode === "coverage" ||
-            (topoMode && zCoverProfile != null),
-        },
-      )
-    : rasterizeModelSection(
-        mLog,
-        nx,
-        nz,
-        xEdges,
-        zEdges,
-        rasterW,
-        rasterH,
-        {
-          logLo,
-          logHi,
-          colorScale,
-          colorLevels: nLevels,
-          displaySmoothPasses: opts.displaySmoothPasses ?? 2,
-          maskMode: "full",
-        },
-      );
+  const rasterOpts = {
+    logLo,
+    logHi,
+    normalizeRho,
+    colorScale,
+    colorLevels: nLevels,
+    displaySmoothPasses:
+      renderMode === "cells"
+        ? 0
+        : renderMode === "fem_smooth"
+          ? (opts.displaySmoothPasses ?? 1)
+          : (opts.displaySmoothPasses ?? 0),
+    maskMode,
+    renderMode,
+    activeCells: opts.activeCells ?? null,
+    zCoverProfile,
+  };
 
-  const off = document.createElement("canvas");
-  off.width = rasterW;
-  off.height = rasterH;
-  const octx = off.getContext("2d");
-  if (octx) {
-    octx.putImageData(new ImageData(rgba, rasterW, rasterH), 0, 0);
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
+  const paintCellsDirect =
+    !topoMode && isBlockCells && !opts.exportWidthPx;
 
-    if (topoMode && elevBounds && syElev) {
-      ctx.save();
-      pathTopographyTrapezoid(
-        ctx,
-        topography,
-        maskMode === "coverage" || zCoverProfile != null
-          ? zCoverProfile
-          : null,
-        elevBounds,
-        x0,
-        x1,
-        nx,
-        z1,
-        sx,
-        syElev,
-      );
-      ctx.clip();
-      ctx.drawImage(off, padL, plotTop, plotW, plotH);
-      ctx.restore();
-      strokeTopographySurface(ctx, topography, elevBounds, sx, syElev);
-    } else if (maskMode === "coverage" && zCoverProfile) {
+  if (paintCellsDirect) {
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(padL, plotTop, plotW, plotH);
+    if (maskMode === "coverage" && zCoverProfile) {
       ctx.save();
       pathTrapezoidCoverage(ctx, zCoverProfile, x0, x1, nx, z0, sx, syDepth);
       ctx.clip();
-      ctx.drawImage(off, padL, plotTop, plotW, plotH);
+    }
+    paintModelCellsOnCanvas(
+      ctx,
+      mLog,
+      nx,
+      nz,
+      xEdges,
+      zEdges,
+      sx,
+      syDepth,
+      rasterOpts,
+    );
+    if (maskMode === "coverage" && zCoverProfile) {
       ctx.restore();
-    } else {
-      ctx.drawImage(off, padL, plotTop, plotW, plotH);
+      strokeTrapezoidCoverage(ctx, zCoverProfile, x0, x1, nx, z0, sx, syDepth);
+    }
+  } else {
+    const rgba = topoMode
+      ? rasterizeModelWithTopography(
+          mLog,
+          nx,
+          nz,
+          xEdges,
+          zEdges,
+          rasterW,
+          rasterH,
+          topography,
+          elevBounds!,
+          {
+            ...rasterOpts,
+            zCoverProfile,
+            useCoverageMask:
+              maskMode === "coverage" ||
+              (topoMode && zCoverProfile != null),
+          },
+        )
+      : rasterizeModelSection(
+          mLog,
+          nx,
+          nz,
+          xEdges,
+          zEdges,
+          rasterW,
+          rasterH,
+          rasterOpts,
+        );
+
+    const off = document.createElement("canvas");
+    off.width = rasterW;
+    off.height = rasterH;
+    const octx = off.getContext("2d");
+    if (octx) {
+      octx.putImageData(
+        new ImageData(new Uint8ClampedArray(rgba), rasterW, rasterH),
+        0,
+        0,
+      );
+      ctx.imageSmoothingEnabled = renderMode !== "cells";
+      if (renderMode === "fem_smooth") {
+        ctx.imageSmoothingEnabled = false;
+      } else if (renderMode !== "cells") {
+        ctx.imageSmoothingQuality = "high";
+      }
+
+      if (topoMode && elevBounds && syElev) {
+        ctx.save();
+        pathTopographyTrapezoid(
+          ctx,
+          topography,
+          maskMode === "coverage" || zCoverProfile != null
+            ? zCoverProfile
+            : null,
+          elevBounds,
+          x0,
+          x1,
+          nx,
+          z1,
+          sx,
+          syElev,
+        );
+        ctx.clip();
+        ctx.drawImage(off, padL, plotTop, plotW, plotH);
+        ctx.restore();
+        strokeTopographySurface(ctx, topography, elevBounds, sx, syElev);
+      } else if (maskMode === "coverage" && zCoverProfile) {
+        ctx.save();
+        pathTrapezoidCoverage(ctx, zCoverProfile, x0, x1, nx, z0, sx, syDepth);
+        ctx.clip();
+        ctx.drawImage(off, padL, plotTop, plotW, plotH);
+        ctx.restore();
+        strokeTrapezoidCoverage(ctx, zCoverProfile, x0, x1, nx, z0, sx, syDepth);
+      } else {
+        ctx.drawImage(off, padL, plotTop, plotW, plotH);
+      }
     }
   }
 
   ctx.fillStyle = "#111827";
   ctx.font = "12px Arial,sans-serif";
-  ctx.fillText(
-    topoMode
-      ? "Model resistivity with topography"
-      : "Inverse Model Resistivity Section",
-    padL,
-    16,
-  );
-  if (opts.methodLabel) {
-    ctx.font = "10px Arial,sans-serif";
-    ctx.fillStyle = "#4b5563";
-    ctx.fillText(opts.methodLabel, padL + 280, 16);
-  }
-  if (opts.iterations != null && opts.rmsLog10 != null) {
-    const absPct = Math.min(
-      99,
-      Math.round((Math.pow(10, opts.rmsLog10) - 1) * 100),
-    );
-    ctx.font = "11px Arial,sans-serif";
-    ctx.fillStyle = "#374151";
+  if (opts.sectionTitle) {
+    ctx.font = "bold 13px Arial,sans-serif";
+    ctx.fillText(opts.sectionTitle, padL, 14);
+    ctx.font = "12px Arial,sans-serif";
     ctx.fillText(
       topoMode
-        ? `Iteration ${opts.iterations}  ·  Abs. error = ${absPct}%`
-        : `Iteration ${opts.iterations}  ·  RMS log₁₀ ρa = ${opts.rmsLog10.toFixed(3)}  ·  Abs. error ≈ ${absPct}%`,
+        ? "Model resistivity with topography"
+        : "Inverse Model Resistivity Section",
+      padL,
+      30,
+    );
+  } else {
+    ctx.fillText(
+      topoMode
+        ? "Model resistivity with topography"
+        : "Inverse Model Resistivity Section",
+      padL,
+      16,
+    );
+  }
+  if (opts.methodLabel) {
+    ctx.font = "10px Arial,sans-serif";
+    ctx.fillStyle = opts.invertEngine === "proxy" ? "#b45309" : "#4b5563";
+    ctx.fillText(opts.methodLabel, padL + 280, 16);
+  }
+  if (opts.invertEngine === "proxy") {
+    ctx.font = "10px Arial,sans-serif";
+    ctx.fillStyle = "#b45309";
+    ctx.fillText(
+      "Preview: projeção da ρa aparente (não é inversão Poisson / RES2DINV)",
+      padL,
+      opts.methodLabel ? 40 : 28,
+    );
+  }
+  if (opts.iterations != null && (opts.rmsPercent != null || opts.rmsLog10 != null)) {
+    const rmsPct =
+      opts.rmsPercent != null && Number.isFinite(opts.rmsPercent)
+        ? Math.round(opts.rmsPercent * 10) / 10
+        : null;
+    ctx.font = "11px Arial,sans-serif";
+    ctx.fillStyle = "#374151";
+    const rmsLine =
+      rmsPct != null
+        ? `Abs. error = ${rmsPct}%`
+        : `RMS log₁₀ = ${(opts.rmsLog10 ?? 0).toFixed(3)}`;
+    ctx.fillText(
+      topoMode
+        ? `Iteration ${opts.iterations}  ·  ${rmsLine}`
+        : `Iteration ${opts.iterations}  ·  ${rmsLine}  ·  log₁₀ residual = ${(opts.rmsLog10 ?? 0).toFixed(3)}`,
       padL,
       28,
     );
@@ -844,14 +1046,15 @@ export function drawModelSection(
     logHi,
     colorScale,
     nLevels,
+    contrastMode === "res2dinv" ? res2dinvLegendLabels() : undefined,
   );
   ctx.fillStyle = "#6b7280";
   ctx.font = "9px Arial,sans-serif";
   ctx.textAlign = "right";
   ctx.fillText(
     colorScale.auto
-      ? `Escala: ${formatRhoLabel(rhoMinLabel)} – ${formatRhoLabel(rhoMaxLabel)} Ω·m (P8–P92 do modelo)`
-      : `Escala: ${formatRhoLabel(rhoMinLabel)} – ${formatRhoLabel(rhoMaxLabel)} Ω·m (definida pelo utilizador)`,
+      ? `Escala ${displayScale === "log" ? "log₁₀" : "linear"}: ${formatRhoLabel(rhoMinLabel)} – ${formatRhoLabel(rhoMaxLabel)} Ω·m (${scaleAutoLabel})`
+      : `Escala ${displayScale === "log" ? "log₁₀" : "linear"}: ${formatRhoLabel(rhoMinLabel)} – ${formatRhoLabel(rhoMaxLabel)} Ω·m (manual)`,
     padL + plotW,
     plotTop + plotH + 52,
   );
@@ -887,33 +1090,65 @@ function drawBottomDiscreteColorBar(
   logHi: number,
   scale: ResistivityColorScale,
   levels: number,
+  legendRhoBreaks?: number[],
 ) {
-  const n = Math.max(3, levels);
-  const segW = w / n;
-  for (let i = 0; i < n; i++) {
-    const t = i / Math.max(1, n - 1);
-    const [r, g, b] = paletteColor(scale.palette, t);
-    const x0 = x + i * segW;
-    ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
-    ctx.fillRect(x0, y, segW + 1, h);
-    ctx.strokeStyle = "rgba(0,0,0,0.35)";
-    ctx.lineWidth = 0.8;
-    ctx.strokeRect(x0, y, segW + 1, h);
-  }
-  ctx.strokeStyle = "#111827";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x, y, w, h);
+  const breaks =
+    legendRhoBreaks && legendRhoBreaks.length >= 2
+      ? legendRhoBreaks
+      : null;
 
-  const labelCount = Math.min(8, n);
-  for (let j = 0; j < labelCount; j++) {
-    const u = j / Math.max(1, labelCount - 1);
-    const lv = logLo + (logHi - logLo) * u;
-    const rho = 10 ** lv;
-    const xt = x + u * w;
-    ctx.fillStyle = "#111827";
-    ctx.font = "10px Arial,sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(formatRhoLabel(rho), xt, y + h + 12);
+  if (breaks) {
+    const n = breaks.length;
+    const segW = w / Math.max(1, n - 1);
+    for (let i = 0; i < n - 1; i++) {
+      const rhoMid = Math.sqrt(Math.max(breaks[i]!, 1) * Math.max(breaks[i + 1]!, 1));
+      const t = rhoToRes2dinvNormalized(rhoMid, breaks);
+      const [r, g, b] = paletteColor(scale.palette, t);
+      const x0 = x + i * segW;
+      ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+      ctx.fillRect(x0, y, segW + 1, h);
+      ctx.strokeStyle = "rgba(0,0,0,0.35)";
+      ctx.lineWidth = 0.8;
+      ctx.strokeRect(x0, y, segW + 1, h);
+    }
+    ctx.strokeStyle = "#111827";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+    for (let i = 0; i < n; i++) {
+      const xt = x + (i / Math.max(1, n - 1)) * w;
+      ctx.fillStyle = "#111827";
+      ctx.font = "10px Arial,sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(formatRhoLabel(breaks[i]!), xt, y + h + 12);
+    }
+  } else {
+    const n = Math.max(3, levels);
+    const segW = w / n;
+    for (let i = 0; i < n; i++) {
+      const t = i / Math.max(1, n - 1);
+      const [r, g, b] = paletteColor(scale.palette, t);
+      const x0 = x + i * segW;
+      ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+      ctx.fillRect(x0, y, segW + 1, h);
+      ctx.strokeStyle = "rgba(0,0,0,0.35)";
+      ctx.lineWidth = 0.8;
+      ctx.strokeRect(x0, y, segW + 1, h);
+    }
+    ctx.strokeStyle = "#111827";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+
+    const labelCount = Math.min(8, n);
+    for (let j = 0; j < labelCount; j++) {
+      const u = j / Math.max(1, labelCount - 1);
+      const lv = logLo + (logHi - logLo) * u;
+      const rho = 10 ** lv;
+      const xt = x + u * w;
+      ctx.fillStyle = "#111827";
+      ctx.font = "10px Arial,sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(formatRhoLabel(rho), xt, y + h + 12);
+    }
   }
   ctx.textAlign = "left";
   ctx.fillText("Resistivity in ohm.m", x, y + h + 26);
@@ -945,9 +1180,16 @@ export function drawResidualSection(
   const xMin = Math.min(...xs);
   const xMax = Math.max(...xs);
   const zMax = Math.max(...readings.map((r) => factorDepth * r.n * r.aM), 1e-6);
-  const rMax = Math.max(...residuals.map((r) => Math.abs(r)), 1e-6);
+  const activeRes = residuals.filter(
+    (_, i) => !excludedIndices?.has(i) && Number.isFinite(residuals[i]),
+  );
+  const rMax = Math.max(...activeRes.map((r) => Math.abs(r)), 1e-6);
   const sx = (x: number) => padL + ((x - xMin) / (xMax - xMin || 1)) * plotW;
   const sy = (z: number) => padT + (z / (zMax || 1)) * plotH;
+
+  ctx.font = "11px system-ui,sans-serif";
+  ctx.fillStyle = theme.text;
+  ctx.fillText("Resíduo ρ_obs − ρ_syn (Ω·m)", padL, 14);
 
   for (let i = 0; i < readings.length; i++) {
     if (excludedIndices?.has(i)) continue;
@@ -967,8 +1209,12 @@ export function drawResidualSection(
   ctx.strokeStyle = theme.border;
   ctx.lineWidth = 1;
   ctx.strokeRect(padL, padT, plotW, plotH);
-  ctx.font = "11px system-ui,sans-serif";
   ctx.fillStyle = theme.muted;
+  ctx.fillText(
+    `max |Δρ| = ${rMax.toFixed(1)} Ω·m`,
+    padL + plotW - 120,
+    14,
+  );
   ctx.fillText("Estação (m) →", padL + plotW * 0.25, h - 6);
   ctx.save();
   ctx.translate(14, padT + plotH / 2);

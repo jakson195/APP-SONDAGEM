@@ -2,6 +2,21 @@
 
 Inversão 2D ERT (dipolo-dipolo): **FDM** ou **FEM**, Jacobiana adjoint/FD, Occam com χ² rigoroso, malha adaptativa, pesos QC.
 
+## Prioridade RES2DINV (o que mais importa)
+
+| Ordem | Componente | Motor DataGeo | Notas |
+|-------|------------|---------------|-------|
+| 1 | **Forward FDM Poisson** | `fdm_forward.py` | Caminho principal; FEM é experimental e lento |
+| 2 | **Jacobiana real** | `jacobian_adjoint.py` + fallback FD | Adjoint com mesma calibração ρa que o forward; FD se instável |
+| 3 | **Inversão log + GN** | `invert_2d.py` | m = log₁₀(ρ) [Ω·m]; σ = 10^(−m); GN com busca em linha |
+| 4 | **L1 robusta** | `robust_l1` + IRLS | Outliers; preset «Estilo RES2DINV» na UI |
+| 5 | **Regularização anisotrópica** | `lambda_x`, `lambda_z` | λ_z >> λ_x → camadas horizontais |
+| 6 | **Damping adaptativo** | Occam `lambda_decay` ou `min_improvement` | Occam reduz λ até χ² alvo; L1/L2 param por ganho relativo |
+| 7 | **Topografia** | `mesh.py` + painel topografia | Malha colapsa células acima do relevo |
+| 8 | **Suavização visual** | Só na exibição (0 passes) | Não confundir com regularização da inversão |
+
+**Não usar** o motor *proxy* (matriz G gaussiana) para comparar com RES2DINV.
+
 ## Local
 
 ```bash

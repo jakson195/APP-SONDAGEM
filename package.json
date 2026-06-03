@@ -29,7 +29,9 @@
     "vercel:prod": "vercel --prod",
     "vercel:pull": "vercel env pull .env.local",
     "landsat:engine": "cd python-engine/landsat && uvicorn main:app --reload --port 8093",
-    "geophysics:engine": "cd python-engine/geophysics && uvicorn main:app --reload --port 8092"
+    "geophysics:engine": "cd python-engine/geophysics && python -m uvicorn main:app --host 127.0.0.1 --port 8092",
+    "geophysics:engine:dev": "cd python-engine/geophysics && uvicorn main:app --reload --host 127.0.0.1 --port 8092",
+    "geophysics:kill-port": "powershell -NoProfile -Command \"Get-NetTCPConnection -LocalPort 8092 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Get-CimInstance Win32_Process -Filter \\\"Name='python.exe'\\\" | Where-Object { $_.CommandLine -match 'uvicorn main:app' -and $_.CommandLine -match '8092' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; Get-CimInstance Win32_Process -Filter \\\"Name='python.exe'\\\" | Where-Object { $_.CommandLine -match 'multiprocessing.spawn' -and $_.CommandLine -match 'geophysics' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }\""
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -79,6 +81,7 @@
     "react-map-gl": "^8.1.1",
     "recharts": "^3.8.1",
     "sharp": "^0.34.5",
+    "stripe": "^22.2.0",
     "tailwindcss": "^3.4.17",
     "three": "^0.184.0",
     "utm": "^1.1.1"
@@ -89,6 +92,7 @@
     "@types/google.maps": "^3.64.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/leaflet": "^1.9.21",
+    "@types/mapbox__mapbox-gl-draw": "^1.4.9",
     "@types/mapbox-gl": "^3.4.1",
     "@types/node": "^20",
     "@types/pg": "^8.15.2",

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { withGeophysicsApi } from "@/lib/geofisica/geophys-api-guard";
 import { fetchDemElevations } from "@/lib/geofisica/geodata/fetch-elevation-dem";
 
-export async function POST(req: Request) {
+export const dynamic = "force-dynamic";
+
+async function handleElevationProfile(req: Request) {
   try {
     const body = (await req.json()) as {
       locations?: { lat: number; lng: number; stationM?: number }[];
@@ -54,4 +57,10 @@ export async function POST(req: Request) {
     const msg = e instanceof Error ? e.message : "Erro ao consultar DEM";
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
+}
+
+export async function POST(req: Request) {
+  return withGeophysicsApi(req, async (_ctx, r) => handleElevationProfile(r), {
+    allowGlobalScope: true,
+  });
 }

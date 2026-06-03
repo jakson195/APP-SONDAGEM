@@ -5,7 +5,11 @@ import {
   type ResistivityColorScale,
 } from "@/lib/geofisica/dipolo2d/colormap";
 import { exportInvertModelPng } from "@/lib/geofisica/dipolo2d/model-section-export";
-import type { ModelDrawOptions } from "@/lib/geofisica/dipolo2d/dipolo-pseudo-draw";
+import type {
+  ModelDrawOptions,
+  ModelLogContrast,
+} from "@/lib/geofisica/dipolo2d/dipolo-pseudo-draw";
+import type { ModelDisplayScale } from "@/lib/geofisica/dipolo2d/model-visual-scale";
 import type { TopographyPoint } from "@/lib/geofisica/dipolo2d/topography-types";
 import type { Dipolo2DInvertResult, Dipolo2DReading } from "@/lib/geofisica/dipolo2d/types";
 import { ColorScalePanel } from "./color-scale-panel";
@@ -25,6 +29,8 @@ type Props = {
   suggestedRhoMax?: number;
   topography?: TopographyPoint[];
   showTopography?: boolean;
+  logContrast?: ModelLogContrast;
+  displayScale?: ModelDisplayScale;
 };
 
 export function DipoloModelExportPanel({
@@ -42,6 +48,8 @@ export function DipoloModelExportPanel({
   suggestedRhoMax,
   topography = [],
   showTopography = true,
+  logContrast = "auto",
+  displayScale = "log",
 }: Props) {
   const buildDrawOpts = (): ModelDrawOptions => ({
     readings: activeReadings,
@@ -49,13 +57,16 @@ export function DipoloModelExportPanel({
     maskMode,
     iterations: invertResult.iterations,
     rmsLog10: invertResult.rmsLog10,
+    rmsPercent: invertResult.rmsPercent,
     methodLabel: invertResult.methodLabel,
     scaleXM,
     scaleZM,
     topography,
     showTopography: showTopography && topography.length >= 2,
     colorLevels: 24,
-    displaySmoothPasses: 2,
+    displaySmoothPasses: 0,
+    logContrast,
+    displayScale,
   });
 
   const exportPng = (widthPx: number) => {

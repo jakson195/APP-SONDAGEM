@@ -55,8 +55,8 @@ export async function GET(req: Request) {
     }
 
     const raw = (await res.json()) as NominatimItem[];
-    const results: GeocodeResult[] = raw
-      .map((item) => {
+    const results = raw
+      .map((item): GeocodeResult | null => {
         const lat = Number(item.lat);
         const lng = Number(item.lon);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;

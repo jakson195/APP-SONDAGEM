@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withGeophysicsApi } from "@/lib/geofisica/geophys-api-guard";
 import { isGeophysAiAvailable } from "@/lib/geofisica/ai/geophys-interpret-ai";
 import { buildRegionalGeology } from "@/lib/geofisica/dipolo2d/build-regional-geology";
 import {
@@ -17,7 +18,9 @@ async function buildRegionalWithTimeout(lat: number, lng: number) {
   ]);
 }
 
-export async function GET(req: Request) {
+export const dynamic = "force-dynamic";
+
+async function handleGeologyGet(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const lat = Number(searchParams.get("lat"));
@@ -52,4 +55,10 @@ export async function GET(req: Request) {
       error: msg,
     });
   }
+}
+
+export async function GET(req: Request) {
+  return withGeophysicsApi(req, async (_ctx, r) => handleGeologyGet(r), {
+    allowGlobalScope: true,
+  });
 }

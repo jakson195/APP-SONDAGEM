@@ -7,6 +7,7 @@ export function RecoverForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [devLink, setDevLink] = useState<string | null>(null);
 
   async function onSubmit(formData: FormData) {
     setLoading(true);
@@ -20,9 +21,19 @@ export function RecoverForm() {
           email: String(formData.get("email") ?? "").trim(),
         }),
       });
-      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        devResetLink?: string;
+        message?: string;
+      };
       if (!response.ok) {
         setError(data.error ?? "Falha ao enviar o email.");
+        return;
+      }
+      if (data.devResetLink) {
+        setError(null);
+        setSent(true);
+        setDevLink(data.devResetLink);
         return;
       }
       setSent(true);
@@ -48,9 +59,17 @@ export function RecoverForm() {
           </p>
         ) : null}
         {sent ? (
-          <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-            Se o email existir, enviámos um link para redefinir a palavra-passe.
-          </p>
+          <div className="space-y-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+            <p>Se o email existir, enviámos um link para redefinir a palavra-passe.</p>
+            {devLink ? (
+              <p className="break-all text-xs">
+                Dev (JWT):{" "}
+                <a href={devLink} className="font-medium underline">
+                  {devLink}
+                </a>
+              </p>
+            ) : null}
+          </div>
         ) : null}
         <div>
           <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-[var(--text)]">
@@ -68,7 +87,7 @@ export function RecoverForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-[var(--accent)] py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-70"
+          className="dg-btn-primary w-full py-2.5 disabled:opacity-70"
         >
           {loading ? "A enviar..." : "Enviar link de recuperação"}
         </button>

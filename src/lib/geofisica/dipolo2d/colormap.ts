@@ -172,6 +172,10 @@ export function applyLogBoundsScale(
   return { logLo: lo, logHi: hi };
 }
 
+/**
+ * Normalização logarítmica (equivalente a matplotlib.colors.LogNorm em log₁₀).
+ * ρ_display = (log₁₀ ρ − logLo) / (logHi − logLo).
+ */
 export function rhoToNormalized(
   rhoOhmM: number,
   logLo: number,
@@ -179,4 +183,23 @@ export function rhoToNormalized(
 ): number {
   const logV = Math.log10(Math.max(1e-12, rhoOhmM));
   return clamp01((logV - logLo) / (logHi - logLo || 1));
+}
+
+/** Limites LogNorm a partir de valores em Ω·m (percentis opcionais). */
+export function logNormBoundsFromRho(
+  rhoValues: number[],
+  pLo = 0.02,
+  pHi = 0.98,
+): { logLo: number; logHi: number } {
+  const logs = rhoValues
+    .filter((v) => v > 0 && Number.isFinite(v))
+    .map((v) => Math.log10(v))
+    .sort((a, b) => a - b);
+  if (!logs.length) return { logLo: 1, logHi: 3 };
+  const iLo = Math.max(0, Math.floor(logs.length * pLo));
+  const iHi = Math.min(logs.length - 1, Math.floor(logs.length * pHi));
+  let logLo = logs[iLo]!;
+  let logHi = logs[iHi]!;
+  if (!(logHi > logLo)) logHi = logLo + 0.15;
+  return { logLo, logHi };
 }

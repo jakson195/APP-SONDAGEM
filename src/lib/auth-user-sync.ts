@@ -1,7 +1,11 @@
+import type { SaasPlanSlug } from "@prisma/client";
 import type { User as SupabaseAuthUser } from "@supabase/supabase-js";
+import bcrypt from "bcrypt";
 import { prisma } from "@/lib/prisma";
 import { garantirModulosPadraoEmpresa } from "@/lib/seed-empresa-modulos";
 import { ensureUniqueCompanySlug } from "@/lib/client-slug";
+import { parseSignupPlan } from "@/lib/saas/plan-limits";
+import { provisionSubscriptionForCompany } from "@/lib/saas/subscription-service";
 
 function deriveName(user: SupabaseAuthUser): string | null {
   const raw =
@@ -57,25 +61,29 @@ export async function syncUserFromSupabase(user: SupabaseAuthUser) {
   });
 }
 
-export async function createClientSignupAccount(input: {
-  authUser: SupabaseAuthUser;
+async function provisionCompanyForUser(input: {
+  userId: number;
   companyName: string;
+  plan: SaasPlanSlug;
+  ownerEmail: string | null;
   cnpj?: string | null;
   phone?: string | null;
   email?: string | null;
   address?: string | null;
 }) {
-  const localUser = await syncUserFromSupabase(input.authUser);
   const slug = await ensureUniqueCompanySlug(input.companyName);
+  const plan = input.plan;
 
   const company = await prisma.company.create({
     data: {
       name: input.companyName,
       slug,
-      userId: localUser.id,
+      userId: input.userId,
+      plan,
+      status: plan === "trial" ? "TRIAL" : "ACTIVE",
       cnpj: input.cnpj ?? null,
       phone: input.phone ?? null,
-      email: input.email ?? input.authUser.email ?? null,
+      email: input.email ?? input.ownerEmail,
       address: input.address ?? null,
       portalEnabled: true,
       shareReportsEnabled: true,
@@ -83,18 +91,83 @@ export async function createClientSignupAccount(input: {
   });
 
   await prisma.orgMembership.upsert({
-    where: { userId_empresaId: { userId: localUser.id, empresaId: company.id } },
+    where: { userId_empresaId: { userId: input.userId, empresaId: company.id } },
     create: {
-      userId: localUser.id,
+      userId: input.userId,
       empresaId: company.id,
       orgRole: "ADMIN",
     },
-    update: {
-      orgRole: "ADMIN",
-    },
+    update: { orgRole: "ADMIN" },
   });
 
   await garantirModulosPadraoEmpresa(company.id);
+  await provisionSubscriptionForCompany(company.id, plan);
+
+  return company;
+}
+
+export async function createClientSignupAccount(input: {
+  authUser: SupabaseAuthUser;
+  companyName: string;
+  plan?: unknown;
+  cnpj?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+}) {
+  const localUser = await syncUserFromSupabase(input.authUser);
+  const company = await provisionCompanyForUser({
+    userId: localUser.id,
+    companyName: input.companyName,
+    plan: parseSignupPlan(input.plan),
+    ownerEmail: input.authUser.email ?? null,
+    cnpj: input.cnpj,
+    phone: input.phone,
+    email: input.email,
+    address: input.address,
+  });
+
+  return { localUser, company };
+}
+
+/** Cadastro com JWT + bcrypt (sem Supabase). */
+export async function createJwtSignupAccount(input: {
+  name: string;
+  email: string;
+  password: string;
+  companyName: string;
+  plan?: unknown;
+  cnpj?: string | null;
+  phone?: string | null;
+  companyEmail?: string | null;
+  address?: string | null;
+}) {
+  const email = input.email.trim().toLowerCase();
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    throw new Error("EMAIL_IN_USE");
+  }
+
+  const passwordHash = await bcrypt.hash(input.password, 12);
+  const localUser = await prisma.user.create({
+    data: {
+      email,
+      password: passwordHash,
+      name: input.name,
+      systemRole: "USER",
+    },
+  });
+
+  const company = await provisionCompanyForUser({
+    userId: localUser.id,
+    companyName: input.companyName,
+    plan: parseSignupPlan(input.plan),
+    ownerEmail: email,
+    cnpj: input.cnpj,
+    phone: input.phone,
+    email: input.companyEmail,
+    address: input.address,
+  });
 
   return { localUser, company };
 }

@@ -14,6 +14,7 @@ import { setObraTipoMonitoramentoSql } from "@/lib/obra-tipo-monitoramento-sql";
 import { parseObraStatus } from "@/lib/obra-status";
 import { syncProjectModules } from "@/lib/project-modules-db";
 import { prisma } from "@/lib/prisma";
+import { assertCanCreateObra } from "@/lib/saas/enforce-limits";
 import { getAuthUserFromRequest } from "@/lib/server-auth";
 import type { ObraStatus, Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
@@ -186,6 +187,9 @@ export async function POST(req: Request) {
     if (!company) {
       return NextResponse.json({ error: "Empresa não encontrada" }, { status: 404 });
     }
+
+    const limitCheck = await assertCanCreateObra(companyId);
+    if (!limitCheck.ok) return limitCheck.response;
 
     const cliente =
       typeof body.cliente === "string" && body.cliente.trim()

@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 export function SignupForm() {
+  const searchParams = useSearchParams();
+  const planParam = searchParams?.get("plan") ?? "trial";
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +24,7 @@ export function SignupForm() {
           name: String(formData.get("name") ?? "").trim(),
           email: String(formData.get("email") ?? "").trim(),
           password: String(formData.get("password") ?? ""),
+          plan: planParam,
           cnpj: String(formData.get("cnpj") ?? "").trim() || null,
           phone: String(formData.get("phone") ?? "").trim() || null,
           address: String(formData.get("address") ?? "").trim() || null,
@@ -31,12 +34,26 @@ export function SignupForm() {
       const data = (await response.json().catch(() => ({}))) as {
         error?: string;
         company?: { slug: string };
+        checkoutRequired?: boolean;
       };
       if (!response.ok) {
         setError(data.error ?? "Falha ao criar a conta.");
         return;
       }
-      router.push(data.company?.slug ? `/cliente/${data.company.slug}` : "/dashboard");
+      if (data.checkoutRequired) {
+        const checkout = await fetch("/api/billing/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ plan: "pro" }),
+        });
+        const checkoutData = (await checkout.json()) as { url?: string; error?: string };
+        if (checkout.ok && checkoutData.url) {
+          window.location.href = checkoutData.url;
+          return;
+        }
+      }
+      router.push(data.company?.slug ? `/dashboard` : "/dashboard");
       router.refresh();
     } catch {
       setError("Falha de rede.");
@@ -47,6 +64,10 @@ export function SignupForm() {
 
   return (
     <>
+      <p className="mb-4 rounded-lg bg-[var(--accent-muted)] px-3 py-2 text-center text-sm text-[var(--text)]">
+        Plano seleccionado:{" "}
+        <strong className="capitalize">{planParam === "pro" ? "Pro" : planParam === "enterprise" ? "Enterprise" : "Trial (14 dias)"}</strong>
+      </p>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -159,7 +180,7 @@ export function SignupForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-[var(--accent)] py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-70"
+          className="dg-btn-primary w-full py-2.5 disabled:opacity-70"
         >
           {loading ? "A criar conta..." : "Criar empresa e entrar"}
         </button>

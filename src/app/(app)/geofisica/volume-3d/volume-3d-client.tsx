@@ -100,6 +100,7 @@ import {
   parseKmlKmzFiles,
   type ImportedKmlTrack,
 } from "@/lib/geofisica/volume3d/parse-kml-kmz";
+import { useGeofisicaObra } from "@/hooks/use-geofisica-obra";
 import {
   GeophysSectionsPanel,
   persistGeophysSection,
@@ -158,6 +159,7 @@ function emptyLine(index: number): GeophysSurveyLine {
 }
 
 export function Volume3DClient() {
+  const { selectedObraId } = useGeofisicaObra();
   const [tab, setTab] = useState<TabId>("dados");
   const [lines, setLines] = useState<GeophysSurveyLine[]>(() => [
     emptyLine(0),
@@ -303,7 +305,11 @@ export function Volume3DClient() {
 
   const loadProjectSections = useCallback(
     (ids: string[] | "all") => {
-      const project = loadGeophysProject();
+      if (selectedObraId == null) {
+        setNotice("Selecione a obra do projeto (selector no topo) antes de importar secções.");
+        return;
+      }
+      const project = loadGeophysProject(selectedObraId);
       const selected =
         ids === "all"
           ? project.sections
@@ -345,7 +351,7 @@ export function Volume3DClient() {
           : `${selected.length} secção(ões) importada(s) — nenhuma com modelo invertido${topoNote}.`,
       );
     },
-    [],
+    [selectedObraId],
   );
 
   useEffect(() => {
@@ -356,20 +362,24 @@ export function Volume3DClient() {
   }, [loadProjectSections]);
 
   const saveLineToProject = useCallback((lineId: string) => {
+    if (selectedObraId == null) {
+      setNotice("Selecione a obra do projeto antes de guardar a secção.");
+      return;
+    }
     const line = lines.find((l) => l.id === lineId);
     if (!line?.invertResult) {
       setNotice("Inverta a linha antes de guardar no projeto.");
       return;
     }
-    const project = loadGeophysProject();
+    const project = loadGeophysProject(selectedObraId);
     const section = buildSavedSectionFromSurveyLine(line, project.sections, {
       lineIndex: project.sections.length,
     });
     if (!section) return;
-    persistGeophysSection(section);
+    persistGeophysSection(section, selectedObraId);
     setSectionsVersion((v) => v + 1);
     setNotice(`${section.code} guardada no projeto.`);
-  }, [lines]);
+  }, [lines, selectedObraId]);
 
   const addLine = useCallback(() => {
     const line = emptyLine(lines.length);
@@ -647,6 +657,7 @@ export function Volume3DClient() {
         for (const line of targets) {
           try {
             const updated = await fetchDemTopographyForLine(line);
+            if (!updated) continue;
             updateLine(line.id, {
               topography: updated.topography,
               geometry: updated.geometry,
@@ -1519,6 +1530,7 @@ export function Volume3DClient() {
 
           <GeophysSectionsPanel
             className="mb-4"
+            obraId={selectedObraId}
             onNotice={setNotice}
             refreshKey={sectionsVersion}
           />

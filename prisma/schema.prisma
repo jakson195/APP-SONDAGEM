@@ -32,6 +32,13 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
+/** Slug comercial do plano SaaS. */
+enum SaasPlanSlug {
+  trial
+  pro
+  enterprise
+}
+
 /** Ciclo de vida da obra (projeto de campo). */
 enum ObraStatus {
   DRAFT
@@ -51,6 +58,7 @@ model User {
 
   companies           Company[]
   memberships         OrgMembership[]
+  passwordResetTokens PasswordResetToken[]
   createdReportShares ClientReportShare[] @relation("ClientReportShareCreator")
   geoPhotos           GeoPhoto[]
   streetFrames        StreetFrame[]
@@ -87,8 +95,53 @@ model Company {
   reportShares ClientReportShare[]
   geoPhotos    GeoPhoto[]
   streetFrames StreetFrame[]
+  subscription Subscription?
 
   @@map("Empresa")
+}
+
+/** Assinatura SaaS por empresa (billing Stripe / Mercado Pago). */
+model Subscription {
+  id        Int     @id @default(autoincrement())
+  companyId Int     @unique @map("empresa_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  plan   SaasPlanSlug         @default(trial)
+  status SubscriptionStatus   @default(TRIAL)
+
+  trialEndsAt          DateTime? @map("trial_ends_at")
+  currentPeriodStart   DateTime? @map("current_period_start")
+  currentPeriodEnd     DateTime? @map("current_period_end")
+  cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
+
+  /** stripe | mercadopago | manual */
+  billingProvider          String? @map("billing_provider")
+  stripeCustomerId         String? @unique @map("stripe_customer_id")
+  stripeSubscriptionId     String? @unique @map("stripe_subscription_id")
+  stripePriceId            String? @map("stripe_price_id")
+  externalSubscriptionId   String? @map("external_subscription_id")
+
+  maxObras  Int @default(2) @map("max_obras")
+  maxUsers  Int @default(5) @map("max_users")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("Subscription")
+}
+
+/** Token de recuperação de senha (fluxo JWT legado). */
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    Int       @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("PasswordResetToken")
 }
 
 /** Equipa operacional dentro da empresa (alocação de campo / projetos). */
@@ -170,6 +223,25 @@ model Obra {
   insarJobs       InsarPipelineJob[]
   geoPhotos       GeoPhoto[]
   streetFrames    StreetFrame[]
+  geophysSections GeophysSection[]
+}
+
+/** Secção ERT invertida persistida (substitui localStorage por obra). */
+model GeophysSection {
+  id        String   @id @default(cuid())
+  obraId    Int      @map("obra_id")
+  obra      Obra     @relation(fields: [obraId], references: [id], onDelete: Cascade)
+  code      String
+  name      String
+  /** Payload completo: readings, invertResult, geometry, etc. */
+  payload   Json
+  savedAt   DateTime @default(now()) @map("saved_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdByUserId Int? @map("created_by_user_id")
+
+  @@unique([obraId, code])
+  @@index([obraId])
+  @@map("GeophysSection")
 }
 
 /** Estado grosso do job InSAR (sub-passos em `properties.stages`). */

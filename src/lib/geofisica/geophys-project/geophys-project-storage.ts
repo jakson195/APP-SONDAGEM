@@ -12,6 +12,14 @@ import type { SurveyLineGeometry } from "../volume3d/volume3d-types";
 export const GEOPHYS_PROJECT_STORAGE_KEY =
   "datageo-digital-geofisica-ert-project-v1";
 
+/** Chave localStorage do projeto ERT por obra (secções GEO01…). */
+export function geophysProjectStorageKey(obraId: number | null): string {
+  if (obraId == null || !Number.isFinite(obraId) || obraId < 1) {
+    return GEOPHYS_PROJECT_STORAGE_KEY;
+  }
+  return `${GEOPHYS_PROJECT_STORAGE_KEY}:obra:${obraId}`;
+}
+
 export const GEOPHYS_PENDING_VOLUME_LOAD_KEY =
   "datageo-geophys-pending-volume-load-v1";
 
@@ -63,10 +71,10 @@ export function emptyGeophysProject(name = "Levantamento ERT"): GeophysProjectSt
   };
 }
 
-export function loadGeophysProject(): GeophysProjectStore {
+export function loadGeophysProject(obraId: number | null = null): GeophysProjectStore {
   if (typeof window === "undefined") return emptyGeophysProject();
   try {
-    const raw = localStorage.getItem(GEOPHYS_PROJECT_STORAGE_KEY);
+    const raw = localStorage.getItem(geophysProjectStorageKey(obraId));
     if (!raw) return emptyGeophysProject();
     const j = JSON.parse(raw) as GeophysProjectStore;
     if (!Array.isArray(j.sections)) return emptyGeophysProject();
@@ -80,10 +88,13 @@ export function loadGeophysProject(): GeophysProjectStore {
   }
 }
 
-export function saveGeophysProject(store: GeophysProjectStore): void {
+export function saveGeophysProject(
+  store: GeophysProjectStore,
+  obraId: number | null = null,
+): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(
-    GEOPHYS_PROJECT_STORAGE_KEY,
+    geophysProjectStorageKey(obraId),
     JSON.stringify({
       ...store,
       updatedAt: new Date().toISOString(),
@@ -100,25 +111,56 @@ export function suggestNextGeoCode(sections: SavedGeophysSection[]): string {
   return `GEO${String(max + 1).padStart(2, "0")}`;
 }
 
-export function addGeophysSection(section: SavedGeophysSection): GeophysProjectStore {
-  const store = loadGeophysProject();
+export function addGeophysSection(
+  section: SavedGeophysSection,
+  obraId: number | null = null,
+): GeophysProjectStore {
+  const store = loadGeophysProject(obraId);
   const withoutDup = store.sections.filter((s) => s.code !== section.code);
   const next = {
     ...store,
     sections: [...withoutDup, section],
   };
-  saveGeophysProject(next);
+  saveGeophysProject(next, obraId);
+  if (obraId != null && obraId > 0) {
+    void import("./geophys-project-api").then((api) =>
+      api.saveGeophysSectionToApi(obraId, section),
+    );
+  }
   return next;
 }
 
-export function removeGeophysSection(id: string): GeophysProjectStore {
-  const store = loadGeophysProject();
+export function removeGeophysSection(
+  id: string,
+  obraId: number | null = null,
+): GeophysProjectStore {
+  const store = loadGeophysProject(obraId);
   const next = {
     ...store,
     sections: store.sections.filter((s) => s.id !== id),
   };
-  saveGeophysProject(next);
+  saveGeophysProject(next, obraId);
+  if (obraId != null && obraId > 0) {
+    void import("./geophys-project-api").then((api) =>
+      api.deleteGeophysSectionFromApi(obraId, id),
+    );
+  }
   return next;
+}
+
+/** Carrega do PostgreSQL quando há obraId; mantém localStorage como cache. */
+export async function loadGeophysProjectAsync(
+  obraId: number | null = null,
+): Promise<GeophysProjectStore> {
+  if (obraId != null && obraId > 0) {
+    const { fetchGeophysProjectFromApi } = await import("./geophys-project-api");
+    const remote = await fetchGeophysProjectFromApi(obraId);
+    if (remote && remote.sections.length > 0) {
+      saveGeophysProject(remote, obraId);
+      return remote;
+    }
+  }
+  return loadGeophysProject(obraId);
 }
 
 export function setPendingVolumeLoad(sectionIds: string[] | "all"): void {

@@ -66,9 +66,25 @@ export function buildSensitivityMatrix(
   return { G, xCenters, zCenters };
 }
 
-/** H = DxᵀDx + DzᵀDz (nm × nm), diferenças primeiras (suavidade). */
+/** H isotrópico (legado). */
 export function accumulateRoughnessH(nx: number, nz: number, H: number[][]) {
+  accumulateRoughnessHAniso(nx, nz, H, 1, 1);
+}
+
+/**
+ * H anisotrópico: λ_x em D_x, λ_z em D_z (m = log₁₀ ρ).
+ * Φ_reg = λ_reg · mᵀ H m com pesos λ_x, λ_z nas arestas.
+ */
+export function accumulateRoughnessHAniso(
+  nx: number,
+  nz: number,
+  H: number[][],
+  lambdaX: number,
+  lambdaZ: number,
+) {
   const nm = NM(nx, nz);
+  const lx = Math.max(lambdaX, 1e-12);
+  const lz = Math.max(lambdaZ, 1e-12);
   const add = (r: number, c: number, v: number) => {
     H[r]![c]! += v;
   };
@@ -77,23 +93,51 @@ export function accumulateRoughnessH(nx: number, nz: number, H: number[][]) {
       const u = idx2(i, j, nz);
       if (i + 1 < nx) {
         const v = idx2(i + 1, j, nz);
-        add(u, u, 1);
-        add(v, v, 1);
-        add(u, v, -1);
-        add(v, u, -1);
+        add(u, u, lx);
+        add(v, v, lx);
+        add(u, v, -lx);
+        add(v, u, -lx);
       }
       if (j + 1 < nz) {
         const v = idx2(i, j + 1, nz);
-        add(u, u, 1);
-        add(v, v, 1);
-        add(u, v, -1);
-        add(v, u, -1);
+        add(u, u, lz);
+        add(v, v, lz);
+        add(u, v, -lz);
+        add(v, u, -lz);
       }
     }
   }
   if (nm === 1) {
     H[0]![0]! += 1e-12;
   }
+}
+
+export function roughnessAnisoFromModel(
+  m: number[],
+  nx: number,
+  nz: number,
+  lambdaX: number,
+  lambdaZ: number,
+): number {
+  const lx = Math.max(lambdaX, 1e-12);
+  const lz = Math.max(lambdaZ, 1e-12);
+  let s = 0;
+  for (let i = 0; i < nx; i++) {
+    for (let j = 0; j < nz; j++) {
+      const u = m[idx2(i, j, nz)]!;
+      if (i + 1 < nx) {
+        const v = m[idx2(i + 1, j, nz)]!;
+        const d = u - v;
+        s += lx * d * d;
+      }
+      if (j + 1 < nz) {
+        const v = m[idx2(i, j + 1, nz)]!;
+        const d = u - v;
+        s += lz * d * d;
+      }
+    }
+  }
+  return Math.sqrt(s);
 }
 
 export function matVec(G: number[][], x: number[]): number[] {
@@ -250,6 +294,8 @@ export function objective(
   nx: number,
   nz: number,
   hybridAlpha = 1,
+  lambdaX = 0.1,
+  lambdaZ = 0.4,
 ): { phi: number; pred: number[]; res: number[] } {
   const pred = matVec(G, m);
   const res = yObs.map((yo, d) => yo - pred[d]!);
@@ -262,7 +308,7 @@ export function objective(
     const l1 = Math.abs(r);
     dataTerm += wd * (alpha * l2 + (1 - alpha) * l1);
   }
-  const rough = roughnessL2FromModel(m, nx, nz);
+  const rough = roughnessAnisoFromModel(m, nx, nz, lambdaX, lambdaZ);
   const phi = dataTerm + lambda * rough * rough;
   return { phi, pred, res };
 }
@@ -322,9 +368,10 @@ export function finalizeResult(
   for (let d = 0; d < nd; d++) {
     const obs = 10 ** yObs[d]!;
     const syn = 10 ** ySyn[d]!;
-    rmsPercent += Math.abs(obs - syn) / Math.max(obs, 1e-6);
+    const rel = (obs - syn) / Math.max(obs, 1e-6);
+    rmsPercent += rel * rel;
   }
-  rmsPercent = (rmsPercent / Math.max(1, nd)) * 100;
+  rmsPercent = Math.sqrt(rmsPercent / Math.max(1, nd)) * 100;
 
   const xEdges = new Float64Array(nx + 1);
   const zEdges = new Float64Array(nz + 1);
@@ -428,7 +475,13 @@ export function prepareInvertProblem(
   const nm = NM(nx, nz);
   const yObs = valid.map((L) => Math.log10(Math.max(1e-12, L.rhoApparentOhmM)));
   const Hreg: number[][] = Array.from({ length: nm }, () => new Array(nm).fill(0));
-  accumulateRoughnessH(nx, nz, Hreg);
+  accumulateRoughnessHAniso(
+    nx,
+    nz,
+    Hreg,
+    p.lambdaX ?? 0.1,
+    p.lambdaZ ?? 0.4,
+  );
   const wData = valid.map((L) => {
     const qc =
       L.sourceRowIndex != null ? qcByRow?.get(L.sourceRowIndex) : undefined;
@@ -487,6 +540,26 @@ export function solveRegularized(
   for (let i = 0; i < nm; i++) A[i]![i]! += ridge;
   symAdd(A, Hreg, lambda);
   const b = GtWy(G, w, yObs);
+  return choleskySolve(A, b);
+}
+
+/** Passo Gauss-Newton: (JᵀWJ + λH) δm = JᵀW r, com J≈G e r = y_obs − Gm. */
+export function solveGaussNewtonIncrement(
+  G: number[][],
+  yObs: number[],
+  m: number[],
+  w: number[],
+  Hreg: number[][],
+  lambda: number,
+  nm: number,
+  ridge: number,
+): number[] | null {
+  const pred = matVec(G, m);
+  const res = yObs.map((yo, d) => yo - pred[d]!);
+  const A = GtWG(G, w);
+  for (let i = 0; i < nm; i++) A[i]![i]! += ridge;
+  symAdd(A, Hreg, lambda);
+  const b = GtWy(G, w, res);
   return choleskySolve(A, b);
 }
 

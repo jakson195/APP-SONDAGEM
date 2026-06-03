@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withGeophysicsApi } from "@/lib/geofisica/geophys-api-guard";
 import {
   enhanceRegionalWithOpenAI,
   enhanceSectionWithOpenAI,
@@ -12,6 +13,8 @@ import type {
   RegionalGeologyProfile,
 } from "@/lib/geofisica/dipolo2d/interpret-types";
 
+export const dynamic = "force-dynamic";
+
 type Body = {
   mode?: "regional" | "section";
   lat?: number;
@@ -21,7 +24,7 @@ type Body = {
   section?: Omit<SectionAiInput, "lat" | "lng" | "regional" | "cellSummary">;
 };
 
-export async function POST(req: Request) {
+async function handleInterpret(req: Request) {
   try {
     const body = (await req.json()) as Body;
     const lat =
@@ -69,4 +72,10 @@ export async function POST(req: Request) {
     const msg = e instanceof Error ? e.message : "Erro na interpretação geofísica";
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
+}
+
+export async function POST(req: Request) {
+  return withGeophysicsApi(req, async (_ctx, r) => handleInterpret(r), {
+    allowGlobalScope: true,
+  });
 }

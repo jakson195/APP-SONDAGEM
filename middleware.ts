@@ -1,30 +1,27 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { AUTH_TOKEN_COOKIE } from "@/lib/auth-constants";
+import { isPublicPath, isAppRoute } from "@/lib/auth/public-routes";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-bypass";
 import { isSupabaseAuthConfigured } from "@/lib/supabase/config";
 import { updateSupabaseSession } from "@/lib/supabase/middleware";
 
-const PUBLIC_PATHS = new Set([
-  "/login",
-  "/cadastro",
-  "/recuperar-senha",
-  "/redefinir-senha",
-  "/auth/callback",
-]);
+const ADMIN_PREFIXES = ["/adm", "/admin"] as const;
 
-function isProtectedPath(pathname: string) {
-  return (
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/adm") ||
-    pathname.startsWith("/admin") ||
-    pathname.startsWith("/cliente/") ||
-    pathname.startsWith("/empresa/") ||
-    pathname.startsWith("/gestao-empresa") ||
-    pathname.startsWith("/obra") ||
-    pathname.startsWith("/obras") ||
-    pathname.startsWith("/hidrologia")
-  );
+function isAdminRoute(pathname: string) {
+  return ADMIN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+function hasLegacySession(req: NextRequest) {
+  return Boolean(req.cookies.get(AUTH_TOKEN_COOKIE)?.value);
+}
+
+async function isAuthenticated(req: NextRequest): Promise<boolean> {
+  if (isSupabaseAuthConfigured()) {
+    const result = await updateSupabaseSession(req, NextResponse.next());
+    return Boolean(result.user);
+  }
+  return hasLegacySession(req);
 }
 
 export async function middleware(req: NextRequest) {
@@ -33,40 +30,40 @@ export async function middleware(req: NextRequest) {
   }
 
   const pathname = req.nextUrl.pathname;
-  if (PUBLIC_PATHS.has(pathname)) {
+
+  if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon") ||
+    pathname.includes(".")
+  ) {
     return NextResponse.next();
   }
 
-  if (!isProtectedPath(pathname)) {
+  if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
-  const next = encodeURIComponent(`${pathname}${req.nextUrl.search || ""}`);
+  const needsAuth = isAppRoute(pathname) || isAdminRoute(pathname);
+  if (!needsAuth) {
+    return NextResponse.next();
+  }
+
+  const authed = await isAuthenticated(req);
+  if (!authed) {
+    const next = encodeURIComponent(`${pathname}${req.nextUrl.search || ""}`);
+    return NextResponse.redirect(new URL(`/login?next=${next}`, req.url));
+  }
 
   if (isSupabaseAuthConfigured()) {
     const result = await updateSupabaseSession(req, NextResponse.next());
-    if (!result.user) {
-      return NextResponse.redirect(new URL(`/login?next=${next}`, req.url));
-    }
     return result.response;
   }
 
-  if (!req.cookies.get(AUTH_TOKEN_COOKIE)?.value) {
-    return NextResponse.redirect(new URL(`/login?next=${next}`, req.url));
-  }
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",
-    "/adm/:path*",
-    "/admin/:path*",
-    "/cliente/:path*",
-    "/empresa/:path*",
-    "/gestao-empresa/:path*",
-    "/obra/:path*",
-    "/obras/:path*",
-    "/hidrologia/:path*",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?)$).*)",
   ],
 };

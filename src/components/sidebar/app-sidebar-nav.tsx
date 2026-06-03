@@ -26,9 +26,7 @@ function isActivePath(pathname: string, href: string) {
 
 function flatLinkClass(active: boolean) {
   return `block rounded-lg px-2.5 py-2 text-sm font-medium transition-colors duration-200 ${
-    active
-      ? "bg-gray-700/90 text-white ring-1 ring-teal-500/30"
-      : "text-gray-200 hover:bg-gray-700/70 hover:text-white"
+    active ? "dg-nav-active" : "dg-nav-item"
   }`;
 }
 

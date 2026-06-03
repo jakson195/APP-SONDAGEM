@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from .fdm_forward import electrode_layout
-from .mesh import Mesh2D, _interp_surface
+from .mesh import Mesh2D, _interp_surface, _z_edges_depth
 
 
 def _collect_electrode_x(readings: list[dict]) -> np.ndarray:
@@ -38,7 +38,7 @@ def _refine_intervals(edges: np.ndarray, focus_x: np.ndarray, max_cells: int) ->
 
 
 def _refine_depth_near_surface(
-    z_edges: np.ndarray, max_layers: int, surface_fraction: float = 0.35
+    z_edges: np.ndarray, max_layers: int, surface_fraction: float = 0.45
 ) -> np.ndarray:
     """Refina camadas superficiais (onde a sensibilidade DC é maior)."""
     z_max = float(z_edges[-1])
@@ -73,16 +73,17 @@ def build_adaptive_mesh(
     *,
     max_nx: int = 48,
     max_nz: int = 32,
+    apply_coverage_mask: bool = False,
 ) -> Mesh2D:
     """
     Malha não-uniforme: refinamento local em eletrodos (x) e camadas superficiais (z).
     """
     focus_x = _collect_electrode_x(readings)
     x_edges = np.linspace(x0, x1, base_nx + 1)
-    z_edges = np.linspace(0.0, z_max, base_nz + 1)
+    z_edges = _z_edges_depth(base_nz, z_max, geometric=True)
 
-    target_nx = min(max_nx, max(base_nx + 4, base_nx + focus_x.size // 2))
-    target_nz = min(max_nz, max(base_nz + 2, base_nz + 2))
+    target_nx = min(max_nx, max(base_nx + 8, base_nx + focus_x.size))
+    target_nz = min(max_nz, max(base_nz + 4, base_nz + 4))
 
     x_edges = _refine_intervals(x_edges, focus_x, target_nx)
     z_edges = _refine_depth_near_surface(z_edges, target_nz)
@@ -103,10 +104,17 @@ def build_adaptive_mesh(
         topo_z = np.array([], dtype=float)
 
     surface_z = np.array([_interp_surface(x, topo_x, topo_z) for x in x_centers])
-    active = np.zeros((nx, nz), dtype=bool)
-    for i in range(nx):
-        for j in range(nz):
-            active[i, j] = z_centers[j] >= surface_z[i] - 1e-9
+    # z_centers = profundidade (m); surface_z = cota topográfica — não comparar directamente.
+    # Máscara trapezoidal desactivada por defeito (evita desactivar todas as células).
+    if apply_coverage_mask and topography:
+        active = np.zeros((nx, nz), dtype=bool)
+        z_surf_min = float(np.min(surface_z)) if surface_z.size else 0.0
+        for i in range(nx):
+            depth_below = float(surface_z[i]) - z_surf_min
+            for j in range(nz):
+                active[i, j] = z_centers[j] <= depth_below + z_max + 1e-6
+    else:
+        active = np.ones((nx, nz), dtype=bool)
 
     return Mesh2D(
         nx=nx,

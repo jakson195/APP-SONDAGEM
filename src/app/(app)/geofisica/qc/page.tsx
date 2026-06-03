@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { GeophysQcClient } from "./geophys-qc-client";
 
 export const metadata = {
@@ -7,5 +8,13 @@ export const metadata = {
 };
 
 export default function GeofisicaQcPage() {
-  return <GeophysQcClient />;
+  return (
+    <Suspense
+      fallback={
+        <div className="p-6 text-sm text-[var(--muted)]">A carregar…</div>
+      }
+    >
+      <GeophysQcClient />
+    </Suspense>
+  );
 }

@@ -37,6 +37,7 @@ import {
   type QcSurveyLine,
 } from "@/lib/geofisica/qc/qc-survey-types";
 import { QC_GRADE_COLORS } from "@/lib/geofisica/qc/qc-types";
+import { useGeofisicaObra } from "@/hooks/use-geofisica-obra";
 import { GeophysSectionsPanel } from "../geophys-sections-panel";
 import { QcLegend } from "./qc-legend";
 import { QcMapPanel } from "./qc-map-panel";
@@ -90,6 +91,7 @@ function applyQcLines(
 }
 
 export function GeophysQcClient() {
+  const { selectedObraId } = useGeofisicaObra();
   const [lines, setLines] = useState<QcSurveyLine[]>(() => [defaultQcLine()]);
   const [activeLineId, setActiveLineId] = useState<string | null>(null);
   const [report, setReport] = useState<SurveyQcReport | null>(null);
@@ -225,7 +227,11 @@ export function GeophysQcClient() {
 
   const loadFromProject = useCallback(
     (ids: string[] | "all" = "all") => {
-      const project = loadGeophysProject();
+      if (selectedObraId == null) {
+        setNotice("Selecione a obra do projeto (selector no topo) antes de carregar secções.");
+        return;
+      }
+      const project = loadGeophysProject(selectedObraId);
       const selected =
         ids === "all"
           ? project.sections
@@ -234,7 +240,7 @@ export function GeophysQcClient() {
             );
       importProjectSections(selected, importMode);
     },
-    [importMode, importProjectSections],
+    [importMode, importProjectSections, selectedObraId],
   );
 
   const loadFromDipolo = useCallback(() => {
@@ -366,12 +372,13 @@ export function GeophysQcClient() {
   }, [loadFromProject]);
 
   useEffect(() => {
-    const project = loadGeophysProject();
+    if (selectedObraId == null) return;
+    const project = loadGeophysProject(selectedObraId);
     if (project.sections.length > 0) return;
     loadDemo();
-    // Demo inicial apenas se não houver secções guardadas no projeto
+    // Demo inicial apenas se não houver secções guardadas no projeto desta obra
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedObraId]);
 
   return (
     <div className="space-y-6">
@@ -476,6 +483,7 @@ export function GeophysQcClient() {
       </div>
 
       <GeophysSectionsPanel
+        obraId={selectedObraId}
         showVolumeActions={false}
         showQcActions
         onImportToQc={(sections) => importProjectSections(sections, importMode)}

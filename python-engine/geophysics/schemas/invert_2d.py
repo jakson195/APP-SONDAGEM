@@ -27,13 +27,37 @@ ForwardModelId = Literal["fdm", "fem"]
 
 
 class InvertParamsIn(BaseModel):
-    nx: int = Field(default=24, ge=4, le=48)
-    nz: int = Field(default=16, ge=4, le=32)
+    nx: int = Field(default=32, ge=4, le=48)
+    nz: int = Field(default=20, ge=4, le=32)
     factor_depth: float = Field(default=0.286, gt=0)
-    lambda_reg: float = Field(default=8.0, gt=0)
-    lambda_min: float = Field(default=0.05, gt=0)
+    lambda_reg: float = Field(
+        default=0.03,
+        ge=0,
+        description="Escala global da regularização (Occam / GN); 0 = sem regularização",
+    )
+    lambda_x: float = Field(
+        default=0.06,
+        gt=0,
+        description="Peso horizontal D_x (log₁₀ ρ) — menor = mais contraste lateral",
+    )
+    lambda_z: float = Field(
+        default=0.15,
+        gt=0,
+        description="Peso vertical D_z — alto demais → modelo homogêneo por camadas",
+    )
+    reg_normalize_mesh: bool = Field(
+        default=True,
+        description="Divide R por nº de células (λ independente da malha)",
+    )
+    irls_inner_iters: int = Field(
+        default=4,
+        ge=1,
+        le=12,
+        description="Sub-iterações IRLS por passo (robust_l1 / blocky_l1)",
+    )
+    lambda_min: float = Field(default=0.02, gt=0)
     lambda_decay: float = Field(default=0.82, gt=0, le=1)
-    max_iter: int = Field(default=12, ge=1, le=40)
+    max_iter: int = Field(default=20, ge=1, le=40)
     huber_c: float = Field(default=0.08, gt=0)
     min_improvement: float = Field(default=1e-4, ge=0)
     target_rms_log10: float = Field(default=0.035, gt=0)
@@ -41,6 +65,21 @@ class InvertParamsIn(BaseModel):
     outlier_score_threshold: float = Field(default=35.0, ge=0, le=100)
     auto_exclude_outliers: bool = True
     use_adaptive_mesh: bool = True
+    apply_coverage_mask: bool = Field(
+        default=False,
+        description="Máscara trapezoidal na malha adaptativa (False = todas as células activas)",
+    )
+    geometric_z_layers: bool = True
+    use_line_search: bool = Field(
+        default=True,
+        description="Busca em linha no passo Δm; gauss_newton usa passo completo se False",
+    )
+    trust_region_alpha: float = Field(
+        default=0.35,
+        gt=0,
+        le=1,
+        description="Passo mínimo forçado quando a busca em linha rejeita todos os α",
+    )
     jacobian_mode: Literal["adjoint", "fd"] = "adjoint"
     forward_model: ForwardModelId = "fdm"
     target_chi2: float | None = Field(
@@ -48,6 +87,12 @@ class InvertParamsIn(BaseModel):
         description="Alvo Occam; None = nd (número de dados)",
     )
     chi2_tolerance: float = Field(default=0.05, ge=0, le=0.5)
+    min_iter_before_stop: int = Field(
+        default=8,
+        ge=1,
+        le=30,
+        description="Iterações mínimas antes de parar por ganho relativo",
+    )
 
 
 MethodId = Literal[
@@ -56,6 +101,7 @@ MethodId = Literal[
     "gauss_newton",
     "smoothness",
     "robust_l1",
+    "blocky_l1",
     "hybrid",
 ]
 
@@ -63,7 +109,7 @@ MethodId = Literal[
 class Invert2DRequest(BaseModel):
     readings: list[ReadingIn]
     params: InvertParamsIn = Field(default_factory=InvertParamsIn)
-    method: MethodId = "gauss_newton"
+    method: MethodId = "robust_l1"
     topography: list[TopographyPointIn] | None = None
 
 
@@ -76,6 +122,12 @@ class IterationRecordOut(BaseModel):
     roughness_l2: float
     relative_gain: float | None = None
     chi2_reduced: float | None = None
+    rho_min_ohm_m: float | None = None
+    rho_max_ohm_m: float | None = None
+    rho_std_ohm_m: float | None = None
+    dm_norm: float | None = None
+    j_norm: float | None = None
+    line_search_alpha: float | None = None
 
 
 class Invert2DResponse(BaseModel):
@@ -89,6 +141,8 @@ class Invert2DResponse(BaseModel):
     x_edges_m: list[float]
     z_edges_m: list[float]
     m_log10: list[float]
+    active_cells: list[bool] = Field(default_factory=list)
+    z_cover_m: list[float] = Field(default_factory=list)
     y_obs_log10: list[float]
     y_syn_log10: list[float]
     rms_log10: float

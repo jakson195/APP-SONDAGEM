@@ -17,8 +17,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DataGeo Digital — Sondagem geotécnica",
-  description: "DataGeo Digital — sondagem e operações de campo.",
+  title: {
+    default: "DataGeo Digital",
+    template: "%s · DataGeo Digital",
+  },
+  description:
+    "Plataforma SaaS de geotecnia e geofísica — SPT, ERT, relatórios e portal do cliente.",
 };
 
 export default function RootLayout({

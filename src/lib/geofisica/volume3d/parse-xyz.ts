@@ -246,12 +246,16 @@ export function xyzToLineGeometry(parsed: XyzParseResult): SurveyLineGeometry | 
   const last = sorted[sorted.length - 1]!;
 
   if (parsed.isGeographic) {
-    const start = { lat: first.y, lng: first.x };
-    const end = { lat: last.y, lng: last.x };
+    const start = { x: first.y, y: first.x, z: first.z };
+    const end = { x: last.y, y: last.x, z: last.z };
     return {
+      coordMode: "wgs84",
       start,
       end,
-      azimuthDeg: azimuthDegFromEndpoints(start, end),
+      azimuthDeg: azimuthDegFromEndpoints(
+        { lat: start.x, lng: start.y },
+        { lat: end.x, lng: end.y },
+      ),
       spacingM: inferSpacing(sorted),
     };
   }

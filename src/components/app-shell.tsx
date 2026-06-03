@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { LogOut, Menu, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { apiUrl } from "@/lib/api-url";
 import { useObraModulos } from "@/components/obra-context";
 import { AppSidebarNav } from "@/components/sidebar/app-sidebar-nav";
+import { CompanySwitcher } from "@/components/saas/company-switcher";
 import { useModuleNav } from "@/hooks/use-module-nav";
 
 const coreNav = [
@@ -16,6 +18,7 @@ const coreNav = [
   { href: "/obras", label: "📁 Obras · mapas" },
   { href: "/obra", label: "🏗️ Nova obra" },
   { href: "/gestao-empresa", label: "🏢 Gestão · empresas" },
+  { href: "/assinatura", label: "💳 Assinatura" },
   { href: "/admin/companies", label: "🏛️ Empresas · admin" },
 ] as const;
 
@@ -46,15 +49,15 @@ function ObraContextCard({
   onClear: () => void;
 }) {
   return (
-    <div className="mt-3 rounded-lg border border-gray-700 bg-gray-800/80 px-3 py-2 text-xs text-gray-300">
-      <p className="truncate font-medium text-white" title={obraNome ?? ""}>
+    <div className="mt-3 rounded-lg border border-dg-border bg-dg-card/80 px-3 py-2 text-xs text-dg-muted">
+      <p className="truncate font-medium text-dg-text" title={obraNome ?? ""}>
         {obraNome ?? `Obra #${selectedObraId}`}
       </p>
-      <p className="mt-0.5 text-[10px] text-gray-400">Menu filtrado por esta obra</p>
+      <p className="mt-0.5 text-[10px] text-dg-muted">Menu filtrado por esta obra</p>
       <button
         type="button"
         onClick={onClear}
-        className="mt-2 w-full rounded-md border border-gray-600 py-1 text-[11px] font-medium text-gray-200 transition-colors hover:bg-gray-700"
+        className="dg-btn-outline mt-2 w-full py-1 text-[11px]"
       >
         Limpar obra do menu
       </button>
@@ -70,7 +73,7 @@ function LogoutButton({ onClick }: { onClick?: () => void }) {
         onClick?.();
         void sair();
       }}
-      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-gray-300 transition-colors duration-200 hover:bg-gray-700 hover:text-white"
+      className="dg-nav-item flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium"
     >
       <LogOut className="h-4 w-4 shrink-0" strokeWidth={2} />
       Sair
@@ -91,6 +94,7 @@ function GlobalQuickActions({
 }) {
   const [obras, setObras] = useState<Array<{ id: number; nome: string }>>([]);
   const [loadingObras, setLoadingObras] = useState(false);
+  const [obrasHint, setObrasHint] = useState<string | null>(null);
   const obraHref = hrefWithObra("/obra", selectedObraId);
   const empresaHref = hrefWithObra("/gestao-empresa", selectedObraId);
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
@@ -107,11 +111,30 @@ function GlobalQuickActions({
         if (cancelled) return;
         if (!response.ok || !Array.isArray(data)) {
           setObras([]);
+          const errMsg =
+            typeof data === "object" &&
+            data !== null &&
+            !Array.isArray(data) &&
+            "error" in data &&
+            typeof (data as { error?: string }).error === "string"
+              ? (data as { error: string }).error
+              : response.status === 401
+                ? "Sessão expirada — faça login."
+                : "Não foi possível carregar obras.";
+          setObrasHint(errMsg);
           return;
         }
         setObras(data.map((item) => ({ id: item.id, nome: item.nome })));
+        setObrasHint(
+          data.length === 0
+            ? "Nenhuma obra cadastrada — use «Criar obra»."
+            : null,
+        );
       } catch {
-        if (!cancelled) setObras([]);
+        if (!cancelled) {
+          setObras([]);
+          setObrasHint("Falha de rede ao carregar obras.");
+        }
       } finally {
         if (!cancelled) setLoadingObras(false);
       }
@@ -157,23 +180,25 @@ function GlobalQuickActions({
             </option>
           ))}
         </select>
+        {obrasHint && (
+          <span className="text-[11px] text-amber-700 dark:text-amber-300">
+            {obrasHint}
+          </span>
+        )}
       </label>
       <Link
         href={empresaHref}
-        className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--text)] transition hover:border-teal-500/50 hover:bg-teal-500/10"
+        className="dg-btn-outline"
       >
         Cadastrar empresa
       </Link>
-      <Link
-        href={obraHref}
-        className="rounded-xl bg-teal-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-teal-500"
-      >
+      <Link href={obraHref} className="dg-btn-primary">
         Criar obra
       </Link>
       <button
         type="button"
         onClick={() => void copyLink(false)}
-        className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--text)] transition hover:border-blue-500/50 hover:bg-blue-500/10"
+        className="dg-btn-outline"
       >
         Copiar weblink da aba
       </button>
@@ -181,7 +206,7 @@ function GlobalQuickActions({
         type="button"
         onClick={() => void copyLink(true)}
         disabled={selectedObraId == null}
-        className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--text)] transition hover:border-indigo-500/50 hover:bg-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+        className="dg-btn-outline disabled:cursor-not-allowed disabled:opacity-60"
       >
         Copiar weblink aba + projeto
       </button>
@@ -228,10 +253,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [moduleNav, selectedObraId]);
 
   return (
-    <div className="flex min-h-screen bg-gray-100 dark:bg-[var(--surface)]">
+    <div className="dg-mesh-bg flex min-h-screen bg-[var(--surface)]">
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 bg-gray-900 p-5 text-white print:hidden md:flex md:flex-col">
-        <h1 className="mb-6 text-xl font-bold tracking-tight">DataGeo Digital</h1>
+      <aside className="dg-sidebar hidden w-64 shrink-0 p-5 print:hidden md:flex md:flex-col">
+        <div className="mb-6">
+          <BrandLogo href="/dashboard" height={36} />
+        </div>
+        <CompanySwitcher />
         <AppSidebarNav pathname={pathname} flatItems={flatNavItems} />
         {selectedObraId != null && (
           <ObraContextCard
@@ -240,7 +268,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             onClear={() => setObraContext(null)}
           />
         )}
-        <div className="mt-auto border-t border-gray-700 pt-4">
+        <div className="mt-auto border-t border-dg-border pt-4">
           <LogoutButton />
         </div>
       </aside>
@@ -254,21 +282,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         onClick={() => setMobileOpen(false)}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[min(100%-3rem,18rem)] flex-col bg-gray-900 p-5 text-white shadow-xl transition-transform duration-300 ease-out print:hidden md:hidden ${
+        className={`dg-sidebar fixed inset-y-0 left-0 z-50 flex w-[min(100%-3rem,18rem)] flex-col p-5 shadow-xl transition-transform duration-300 ease-out print:hidden md:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-lg font-bold">DataGeo Digital</h1>
+        <div className="mb-6 flex items-center justify-between gap-2">
+          <BrandLogo href="/dashboard" height={32} />
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
-            className="rounded-lg p-2 text-gray-300 transition-colors hover:bg-gray-700"
+            className="dg-nav-item rounded-lg p-2"
             aria-label="Fechar menu"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
+        <CompanySwitcher />
         <AppSidebarNav
           pathname={pathname}
           flatItems={flatNavItems}
@@ -284,7 +313,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             }}
           />
         )}
-        <div className="border-t border-gray-700 pt-4">
+        <div className="border-t border-dg-border pt-4">
           <LogoutButton onClick={() => setMobileOpen(false)} />
         </div>
       </aside>
@@ -294,19 +323,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="rounded-lg p-2 text-[var(--text)] transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.08]"
+            className="dg-nav-item rounded-lg p-2 text-[var(--text)]"
             aria-label="Abrir menu"
           >
             <Menu className="h-5 w-5" />
           </button>
-          <span className="text-sm font-semibold text-[var(--text)]">DataGeo Digital</span>
+          <BrandLogo href="/dashboard" height={28} />
         </header>
-        <main className="flex-1 bg-gray-100 px-4 py-6 dark:bg-[var(--surface)] print:bg-white print:px-2 print:py-2 sm:px-6 lg:px-8">
+        <main className="dg-grid-bg flex-1 px-4 py-6 print:bg-white print:px-2 print:py-2 sm:px-6 lg:px-8">
           <GlobalQuickActions
             selectedObraId={selectedObraId}
             setObraContext={setObraContext}
             pathname={pathname}
-            search={searchParams.toString()}
+            search={searchParams?.toString() ?? ""}
           />
           {children}
         </main>

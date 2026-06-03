@@ -331,7 +331,6 @@ function SectionPlane({
       polygonOffsetFactor: -2,
       polygonOffsetUnits: -2,
     });
-    m.renderOrder = 20;
     applyClippingToMaterial(m, clipPlanes);
     return m;
   }, [texture, opacity, clipPlanes]);
@@ -339,7 +338,7 @@ function SectionPlane({
   if (!material || !line.invertResult) return null;
 
   if (drape && drapedGeometry) {
-    return <mesh geometry={drapedGeometry} material={material} />;
+    return <mesh geometry={drapedGeometry} material={material} renderOrder={20} />;
   }
 
   const sectionDepthM = invertResultDepthM(line.invertResult);
@@ -354,7 +353,7 @@ function SectionPlane({
     : -sectionDepthM / 2;
 
   return (
-    <mesh position={[mx, centerY, mz]} rotation={[0, angle, 0]} material={material}>
+    <mesh position={[mx, centerY, mz]} rotation={[0, angle, 0]} material={material} renderOrder={20}>
       <planeGeometry args={[seg.lengthM, sectionDepthM]} />
     </mesh>
   );

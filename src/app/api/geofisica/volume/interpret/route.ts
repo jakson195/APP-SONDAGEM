@@ -1,8 +1,12 @@
+import { NextResponse } from "next/server";
+import { withGeophysicsApi } from "@/lib/geofisica/geophys-api-guard";
 import {
   enhanceVolumeWithOpenAI,
   isGeophysAiAvailable,
   type VolumeAiInput,
 } from "@/lib/geofisica/ai/volume-interpret-ai";
+
+export const dynamic = "force-dynamic";
 
 export type VolumeInterpretFinding = {
   id: string;
@@ -25,17 +29,23 @@ export type VolumeInterpretResult = {
   recommendations: string[];
 };
 
-export async function POST(req: Request) {
+async function handleVolumeInterpret(req: Request) {
   try {
     const body = (await req.json()) as VolumeAiInput;
     const result = await enhanceVolumeWithOpenAI(body);
-    return Response.json({
+    return NextResponse.json({
       ok: true,
       interpretation: result,
       aiAvailable: isGeophysAiAvailable(),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Erro na interpretação 3D";
-    return Response.json({ ok: false, error: msg }, { status: 500 });
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
+}
+
+export async function POST(req: Request) {
+  return withGeophysicsApi(req, async (_ctx, r) => handleVolumeInterpret(r), {
+    allowGlobalScope: true,
+  });
 }

@@ -20,18 +20,16 @@ export function invertDipolo2DSmoothRes2dinvLike(
   return invertDipolo2D(readings, p, "smoothness");
 }
 
+import { RES2DINV_INVERT_PARAMS } from "./res2dinv-preset";
+
 /** Parâmetros calibrados para .dat RES2DINV (dipolo-dipolo, ex. Garuva). */
 export const res2dinvDataPreset: Dipolo2DInvertParams = {
-  factorDepth: 0.286,
-  sigmaXM: 4,
-  sigmaZM: 2,
-  lambda: 0.2,
-  huberC: 0.03,
-  maxIter: 20,
-  lambdaDecay: 0.88,
-  lambdaMin: 0.03,
-  minImprovement: 0.0006,
+  ...RES2DINV_INVERT_PARAMS,
   nx: 40,
   nz: 22,
-  hybridAlpha: 1,
+};
+
+/** Alias — preset principal RES2DINV (L1 + λ anisotrópico). */
+export const res2dinvSharpPreset: Dipolo2DInvertParams = {
+  ...RES2DINV_INVERT_PARAMS,
 };

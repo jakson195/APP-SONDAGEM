@@ -1,26 +1,51 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useGeofisicaObra } from "@/hooks/use-geofisica-obra";
 import {
   defaultColorScale,
   type ResistivityColorScale,
 } from "@/lib/geofisica/dipolo2d/colormap";
 import {
+  drawModelCanvasMessage,
   drawModelSection,
   drawPseudoScatter,
   drawResidualSection,
   findNearestPseudoHit,
   formatRhoApparentOhmM,
   type ModelDrawOptions,
+  type ModelLogContrast,
   type PseudoHit,
 } from "@/lib/geofisica/dipolo2d/dipolo-pseudo-draw";
+import type { ModelRenderMode } from "@/lib/geofisica/dipolo2d/model-section-render";
+import {
+  computeRelativeRmsPercent,
+  modelStatsFromLog10,
+  rhoPercentileBounds,
+  type ModelDisplayScale,
+} from "@/lib/geofisica/dipolo2d/model-visual-scale";
 import { invertDipolo2D } from "@/lib/geofisica/dipolo2d/invert-methods-2d";
 import {
+  checkPhysicsEngineOnline,
   invertDipolo2DPhysics,
   type InvertEngineId,
   type PhysicsForwardModelId,
 } from "@/lib/geofisica/dipolo2d/physics-invert-2d";
+import {
+  HORIZONTAL_LAYERS_INVERT_PARAMS,
+  RES2DINV_COLOR_LEVELS,
+  RES2DINV_DEFAULT_METHOD,
+  RES2DINV_DISPLAY_SMOOTH_PASSES,
+  RES2DINV_FIXED_COLOR_SCALE,
+  RES2DINV_FORWARD_MODEL,
+  RES2DINV_INVERSION_NOTICE,
+  RES2DINV_INVERT_PARAMS,
+  RES2DINV_LOG_CONTRAST,
+  RES2DINV_PREFER_PHYSICS_ENGINE,
+  RES2DINV_RENDER_MODE,
+} from "@/lib/geofisica/dipolo2d/res2dinv-preset";
 import { res2dinvDataPreset } from "@/lib/geofisica/dipolo2d/smooth-invert-2d";
 import { qcGradesByRowIndex } from "@/lib/geofisica/qc/qc-row-grades";
 import { loadSolodataLinha12Demo } from "@/lib/geofisica/dipolo2d/solodata-linha-demo";
@@ -47,6 +72,7 @@ import {
   DIPOLO2D_INVERT_METHODS,
   type Dipolo2DInvertMethodId,
   type Dipolo2DInvertParams,
+  type Dipolo2DInvertResult,
   type Dipolo2DReading,
 } from "@/lib/geofisica/dipolo2d/types";
 import { res2dinvToSolodataLinha } from "@/lib/geofisica/dipolo2d/parse-res2dinv-dat";
@@ -69,6 +95,7 @@ import { DipoloModelExportPanel } from "./dipolo-model-export-panel";
 import { DipoloTopographyPanel } from "./dipolo-topography-panel";
 import { DipoloReadingsTable } from "./dipolo-readings-table";
 import { SolodataLinhaSheet } from "./solodata-linha-sheet";
+import { buildSyntheticInvertResult } from "@/lib/geofisica/dipolo2d/synthetic-invert-model";
 import { buildSavedSectionFromDipolo } from "@/lib/geofisica/geophys-project/dipolo-to-saved-section";
 import { loadGeophysProject } from "@/lib/geofisica/geophys-project/geophys-project-storage";
 import {
@@ -83,36 +110,15 @@ type TabId = "dados" | "pseudo" | "modelo" | "interpretacao" | "ajustes";
 
 type ModelMaskMode = NonNullable<ModelDrawOptions["maskMode"]>;
 
-const defaultParams: Dipolo2DInvertParams = {
-  factorDepth: 0.37,
-  sigmaXM: 8,
-  sigmaZM: 4,
-  lambda: 3.5,
-  huberC: 0.03,
-  maxIter: 16,
-  lambdaDecay: 0.9,
-  lambdaMin: 0.35,
-  minImprovement: 0.0015,
-  nx: 28,
-  nz: 16,
-  hybridAlpha: 1,
-};
+const defaultParams: Dipolo2DInvertParams = { ...RES2DINV_INVERT_PARAMS };
 
 const precisionPreset: Dipolo2DInvertParams = res2dinvDataPreset;
 
 const fastPreset: Dipolo2DInvertParams = {
-  factorDepth: 0.37,
-  sigmaXM: 9,
-  sigmaZM: 5,
-  lambda: 2.2,
-  huberC: 0.04,
-  maxIter: 8,
-  lambdaDecay: 0.95,
-  lambdaMin: 0.4,
-  minImprovement: 0.002,
-  nx: 20,
-  nz: 12,
-  hybridAlpha: 1,
+  ...RES2DINV_INVERT_PARAMS,
+  nx: 22,
+  nz: 14,
+  maxIter: 10,
 };
 
 function HybridAlphaControl({
@@ -165,6 +171,16 @@ function HybridAlphaControl({
 }
 
 export function DipoloDipoloClient() {
+  const router = useRouter();
+  const pathname = usePathname() ?? "/geofisica/dipolo-dipolo";
+  const {
+    obras,
+    obrasLoading,
+    obrasError,
+    selectedObraId,
+    obraNome,
+    selectObra,
+  } = useGeofisicaObra();
   const [tab, setTab] = useState<TabId>("dados");
   const [linha, setLinha] = useState<SolodataLinhaState>(() =>
     defaultSolodataLinhaState(91),
@@ -172,8 +188,10 @@ export function DipoloDipoloClient() {
   const [defaultA, setDefaultA] = useState("15");
   const [params, setParams] = useState<Dipolo2DInvertParams>(defaultParams);
   const [invertMethod, setInvertMethod] =
-    useState<Dipolo2DInvertMethodId>("smoothness");
-  const [invertEngine, setInvertEngine] = useState<InvertEngineId>("proxy");
+    useState<Dipolo2DInvertMethodId>(RES2DINV_DEFAULT_METHOD);
+  const [invertEngine, setInvertEngine] = useState<InvertEngineId>(
+    RES2DINV_PREFER_PHYSICS_ENGINE ? "physics" : "proxy",
+  );
   const [physicsForwardModel, setPhysicsForwardModel] =
     useState<PhysicsForwardModelId>("fdm");
   const [physicsResult, setPhysicsResult] = useState<
@@ -181,16 +199,110 @@ export function DipoloDipoloClient() {
   >(null);
   const [physicsBusy, setPhysicsBusy] = useState(false);
   const [physicsError, setPhysicsError] = useState<string | null>(null);
+  /** null = a verificar; true = :8092 online → motor físico por defeito. */
+  const [physicsEngineOnline, setPhysicsEngineOnline] = useState<boolean | null>(
+    null,
+  );
+  const [physicsCheckError, setPhysicsCheckError] = useState<string | null>(
+    null,
+  );
+  /** Só quando o motor físico está online: permite preview proxy. */
+  const [proxyOverride, setProxyOverride] = useState(false);
 
-  const selectInvertMethod = useCallback((id: Dipolo2DInvertMethodId) => {
-    setInvertMethod(id);
-    setParams((p) => {
-      if (id === "hybrid" && (p.hybridAlpha ?? 1) >= 0.999) {
-        return { ...p, hybridAlpha: 0.65 };
+  const selectInvertMethod = useCallback(
+    (id: Dipolo2DInvertMethodId) => {
+      if (invertEngine === "proxy" && id === "least_squares") {
+        setImportNotice(
+          "«Mínimos quadrados (proxy)» apenas projecta a ρa aparente na malha (parecido com x2ipi). Use motor Físico + Robusta L1 para inversão real.",
+        );
+        return;
       }
-      return p;
+      setInvertMethod(id);
+      setParams((p) => {
+        if (id === "hybrid" && (p.hybridAlpha ?? 1) >= 0.999) {
+          return { ...p, hybridAlpha: 0.65 };
+        }
+        return p;
+      });
+    },
+    [invertEngine],
+  );
+
+  /** Força novo cálculo FDM mesmo que parâmetros não mudem. */
+  const [physicsInvertNonce, setPhysicsInvertNonce] = useState(0);
+
+  const applyRes2dinvPreset = useCallback(() => {
+    setParams({ ...res2dinvDataPreset });
+    selectInvertMethod(RES2DINV_DEFAULT_METHOD);
+    setInvertEngine(RES2DINV_PREFER_PHYSICS_ENGINE ? "physics" : "proxy");
+    setPhysicsForwardModel("fdm");
+    setModelRenderMode(RES2DINV_RENDER_MODE);
+    setModelDisplaySmoothPasses(RES2DINV_DISPLAY_SMOOTH_PASSES);
+    setModelMaskMode("full");
+    setModelLogContrast(RES2DINV_LOG_CONTRAST);
+    setModelColorScale({ ...RES2DINV_FIXED_COLOR_SCALE });
+    setProxyOverride(false);
+    setShowTopography(true);
+  }, [selectInvertMethod]);
+
+  /** λ_z alto + interpolação só em x (contactos horizontais na visualização). */
+  const applyHorizontalLayersStyle = useCallback(() => {
+    setParams({ ...HORIZONTAL_LAYERS_INVERT_PARAMS });
+    selectInvertMethod(RES2DINV_DEFAULT_METHOD);
+    setInvertEngine(RES2DINV_PREFER_PHYSICS_ENGINE ? "physics" : "proxy");
+    setPhysicsForwardModel("fdm");
+    setModelRenderMode(RES2DINV_RENDER_MODE);
+    setModelDisplaySmoothPasses(RES2DINV_DISPLAY_SMOOTH_PASSES);
+    setModelMaskMode("coverage");
+    setModelLogContrast("auto");
+    setModelColorScale({
+      auto: true,
+      rhoMinOhmM: null,
+      rhoMaxOhmM: null,
+      palette: "x2ipi",
+    });
+    setProxyOverride(false);
+    setImportNotice(
+      "Camadas horizontais: λ_z alto, FDM (rápido). FEM só se precisar — pode demorar >10 min.",
+    );
+  }, [selectInvertMethod]);
+
+  const recheckPhysicsEngine = useCallback(() => {
+    setPhysicsEngineOnline(null);
+    setPhysicsCheckError(null);
+    checkPhysicsEngineOnline().then((status) => {
+      setPhysicsEngineOnline(status.online);
+      setPhysicsCheckError(status.error ?? null);
+      if (status.online) {
+        setInvertEngine("physics");
+        setProxyOverride(false);
+        setInvertMethod((m) =>
+          m === "least_squares" ? RES2DINV_DEFAULT_METHOD : m,
+        );
+        setImportNotice(
+          "Motor Python online (:8092). Inversão requer também npm run dev no outro terminal.",
+        );
+      } else {
+        setImportNotice(
+          status.error ??
+            "Motor Python offline. Veja os comandos abaixo e clique Verificar de novo.",
+        );
+      }
     });
   }, []);
+
+  useEffect(() => {
+    recheckPhysicsEngine();
+  }, [recheckPhysicsEngine]);
+
+  useEffect(() => {
+    if (invertEngine === "physics" && invertMethod === "least_squares") {
+      selectInvertMethod(RES2DINV_DEFAULT_METHOD);
+      setImportNotice(
+        "Mínimos quadrados no motor físico usa só 1 iteração. Método alterado para Robusta L1 (inversão iterativa).",
+      );
+    }
+  }, [invertEngine, invertMethod, selectInvertMethod]);
   const [colorScale, setColorScale] =
     useState<ResistivityColorScale>(defaultColorScale);
   const [selectedReadingIndex, setSelectedReadingIndex] = useState<number | null>(
@@ -204,11 +316,31 @@ export function DipoloDipoloClient() {
     useState<RegionalGeologyProfile | null>(null);
   const [geologicInterpretation, setGeologicInterpretation] =
     useState<SectionGeologicInterpretation | null>(null);
-  const [modelMaskMode, setModelMaskMode] = useState<ModelMaskMode>("full");
+  const [modelMaskMode, setModelMaskMode] = useState<ModelMaskMode>("coverage");
+  /** 0 = sem blur na imagem (mais próximo RES2DINV). */
+  const [modelDisplaySmoothPasses, setModelDisplaySmoothPasses] = useState(
+    RES2DINV_DISPLAY_SMOOTH_PASSES,
+  );
+  const [modelRenderMode, setModelRenderMode] =
+    useState<ModelRenderMode>(RES2DINV_RENDER_MODE);
+  const [modelLogContrast, setModelLogContrast] =
+    useState<ModelLogContrast>(RES2DINV_LOG_CONTRAST);
+  const [modelDisplayScale, setModelDisplayScale] =
+    useState<ModelDisplayScale>("log");
   const [modelColorScale, setModelColorScale] =
-    useState<ResistivityColorScale>(defaultColorScale);
+    useState<ResistivityColorScale>({
+      ...defaultColorScale,
+      auto: true,
+      palette: "x2ipi",
+    });
   const [modelScaleXM, setModelScaleXM] = useState(1);
   const [modelScaleZM, setModelScaleZM] = useState(1);
+  const [modelRenderError, setModelRenderError] = useState<string | null>(null);
+  const [syntheticDemoResult, setSyntheticDemoResult] =
+    useState<Dipolo2DInvertResult | null>(null);
+  const [modelSectionTitle, setModelSectionTitle] = useState<string | null>(
+    null,
+  );
   const [topography, setTopography] = useState<TopographyPoint[]>([]);
   const [showTopography, setShowTopography] = useState(true);
   const [sectionCode, setSectionCode] = useState("");
@@ -238,6 +370,8 @@ export function DipoloDipoloClient() {
           surveyLocation?: GeoSurveyLocation;
           regionalGeology?: RegionalGeologyProfile;
           modelMaskMode?: ModelMaskMode;
+          modelDisplaySmoothPasses?: number;
+          modelLogContrast?: ModelLogContrast;
           modelColorScale?: ResistivityColorScale;
           modelScaleXM?: number;
           modelScaleZM?: number;
@@ -269,6 +403,24 @@ export function DipoloDipoloClient() {
         }
         if (j.modelMaskMode === "full" || j.modelMaskMode === "coverage") {
           setModelMaskMode(j.modelMaskMode);
+        }
+        if (typeof j.modelDisplaySmoothPasses === "number") {
+          setModelDisplaySmoothPasses(
+            Math.max(0, Math.min(3, Math.round(j.modelDisplaySmoothPasses))),
+          );
+        }
+        if (j.modelLogContrast === "standard") {
+          setModelLogContrast("standard");
+        } else if ((j.modelLogContrast as string) === "res2dinv") {
+          setModelLogContrast("minmax");
+        } else if (
+          j.modelLogContrast === "auto" ||
+          j.modelLogContrast === "percentile" ||
+          j.modelLogContrast === "minmax" ||
+          j.modelLogContrast === "equalize" ||
+          j.modelLogContrast === "stdstretch"
+        ) {
+          setModelLogContrast(j.modelLogContrast);
         }
         if (j.modelColorScale) {
           setModelColorScale((s) => ({ ...s, ...j.modelColorScale }));
@@ -306,6 +458,8 @@ export function DipoloDipoloClient() {
             surveyLocation,
             regionalGeology,
             modelMaskMode,
+            modelDisplaySmoothPasses,
+            modelLogContrast,
             modelColorScale,
             modelScaleXM,
             modelScaleZM,
@@ -328,6 +482,8 @@ export function DipoloDipoloClient() {
     surveyLocation,
     regionalGeology,
     modelMaskMode,
+    modelDisplaySmoothPasses,
+    modelLogContrast,
     modelColorScale,
     modelScaleXM,
     modelScaleZM,
@@ -434,7 +590,7 @@ export function DipoloDipoloClient() {
         });
         setDefaultA(String(resParsed.unitSpacingM));
         setParams(res2dinvDataPreset);
-        setInvertMethod("smoothness");
+        setInvertMethod(RES2DINV_DEFAULT_METHOD);
         const rhos = resParsed.readings.map((r) => r.rhoApparentOhmM);
         const rhoMin = Math.min(...rhos);
         const rhoMax = Math.max(...rhos);
@@ -483,77 +639,230 @@ export function DipoloDipoloClient() {
   );
 
   const proxyInvertResult = useMemo(() => {
-    if (activeReadings.length < 4) return null;
+    if (invertEngine === "physics" || activeReadings.length < 4) return null;
     return invertDipolo2D(activeReadings, params, invertMethod, qcByRow);
-  }, [activeReadings, params, invertMethod, qcByRow]);
+  }, [invertEngine, activeReadings, params, invertMethod, qcByRow]);
+
+  const physicsRunIdRef = useRef(0);
+  const physicsBusyCountRef = useRef(0);
+  const physicsInputsRef = useRef({
+    readings,
+    params,
+    invertMethod,
+    topography,
+    qcByRow,
+    physicsForwardModel,
+  });
+  physicsInputsRef.current = {
+    readings,
+    params,
+    invertMethod,
+    topography,
+    qcByRow,
+    physicsForwardModel,
+  };
+
+  const runPhysicsInversion = useCallback(async () => {
+    if (invertEngine !== "physics") return;
+    if (activeReadings.length < 4) {
+      setPhysicsError("Mínimo 4 leituras activas para inversão RES2DINV.");
+      setPhysicsResult(null);
+      setPhysicsBusy(false);
+      return;
+    }
+
+    const runId = ++physicsRunIdRef.current;
+    physicsBusyCountRef.current += 1;
+    setPhysicsBusy(true);
+    setPhysicsError(null);
+    setSyntheticDemoResult(null);
+
+    const {
+      readings: rIn,
+      params: pIn,
+      invertMethod: methodIn,
+      topography: topoIn,
+      qcByRow: qcIn,
+      physicsForwardModel: fwdIn,
+    } = physicsInputsRef.current;
+
+    const qcMap = new Map<
+      number,
+      { qualityScore: number; isSpike: boolean }
+    >();
+    qcIn.forEach((g, rowIdx) => {
+      qcMap.set(rowIdx, {
+        qualityScore: g.qualityScore,
+        isSpike: g.isSpike,
+      });
+    });
+
+    try {
+      const r = await invertDipolo2DPhysics(
+        rIn,
+        pIn,
+        methodIn,
+        topoIn,
+        qcMap,
+        fwdIn,
+      );
+      if (runId !== physicsRunIdRef.current) return;
+
+      if (!r) {
+        setPhysicsResult(null);
+        setPhysicsError(
+          "Inversão concluída sem modelo na resposta. Reinicie o motor Python (npm run geophysics:kill-port, depois geophysics:engine).",
+        );
+        return;
+      }
+
+      setPhysicsResult(r);
+      setPhysicsEngineOnline(true);
+      setPhysicsError(null);
+      setImportNotice(
+        `Inversão concluída (${r.forwardModel?.toUpperCase() ?? "FDM"}) — ${r.iterations} iterações, malha ${r.nx}×${r.nz}.`,
+      );
+    } catch (e: unknown) {
+      if (runId !== physicsRunIdRef.current) return;
+      setPhysicsResult(null);
+      const msg = e instanceof Error ? e.message : "Erro na inversão FDM";
+      setPhysicsError(msg);
+      if (
+        /indisponível|ECONNREFUSED|contactar|fetch failed|motor python|timeout|aborted/i.test(
+          msg,
+        )
+      ) {
+        setPhysicsEngineOnline(false);
+      } else {
+        setPhysicsEngineOnline(true);
+      }
+    } finally {
+      physicsBusyCountRef.current = Math.max(0, physicsBusyCountRef.current - 1);
+      if (physicsBusyCountRef.current === 0) {
+        setPhysicsBusy(false);
+      }
+    }
+  }, [invertEngine, activeReadings.length]);
 
   useEffect(() => {
     if (invertEngine !== "physics" || activeReadings.length < 4) {
       setPhysicsResult(null);
       setPhysicsError(null);
       setPhysicsBusy(false);
+      physicsBusyCountRef.current = 0;
       return;
     }
-    let cancelled = false;
-    setPhysicsBusy(true);
-    setPhysicsError(null);
-    const qcMap = new Map<
-      number,
-      { qualityScore: number; isSpike: boolean }
-    >();
-    qcByRow.forEach((g, rowIdx) => {
-      qcMap.set(rowIdx, {
-        qualityScore: g.qualityScore,
-        isSpike: g.isSpike,
-      });
-    });
-    invertDipolo2DPhysics(
-      readings,
-      params,
-      invertMethod,
-      topography,
-      qcMap,
-      physicsForwardModel,
-    )
-      .then((r) => {
-        if (!cancelled) setPhysicsResult(r);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) {
-          setPhysicsResult(null);
-          setPhysicsError(
-            e instanceof Error ? e.message : "Erro na inversão FDM",
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setPhysicsBusy(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+
+    const timer = window.setTimeout(() => {
+      void runPhysicsInversion();
+    }, 400);
+
+    return () => window.clearTimeout(timer);
   }, [
     invertEngine,
-    physicsForwardModel,
     activeReadings.length,
-    readings,
-    params,
-    invertMethod,
-    topography,
-    qcByRow,
+    physicsForwardModel,
+    physicsInvertNonce,
+    runPhysicsInversion,
   ]);
 
+  /** Um clique: preset RES2DINV + aba modelo + inversão física. */
+  const applyRes2dinvInversion = useCallback(() => {
+    if (activeReadings.length < 4) {
+      setImportNotice(
+        "Inversão RES2DINV: importe ou preencha pelo menos 4 leituras activas.",
+      );
+      return;
+    }
+    applyRes2dinvPreset();
+    setSyntheticDemoResult(null);
+    setTab("modelo");
+    setPhysicsEngineOnline(null);
+    setPhysicsError(null);
+    setImportNotice("A calcular inversão RES2DINV (FDM Poisson + Jacobiana)…");
+    setPhysicsInvertNonce((n) => n + 1);
+    void recheckPhysicsEngine();
+  }, [activeReadings.length, applyRes2dinvPreset, recheckPhysicsEngine]);
+
+  /** Dados SOLODATA + topografia + preset RES2DINV (estilo GARUVA LINHA 10). */
+  const applyGaruvaRes2dinvWorkflow = useCallback(() => {
+    const demo = loadSolodataLinha12Demo();
+    setDefaultA("15");
+    const demoReadings = solodataLinhaToReadings(demo, 15);
+    const topo = buildDemoTopography(demoReadings.map((r) => r.stationM));
+    setLinha(applyTopographyToLinha(demo, topo));
+    setTopography(topo);
+    setShowTopography(true);
+    setPhysicsForwardModel("fdm");
+    setSurveyLocation((loc) => ({
+      ...(loc ?? GARUVA_DEFAULT_LOCATION),
+      label: "Garuva",
+    }));
+    setModelSectionTitle("Geofisica - GARUVA (LINHA 10)");
+    setImportNotice(
+      "GARUVA: SOLODATA + topografia + malha 40×22 + escala RES2DINV. A calcular inversão FDM…",
+    );
+    if (demoReadings.filter((r) => !r.excluded).length >= 4) {
+      applyRes2dinvInversion();
+    } else {
+      applyRes2dinvPreset();
+      setTab("modelo");
+    }
+  }, [applyRes2dinvInversion, applyRes2dinvPreset]);
+
   const invertResult =
-    invertEngine === "physics" ? physicsResult : proxyInvertResult;
+    syntheticDemoResult ??
+    (invertEngine === "physics" ? physicsResult : proxyInvertResult);
+
+  const loadSyntheticModelDemo = useCallback(
+    (pattern: "layered" | "block" | "gradient" = "gradient") => {
+      const demo = buildSyntheticInvertResult(activeReadings, params, {
+        pattern,
+        rhoBackground: 100,
+        rhoContrast: 1000,
+        nx: params.nx,
+        nz: params.nz,
+      });
+      setSyntheticDemoResult(demo);
+      setModelRenderError(null);
+      setModelMaskMode("full");
+      setModelColorScale((s) => ({
+        ...s,
+        auto: false,
+        rhoMinOhmM: 100,
+        rhoMaxOhmM: 1000,
+        palette: "x2ipi",
+      }));
+      setModelLogContrast("res2dinv");
+      setTab("modelo");
+      setImportNotice(
+        `Modo teste sintético — ${demo.methodLabel} (${demo.nx}×${demo.nz}). Não é saída do motor :8092.`,
+      );
+    },
+    [activeReadings, params],
+  );
+
+  const clearSyntheticModelDemo = useCallback(() => {
+    setSyntheticDemoResult(null);
+    setImportNotice("Teste sintético removido — a mostrar inversão real (se disponível).");
+  }, []);
 
   useEffect(() => {
-    const project = loadGeophysProject();
+    if (selectedObraId == null) {
+      setSectionCode("");
+      return;
+    }
+    const project = loadGeophysProject(selectedObraId);
     setSectionCode(suggestNextGeoCode(project.sections));
-  }, [invertResult, tab]);
+  }, [invertResult, tab, selectedObraId]);
 
   const saveSectionToProject = useCallback(() => {
+    if (selectedObraId == null) {
+      setSectionNotice("Selecione a obra do projeto antes de guardar a secção.");
+      return;
+    }
     if (!invertResult) return;
-    const project = loadGeophysProject();
+    const project = loadGeophysProject(selectedObraId);
     const code =
       sectionCode.trim().toUpperCase() ||
       suggestNextGeoCode(project.sections);
@@ -569,7 +878,7 @@ export function DipoloDipoloClient() {
       lineIndex: project.sections.length,
       existingSections: project.sections,
     });
-    persistGeophysSection(section);
+    persistGeophysSection(section, selectedObraId);
     setSectionsVersion((v) => v + 1);
     setSectionCode(suggestNextGeoCode([...project.sections, section]));
     setSectionNotice(
@@ -584,6 +893,7 @@ export function DipoloDipoloClient() {
     invertMethod,
     surveyLocation,
     topography,
+    selectedObraId,
   ]);
 
   const modelRhoRange = useMemo(() => {
@@ -593,8 +903,67 @@ export function DipoloDipoloClient() {
       vals.push(10 ** invertResult.mLog10[k]!);
     }
     if (!vals.length) return { min: 10, max: 1000 };
-    return { min: Math.min(...vals), max: Math.max(...vals) };
+    const { rhoMin, rhoMax } = rhoPercentileBounds(vals, 5, 95);
+    return { min: rhoMin, max: rhoMax };
   }, [invertResult]);
+
+  const modelStats = useMemo(() => {
+    if (!invertResult) return null;
+    return modelStatsFromLog10(invertResult.mLog10);
+  }, [invertResult]);
+
+  const displayRmsPercent = useMemo(() => {
+    if (!invertResult) return null;
+    return computeRelativeRmsPercent(
+      invertResult.yObsLog10,
+      invertResult.ySynLog10,
+    );
+  }, [invertResult]);
+
+  /** Aviso só para inversão física real — não modo sintético nem bom ajuste (RMS baixo). */
+  const showInadequateModelWarning = useMemo(() => {
+    if (!invertResult || syntheticDemoResult) return false;
+    if (invertResult.engine !== "physics") return false;
+
+    const rms = displayRmsPercent ?? invertResult.rmsPercent ?? 999;
+    const iters = invertResult.iterations;
+    const nm = invertResult.nx * invertResult.nz;
+    const ratio =
+      modelStats && modelStats.min > 0
+        ? modelStats.max / modelStats.min
+        : 1;
+
+    if (rms <= 8 && ratio >= 2 && iters >= 1) return false;
+
+    if (invertResult.forwardModel === "fem") return true;
+    if (iters === 0) return true;
+    if (nm < 400) return true;
+    if (iters < 4 && rms > 12) return true;
+    if (ratio < 1.8 && rms > 15) return true;
+    if (rms > 35) return true;
+    return false;
+  }, [
+    invertResult,
+    syntheticDemoResult,
+    displayRmsPercent,
+    modelStats,
+  ]);
+
+  const showGoodFitHint = useMemo(() => {
+    if (!invertResult || syntheticDemoResult) return false;
+    if (invertResult.engine !== "physics") return false;
+    const rms = displayRmsPercent ?? invertResult.rmsPercent ?? 999;
+    const ratio =
+      modelStats && modelStats.min > 0
+        ? modelStats.max / modelStats.min
+        : 1;
+    return (
+      rms <= 10 &&
+      ratio >= 2 &&
+      invertResult.iterations >= 1 &&
+      invertResult.forwardModel !== "fem"
+    );
+  }, [invertResult, syntheticDemoResult, displayRmsPercent, modelStats]);
 
   const toggleExcludedAt = useCallback(
     (index: number, excluded: boolean) => {
@@ -657,33 +1026,89 @@ export function DipoloDipoloClient() {
         title: "ρa calculada (inversão)",
       });
     }
-    if (modelRef.current && invertResult) {
+    if (modelRef.current) {
       const containerWidthPx =
         modelWrapRef.current?.clientWidth ??
         modelRef.current.parentElement?.clientWidth ??
         800;
-      drawModelSection(
-        modelRef.current,
-        invertResult.mLog10,
-        invertResult.nx,
-        invertResult.nz,
-        invertResult.xEdgesM,
-        invertResult.zEdgesM,
-        modelColorScale,
-        {
-          readings: activeReadings,
-          factorDepth: params.factorDepth,
-          iterations: invertResult.iterations,
-          rmsLog10: invertResult.rmsLog10,
-          methodLabel: invertResult.methodLabel,
-          maskMode: modelMaskMode,
-          scaleXM: modelScaleXM,
-          scaleZM: modelScaleZM,
-          containerWidthPx,
-          topography,
-          showTopography: showTopography && topography.length >= 2,
-        },
-      );
+      if (!invertResult) {
+        const ctx = modelRef.current.getContext("2d");
+        if (ctx) {
+          const w = modelRef.current.width;
+          const h = modelRef.current.height;
+          ctx.clearRect(0, 0, w, h);
+          ctx.fillStyle = "#f8fafc";
+          ctx.fillRect(0, 0, w, h);
+          if (invertEngine === "physics" && physicsBusy) {
+            ctx.fillStyle = "#374151";
+            ctx.font = "14px system-ui,sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(
+              "A calcular inversão FDM (Poisson + GN + L1)…",
+              w / 2,
+              h / 2 - 8,
+            );
+            ctx.font = "12px system-ui,sans-serif";
+            ctx.fillStyle = "#6b7280";
+            ctx.fillText(
+              "Células reais — aguarde (não é pseudoseção)",
+              w / 2,
+              h / 2 + 14,
+            );
+            ctx.textAlign = "left";
+          }
+        }
+      } else {
+        const drawAsPhysics =
+          syntheticDemoResult != null || invertEngine === "physics";
+        try {
+          drawModelSection(
+            modelRef.current,
+            invertResult.mLog10,
+            invertResult.nx,
+            invertResult.nz,
+            invertResult.xEdgesM,
+            invertResult.zEdgesM,
+            modelColorScale,
+            {
+              readings: activeReadings,
+              factorDepth: params.factorDepth,
+              iterations: invertResult.iterations,
+              rmsLog10: invertResult.rmsLog10,
+              rmsPercent: displayRmsPercent ?? invertResult.rmsPercent,
+              methodLabel: invertResult.methodLabel,
+              invertEngine: drawAsPhysics ? "physics" : "proxy",
+              renderMode: drawAsPhysics ? modelRenderMode : "bilinear",
+              activeCells: invertResult.activeCells ?? null,
+              zCoverM: invertResult.zCoverM ?? null,
+              maskMode:
+                drawAsPhysics && !syntheticDemoResult
+                  ? "coverage"
+                  : modelMaskMode,
+              displaySmoothPasses: modelDisplaySmoothPasses,
+              logContrast: modelLogContrast,
+              displayScale: modelDisplayScale,
+              scaleXM: modelScaleXM,
+              scaleZM: modelScaleZM,
+              containerWidthPx,
+              topography,
+              showTopography: showTopography && topography.length >= 2,
+              sectionTitle: modelSectionTitle ?? undefined,
+              colorLevels: RES2DINV_COLOR_LEVELS,
+            },
+          );
+          setModelRenderError(null);
+        } catch (err) {
+          const msg =
+            err instanceof Error ? err.message : "Erro desconhecido no render";
+          setModelRenderError(msg);
+          drawModelCanvasMessage(
+            modelRef.current,
+            "Erro ao desenhar o modelo",
+            msg,
+          );
+        }
+      }
     }
     if (residualRef.current && readings.length > 0 && invertResult) {
       const residualsFull: number[] = [];
@@ -691,9 +1116,9 @@ export function DipoloDipoloClient() {
       for (let i = 0; i < readings.length; i++) {
         if (readings[i]!.excluded) residualsFull.push(0);
         else {
-          residualsFull.push(
-            invertResult.yObsLog10[ai]! - invertResult.ySynLog10[ai]!,
-          );
+          const obs = 10 ** invertResult.yObsLog10[ai]!;
+          const syn = 10 ** invertResult.ySynLog10[ai]!;
+          residualsFull.push(obs - syn);
           ai++;
         }
       }
@@ -712,13 +1137,22 @@ export function DipoloDipoloClient() {
     colorScale,
     params.factorDepth,
     invertResult,
+    syntheticDemoResult,
+    invertEngine,
+    physicsBusy,
+    modelRenderMode,
     activeReadings,
     modelColorScale,
     modelMaskMode,
+    modelDisplaySmoothPasses,
+    modelLogContrast,
+    modelDisplayScale,
+    displayRmsPercent,
     modelScaleXM,
     modelScaleZM,
     topography,
     showTopography,
+    modelSectionTitle,
   ]);
 
   useEffect(() => {
@@ -832,13 +1266,76 @@ export function DipoloDipoloClient() {
             Ruído), ajuste a escala de cor e inverta como no RES2DINV/x2ipi.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex min-w-[14rem] flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            Obra (projeto)
+            <select
+              value={selectedObraId ?? ""}
+              disabled={obrasLoading}
+              onChange={(e) => {
+                const next = e.target.value ? Number(e.target.value) : null;
+                selectObra(next);
+                const params = new URLSearchParams(
+                  typeof window !== "undefined" ? window.location.search : "",
+                );
+                if (next != null) params.set("obraId", String(next));
+                else params.delete("obraId");
+                const qs = params.toString();
+                router.replace(qs ? `${pathname}?${qs}` : pathname);
+              }}
+              className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--text)] dark:bg-gray-900"
+            >
+              <option value="">
+                {obrasLoading ? "A carregar obras…" : "— Selecione a obra —"}
+              </option>
+              {obras.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.nome}
+                  {o.cliente ? ` — ${o.cliente}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={applyGaruvaRes2dinvWorkflow}
+            className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-700"
+            title="SOLODATA Garuva + topografia + malha 40×22 + escala RES2DINV (como referência LINHA 10)"
+          >
+            GARUVA RES2DINV
+          </button>
+          <button
+            type="button"
+            onClick={applyRes2dinvInversion}
+            disabled={activeReadings.length < 4}
+            className="rounded-lg border border-teal-600 bg-teal-600/10 px-3 py-2 text-sm font-semibold text-teal-900 hover:bg-teal-600/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-teal-100"
+            title="Poisson FDM + Jacobiana + L1 + malha 40×22 + exibição RES2DINV"
+          >
+            Inversão RES2DINV
+          </button>
+          <button
+            type="button"
+            onClick={applyRes2dinvPreset}
+            className="rounded-lg border border-teal-600/50 bg-teal-600/10 px-3 py-2 text-sm font-medium text-teal-900 hover:bg-teal-600/20 dark:text-teal-100"
+            title="Só parâmetros e exibição, sem mudar de aba"
+          >
+            Preset RES2DINV
+          </button>
+          <button
+            type="button"
+            onClick={applyHorizontalLayersStyle}
+            className="rounded-lg border border-teal-600/50 bg-teal-600/10 px-3 py-2 text-sm font-medium text-teal-900 hover:bg-teal-600/20 dark:text-teal-100"
+            title="λ_z máximo — camadas horizontais nítidas na inversão e no desenho"
+          >
+            Camadas horizontais
+          </button>
           <button
             type="button"
             onClick={() => setParams(precisionPreset)}
-            className="rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700"
+            className="rounded-lg border border-teal-600/40 px-3 py-2 text-sm font-medium text-teal-900 hover:bg-teal-50 dark:text-teal-200 dark:hover:bg-teal-950/40"
+            title="Parâmetros do .dat Garuva (λ=0,2, malha 40×22)"
           >
-            Preset RES2DINV (.dat)
+            Malha .dat
           </button>
           <button
             type="button"
@@ -849,6 +1346,28 @@ export function DipoloDipoloClient() {
           </button>
         </div>
       </div>
+
+      {obrasError && (
+        <p className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+          {obrasError}{" "}
+          <Link href="/obra" className="font-medium underline">
+            Criar obra
+          </Link>
+        </p>
+      )}
+      {selectedObraId != null && obraNome && (
+        <p className="text-xs text-[var(--muted)]">
+          Obra activa: <strong className="text-[var(--text)]">{obraNome}</strong>
+          {" "}
+          (secções ERT guardadas só nesta obra)
+        </p>
+      )}
+      {selectedObraId == null && !obrasLoading && obras.length > 0 && (
+        <p className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+          Selecione a obra para guardar secções no projeto e usar o Modelo 3D / QC
+          vinculados a ela.
+        </p>
+      )}
 
       <div className="flex flex-wrap border-b border-[var(--border)]">
         {tabBtn("dados", "Dados")}
@@ -949,6 +1468,7 @@ export function DipoloDipoloClient() {
             )}
           </p>
           <GeophysSectionsPanel
+            obraId={selectedObraId}
             onNotice={setSectionNotice}
             refreshKey={sectionsVersion}
             showQcActions
@@ -964,6 +1484,8 @@ export function DipoloDipoloClient() {
               onChange={setColorScale}
               suggestedMin={rhoRange.min}
               suggestedMax={rhoRange.max}
+              displayScale={modelDisplayScale}
+              onDisplayScaleChange={setModelDisplayScale}
             />
             <div className="space-y-2">
               <div className="flex flex-wrap gap-2">
@@ -1080,22 +1602,43 @@ export function DipoloDipoloClient() {
 
       {tab === "modelo" && (
         <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-teal-600/30 bg-teal-600/5 px-3 py-3">
+            <button
+              type="button"
+              onClick={applyRes2dinvInversion}
+              disabled={activeReadings.length < 4 || physicsBusy}
+              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {physicsBusy ? "A calcular…" : "Inversão RES2DINV"}
+            </button>
+            <p className="min-w-[12rem] flex-1 text-xs text-[var(--muted)]">
+              FDM Poisson · Jacobiana · L1 · λ_z/λ_x · topografia · sem blur visual.
+              Requer motor Python em :8092.
+            </p>
+          </div>
           <fieldset>
             <legend className="mb-2 text-sm font-medium text-[var(--text)]">
               Motor de inversão
             </legend>
             <div className="flex flex-wrap gap-3 text-sm">
-              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2">
+              <label
+                className={`flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 ${
+                  physicsEngineOnline === true && !proxyOverride
+                    ? "cursor-not-allowed opacity-50"
+                    : "cursor-pointer"
+                }`}
+              >
                 <input
                   type="radio"
                   name="invert-engine"
                   checked={invertEngine === "proxy"}
+                  disabled={physicsEngineOnline === true && !proxyOverride}
                   onChange={() => setInvertEngine("proxy")}
                 />
                 <span>
                   <strong>Rápido (proxy)</strong>
                   <span className="block text-xs text-[var(--muted)]">
-                    Sensibilidade gaussiana — preview instantâneo
+                    Sensibilidade gaussiana — não comparável ao RES2DINV
                   </span>
                 </span>
               </label>
@@ -1104,16 +1647,84 @@ export function DipoloDipoloClient() {
                   type="radio"
                   name="invert-engine"
                   checked={invertEngine === "physics"}
-                  onChange={() => setInvertEngine("physics")}
+                  onChange={() => {
+                    setInvertEngine("physics");
+                    setProxyOverride(false);
+                    setInvertMethod((m) =>
+                      m === "smoothness" || m === "least_squares"
+                        ? RES2DINV_DEFAULT_METHOD
+                        : m,
+                    );
+                  }}
                 />
                 <span>
                   <strong>Físico (FDM/FEM)</strong>
                   <span className="block text-xs text-[var(--muted)]">
-                    Poisson FDM ou FEM P1 + Jacobiana + Occam χ² + QC
+                    Poisson FDM + Jacobiana — recomendado (RES2DINV)
                   </span>
                 </span>
               </label>
             </div>
+            {physicsEngineOnline === null && (
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                A verificar motor Python (:8092)…
+              </p>
+            )}
+            {physicsEngineOnline === true && (
+              <p className="mt-2 text-xs text-teal-800 dark:text-teal-200">
+                Motor Python online (:8092). Use FDM + Robusta L1. Confirme{" "}
+                <code className="text-[10px]">npm run dev</code> para calcular o
+                modelo.
+              </p>
+            )}
+            {physicsEngineOnline === false && !physicsBusy && !physicsResult && (
+              <div className="mt-2 space-y-2 text-xs text-amber-800 dark:text-amber-200">
+                <p>
+                  <strong>Motor Python offline</strong> na última verificação.
+                  Pode tentar <strong>Inversão RES2DINV</strong> na mesma — liga
+                  directo à porta 8092. Terminais: motor (:8092) e{" "}
+                  <code>npm run dev</code>.
+                </p>
+                {physicsCheckError && (
+                  <p className="text-red-700 dark:text-red-300">
+                    {physicsCheckError}
+                  </p>
+                )}
+                <code className="block rounded bg-[var(--muted)]/15 px-2 py-1">
+                  cd c:\VISION\APP-SONDAGEM\app-web
+                  <br />
+                  npm run geophysics:kill-port
+                  <br />
+                  npm run geophysics:engine
+                </code>
+                <p className="text-[var(--muted)]">
+                  Deixe esse terminal aberto. Depois clique em Verificar de novo (se
+                  alterou .env.local, reinicie também <code>npm run dev</code>).
+                </p>
+                <button
+                  type="button"
+                  onClick={recheckPhysicsEngine}
+                  className="rounded-md border border-amber-600/50 bg-amber-500/10 px-3 py-1.5 font-medium hover:bg-amber-500/20"
+                >
+                  Verificar motor de novo
+                </button>
+              </div>
+            )}
+            {physicsEngineOnline === true && (
+              <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-[var(--muted)]">
+                <input
+                  type="checkbox"
+                  checked={proxyOverride}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setProxyOverride(on);
+                    if (on) setInvertEngine("proxy");
+                    else setInvertEngine("physics");
+                  }}
+                />
+                Permitir preview proxy (não usar para comparar com RES2DINV)
+              </label>
+            )}
             {invertEngine === "physics" && (
               <div className="mt-3 flex flex-wrap gap-3 text-xs">
                 <span className="self-center text-[var(--muted)]">Forward:</span>
@@ -1131,7 +1742,15 @@ export function DipoloDipoloClient() {
                     type="radio"
                     name="physics-forward"
                     checked={physicsForwardModel === "fem"}
-                    onChange={() => setPhysicsForwardModel("fem")}
+                    onChange={() => {
+                      setImportNotice(
+                        "FEM experimental — para inversão tipo RES2DINV use FDM (adjoint).",
+                      );
+                      setPhysicsForwardModel("fem");
+                      setImportNotice(
+                        "FEM pode demorar 15–40 min ou não terminar. Para calcular agora: seleccione FDM (adjoint).",
+                      );
+                    }}
                   />
                   FEM P1 (triangular)
                 </label>
@@ -1139,8 +1758,18 @@ export function DipoloDipoloClient() {
             )}
             {invertEngine === "physics" && physicsBusy && (
               <p className="mt-2 text-xs text-teal-700 dark:text-teal-300">
-                A calcular inversão {physicsForwardModel.toUpperCase()} (motor
-                Python :8092)…
+                A calcular inversão {physicsForwardModel.toUpperCase()} (
+                {activeReadings.length} leituras, motor :8092)…
+                {physicsForwardModel === "fem" ? (
+                  <span className="block font-medium text-amber-800 dark:text-amber-200">
+                    FEM muito lento — use FDM (adjoint).
+                  </span>
+                ) : (
+                  <span className="block text-[var(--muted)]">
+                    FDM adjoint: ~30 s com poucas leituras, 1–3 min com perfil
+                    grande. Se passar de 5 min, reinicie o motor Python.
+                  </span>
+                )}
               </p>
             )}
             {physicsError && (
@@ -1155,10 +1784,17 @@ export function DipoloDipoloClient() {
               Método de inversão
             </legend>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {DIPOLO2D_INVERT_METHODS.map((m) => (
+              {DIPOLO2D_INVERT_METHODS.map((m) => {
+                const proxyBlocksLs =
+                  invertEngine === "proxy" && m.id === "least_squares";
+                return (
                 <label
                   key={m.id}
-                  className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    proxyBlocksLs
+                      ? "cursor-not-allowed opacity-45"
+                      : "cursor-pointer"
+                  } ${
                     invertMethod === m.id
                       ? "border-teal-600 bg-teal-600/10"
                       : "border-[var(--border)] hover:bg-[var(--muted)]/10"
@@ -1169,29 +1805,41 @@ export function DipoloDipoloClient() {
                     name="invert-method"
                     className="mt-1"
                     checked={invertMethod === m.id}
+                    disabled={proxyBlocksLs}
                     onChange={() => selectInvertMethod(m.id)}
                   />
                   <span>
                     <span className="font-medium text-[var(--text)]">
-                      {m.label}
+                      {invertEngine === "physics" && m.id === "blocky_l1"
+                        ? "Blocky L1 (contraste / bordas)"
+                        : invertEngine === "physics" && m.id === "robust_l1"
+                          ? "Robusta L1 (inversão física)"
+                          : invertEngine === "physics" && m.id === "smoothness"
+                            ? "Suavizada L2 (inversão física)"
+                            : m.label}
                     </span>
                     <span className="mt-0.5 block text-xs text-[var(--muted)]">
                       {m.id === "least_squares" &&
-                        "Solução única L2 + regularização λ."}
+                        (invertEngine === "proxy"
+                          ? "Desactivado no proxy (≈ pseudoseção)."
+                          : "Solução única L2 + regularização λ.")}
                       {m.id === "occam" &&
                         "λ alto → reduz até ajuste alvo (estilo Occam)."}
                       {m.id === "gauss_newton" &&
                         "Passos iterativos na matriz normal + busca em linha."}
                       {m.id === "smoothness" &&
-                        "IRLS Huber + decaimento λ (preset RES2DINV)."}
+                        "L2 suavizada — tende a espalhar contraste; use L1 para contactos."}
+                      {m.id === "blocky_l1" &&
+                        "L1 nos dados + IRLS em ∇m — máximo contraste (recomendado)."}
                       {m.id === "robust_l1" &&
-                        "IRLS com norma L1 nos resíduos (outliers)."}
+                        "L1 robusta nos dados — preserva contactos."}
                       {m.id === "hybrid" &&
                         "IRLS Huber+L1 misturados; α controla L2 vs robustez."}
                     </span>
                   </span>
                 </label>
-              ))}
+              );
+              })}
             </div>
           </fieldset>
 
@@ -1204,7 +1852,7 @@ export function DipoloDipoloClient() {
             />
           )}
 
-          {activeReadings.length >= 4 && (
+          {activeReadings.length >= 4 && invertEngine === "proxy" && (
             <DipoloInvertCompare
               activeReadings={activeReadings}
               params={params}
@@ -1215,20 +1863,101 @@ export function DipoloDipoloClient() {
             />
           )}
 
-          {!invertResult && (
+          {activeReadings.length < 4 && (
             <p className="text-sm text-[var(--muted)]">
               Precisa de pelo menos 4 leituras <strong>ativas</strong> (não
-              excluídas) na aba Pseudoseção/Dados.
+              excluídas) na aba Pseudoseção/Dados — tem{" "}
+              <strong>{activeReadings.length}</strong> ativa(s).
             </p>
           )}
+          {activeReadings.length >= 4 &&
+            invertEngine === "physics" &&
+            !invertResult &&
+            !physicsBusy &&
+            !physicsError &&
+            physicsEngineOnline !== false && (
+              <p className="text-sm text-[var(--muted)]">
+                Aguardando inversão física ({activeReadings.length} leituras
+                ativas)…
+              </p>
+            )}
+          {invertResult && invertEngine === "proxy" && (
+            <div
+              role="alert"
+              className="rounded-lg border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100"
+            >
+              <strong>Não é inversão de dados (RES2DINV).</strong> O motor{" "}
+              <em>proxy</em> distribui a <strong>resistividade aparente (ρa)</strong>{" "}
+              na malha com pesos gaussianos — o desenho fica parecido com a
+              pseudoseção do x2ipi. Para modelo invertido com camadas:{" "}
+              <strong>Físico (FDM)</strong> + <strong>Robusta L1</strong> (botão
+              Estilo RES2DINV).
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-violet-500/40 bg-violet-500/5 px-3 py-2 text-sm">
+            <span className="text-[var(--muted)]">Diagnóstico render:</span>
+            <button
+              type="button"
+              onClick={() => loadSyntheticModelDemo("gradient")}
+              className="rounded-md bg-violet-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-violet-700"
+            >
+              Modelo sintético (gradiente 100→1000 Ω·m)
+            </button>
+            <button
+              type="button"
+              onClick={() => loadSyntheticModelDemo("layered")}
+              className="rounded-md border border-violet-600/50 px-2.5 py-1 text-xs text-violet-900 hover:bg-violet-600/10 dark:text-violet-100"
+            >
+              Camadas
+            </button>
+            <button
+              type="button"
+              onClick={() => loadSyntheticModelDemo("block")}
+              className="rounded-md border border-violet-600/50 px-2.5 py-1 text-xs text-violet-900 hover:bg-violet-600/10 dark:text-violet-100"
+            >
+              Bloco
+            </button>
+            {syntheticDemoResult && (
+              <button
+                type="button"
+                onClick={clearSyntheticModelDemo}
+                className="rounded-md border border-[var(--border)] px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--muted)]/10"
+              >
+                Limpar teste
+              </button>
+            )}
+          </div>
+
+          {syntheticDemoResult && (
+            <div
+              role="status"
+              className="rounded-lg border border-violet-500/50 bg-violet-500/10 px-3 py-2 text-sm text-violet-950 dark:text-violet-100"
+            >
+              <strong>Modo teste sintético.</strong> Modelo sintético (gradiente
+              100→1000 Ω·m). Se o perfil aparecer aqui mas não após inversão real,
+              o problema está no JSON do motor (:8092), não no canvas.
+              {syntheticDemoResult.methodLabel !==
+              "Modelo sintético (gradiente 100→1000 Ω·m)" ? (
+                <> Variante activa: {syntheticDemoResult.methodLabel}.</>
+              ) : null}
+            </div>
+          )}
+
           {invertResult && (
             <>
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <p className="max-w-prose text-xs text-[var(--muted)]">
-                  {invertEngine === "physics" ? (
+                  {syntheticDemoResult ? (
                     <>
-                      {invertResult.methodLabel} — FDM Poisson 2D, Jacobiana por
-                      diferenças finitas, regularização L1/L2 e pesos QC.
+                      {invertResult.methodLabel}
+                      {invertResult.physicsMessage
+                        ? ` — ${invertResult.physicsMessage}`
+                        : ""}
+                    </>
+                  ) : invertEngine === "physics" ? (
+                    <>
+                      {invertResult.methodLabel} — Poisson FDM 2D + Jacobiana
+                      (adjoint, com fallback FD), L1/L2 e pesos QC.
                       {invertResult.physicsMessage
                         ? ` ${invertResult.physicsMessage}`
                         : ""}
@@ -1236,11 +1965,82 @@ export function DipoloDipoloClient() {
                   ) : (
                     <>
                       {invertResult.methodLabel} — preview rápido com matriz de
-                      sensibilidade gaussiana (não é RES2DINV). Interpolação
-                      bilinear + paleta P8–P92.
+                      sensibilidade gaussiana (não é RES2DINV). Exibição{" "}
+                      {modelDisplayScale === "log" ? "log₁₀(ρ)" : "ρ linear"},{" "}
+                      {modelLogContrast === "auto"
+                        ? "auto ±2σ / equalização"
+                        : modelLogContrast === "percentile"
+                          ? "P5–P95"
+                          : modelLogContrast === "equalize"
+                            ? "equalização"
+                            : modelLogContrast === "stdstretch"
+                              ? "±2σ linear"
+                              : modelLogContrast === "minmax"
+                                ? "min–máx"
+                                : modelLogContrast}
+                      {modelDisplaySmoothPasses === 0
+                        ? ", sem blur visual"
+                        : `, blur visual ×${modelDisplaySmoothPasses}`}
+                      .
                     </>
                   )}
                 </p>
+                <fieldset className="shrink-0 text-xs">
+                  <legend className="mb-1 font-medium text-[var(--text)]">
+                    Exibição (ρ = log₁₀ escala)
+                  </legend>
+                  <div className="mb-2 flex flex-col gap-1.5">
+                    <label className="flex items-center gap-2">
+                      <span className="text-[var(--muted)]">Contraste</span>
+                      <select
+                        value={modelLogContrast}
+                        onChange={(e) =>
+                          setModelLogContrast(
+                            e.target.value as ModelLogContrast,
+                          )
+                        }
+                        className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5"
+                      >
+                        <option value="res2dinv">RES2DINV (classes 0–4500)</option>
+                        <option value="auto">Auto (faixa estreita → ±2σ)</option>
+                        <option value="equalize">Equalização</option>
+                        <option value="stdstretch">Stretch ±2σ (linear)</option>
+                        <option value="percentile">P5–P95 log</option>
+                        <option value="minmax">Min–máx</option>
+                        <option value="standard">P8–P92</option>
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <span className="text-[var(--muted)]">Escala ρ</span>
+                      <select
+                        value={modelDisplayScale}
+                        onChange={(e) =>
+                          setModelDisplayScale(
+                            e.target.value as ModelDisplayScale,
+                          )
+                        }
+                        className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5"
+                      >
+                        <option value="log">Log₁₀ (RES2DINV)</option>
+                        <option value="linear">Linear (Ω·m)</option>
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <span className="text-[var(--muted)]">Blur visual</span>
+                      <select
+                        value={modelDisplaySmoothPasses}
+                        onChange={(e) =>
+                          setModelDisplaySmoothPasses(Number(e.target.value))
+                        }
+                        className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5"
+                      >
+                        <option value={0}>0 (RES2DINV)</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                      </select>
+                    </label>
+                  </div>
+                </fieldset>
                 <fieldset className="shrink-0 text-xs">
                   <legend className="mb-1 font-medium text-[var(--text)]">
                     Área exibida
@@ -1297,6 +2097,20 @@ export function DipoloDipoloClient() {
                 </p>
               )}
 
+              {modelRenderError && (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-red-500/60 bg-red-500/10 px-3 py-2 text-sm text-red-950 dark:text-red-100"
+                >
+                  <strong>Renderização do modelo falhou.</strong>{" "}
+                  {modelRenderError}
+                  <span className="mt-1 block text-xs opacity-90">
+                    Abra o console (F12) para detalhes. Verifique se o motor em
+                    :8092 está online e se a inversão retornou m_log10 válido.
+                  </span>
+                </div>
+              )}
+
               <div
                 ref={modelWrapRef}
                 className="flex w-full justify-center overflow-x-hidden overflow-y-auto rounded-lg border border-[var(--border)] bg-white dark:bg-gray-950"
@@ -1319,7 +2133,48 @@ export function DipoloDipoloClient() {
                 suggestedRhoMax={modelRhoRange.max}
                 topography={topography}
                 showTopography={showTopography}
+                logContrast={modelLogContrast}
+                displayScale={modelDisplayScale}
               />
+              {showGoodFitHint && (
+                <div
+                  role="status"
+                  className="rounded-lg border border-green-600/40 bg-green-600/10 px-3 py-2 text-sm text-green-950 dark:text-green-100"
+                >
+                  <strong>Bom ajuste aos dados.</strong> Malha {invertResult.nx}×
+                  {invertResult.nz}, {invertResult.iterations} iterações, erro relativo{" "}
+                  {(displayRmsPercent ?? invertResult.rmsPercent ?? 0).toFixed(1)}%.
+                  {modelStats ? (
+                    <>
+                      {" "}
+                      Contraste ρ {modelStats.min.toFixed(0)}–{modelStats.max.toFixed(0)} Ω·m.
+                    </>
+                  ) : null}
+                </div>
+              )}
+              {showInadequateModelWarning && (
+                  <div
+                    role="alert"
+                    className="rounded-lg border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100"
+                  >
+                    <strong>Modelo provavelmente inadequado.</strong> Malha{" "}
+                    {invertResult.nx}×{invertResult.nz}, {invertResult.iterations}{" "}
+                    iterações, erro relativo{" "}
+                    {(displayRmsPercent ?? invertResult.rmsPercent ?? 0).toFixed(1)}%.
+                    {invertResult.iterations === 0 ? (
+                      <span className="mt-1 block text-xs">
+                        Nenhuma iteração registada — reinicie o motor (:8092) e use{" "}
+                        <strong>Estilo RES2DINV</strong>.
+                      </span>
+                    ) : null}
+                    <span className="mt-1 block text-xs">
+                      Para camadas horizontais como no RES2DINV: clique{" "}
+                      <strong>Estilo RES2DINV</strong> (FDM + L1, malha fina), ou
+                      aumente Células X/Z na aba Parâmetros e use{" "}
+                      <strong>FDM (adjoint)</strong> em vez de FEM.
+                    </span>
+                  </div>
+                )}
               <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-6">
                 <div className="col-span-2 sm:col-span-6">
                   <dt className="text-[var(--muted)]">Método</dt>
@@ -1338,11 +2193,22 @@ export function DipoloDipoloClient() {
                   <dt className="text-[var(--muted)]">RMS log₁₀ ρ</dt>
                   <dd className="font-mono">{invertResult.rmsLog10.toFixed(4)}</dd>
                 </div>
-                {invertResult.rmsPercent != null && (
+                {displayRmsPercent != null && (
                   <div>
                     <dt className="text-[var(--muted)]">RMS relativo</dt>
                     <dd className="font-mono">
-                      {invertResult.rmsPercent.toFixed(2)}%
+                      {displayRmsPercent.toFixed(2)}%
+                    </dd>
+                  </div>
+                )}
+                {modelStats && (
+                  <div className="col-span-2 sm:col-span-6">
+                    <dt className="text-[var(--muted)]">Modelo ρ (Ω·m)</dt>
+                    <dd className="font-mono text-xs sm:text-sm">
+                      min {modelStats.min.toFixed(1)} · max{" "}
+                      {modelStats.max.toFixed(1)} · σ{" "}
+                      {modelStats.std.toFixed(1)} · média{" "}
+                      {modelStats.mean.toFixed(1)}
                     </dd>
                   </div>
                 )}
@@ -1409,7 +2275,8 @@ export function DipoloDipoloClient() {
                   <button
                     type="button"
                     onClick={saveSectionToProject}
-                    className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
+                    disabled={selectedObraId == null}
+                    className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Guardar secção no projeto
                   </button>
@@ -1418,6 +2285,7 @@ export function DipoloDipoloClient() {
 
               <GeophysSectionsPanel
                 className="mt-4"
+                obraId={selectedObraId}
                 onNotice={setSectionNotice}
                 refreshKey={sectionsVersion}
                 showQcActions
@@ -1450,14 +2318,16 @@ export function DipoloDipoloClient() {
               ["factorDepth", "Fator prof. pseudo z = f·n·a", 0.05, 0.8, 0.01],
               ["sigmaXM", "σx sensibilidade (m)", 1, 80, 1],
               ["sigmaZM", "σz sensibilidade (m)", 1, 60, 1],
-              ["lambda", "λ regularização", 0.1, 50, 0.1],
+              ["lambda", "λ_reg (global)", 0.02, 2, 0.01],
+              ["lambdaX", "λ_x horizontal (D_x) — menor = mais contraste lateral", 0.01, 1, 0.01],
+              ["lambdaZ", "λ_z vertical (D_z) — maior = camadas horizontais", 0.1, 2.5, 0.02],
               ["huberC", "Huber c (log₁₀ ρ)", 0.001, 0.2, 0.001],
               ["maxIter", "Iterações IRLS", 1, 40, 1],
               ["lambdaDecay", "Decaimento λ/iter", 0.5, 0.99, 0.01],
               ["lambdaMin", "λ mínimo", 0.05, 5, 0.05],
               ["minImprovement", "Ganho mínimo relativo", 0.0001, 0.02, 0.0001],
-              ["nx", "Células X", 8, 48, 1],
-              ["nz", "Células Z", 6, 32, 1],
+              ["nx", "Células X (malha inversão)", 16, 48, 1],
+              ["nz", "Células Z (malha inversão)", 12, 32, 1],
             ] as const
           ).map(([key, label, min, max, step]) => (
             <label key={key} className="block text-sm">
@@ -1489,8 +2359,9 @@ export function DipoloDipoloClient() {
             </div>
           )}
           <p className="sm:col-span-2 text-xs text-[var(--muted)]">
-            Aumente λ para um modelo mais suave; diminua σx/σz para sensibilidade
-            mais localizada. Huber reduz o peso de outliers em log₁₀(ρa).
+            RES2DINV-like: m = log₁₀(ρ), λ_reg ≈ 0,15, λ_x &lt; λ_z favorece
+            camadas horizontais. Use «Robusta L1» ou «Gauss-Newton» + motor Físico
+            (FDM) para Jacobiana real. Exibição sem blur (aba Modelo).
           </p>
         </div>
       )}

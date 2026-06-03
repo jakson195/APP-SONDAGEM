@@ -21,9 +21,13 @@ export default async function LoginPage({ searchParams }: Props) {
       subtitle="Aceda ao dashboard, às empresas e aos portais de cliente com um único login."
       footer={
         <>
-          O acesso ao dashboard e aos portais privados exige autenticação.{" "}
+          <Link href="/" className="font-medium text-[var(--accent)] hover:underline">
+            ← Site comercial
+          </Link>
+          {" · "}
+          O acesso ao dashboard exige autenticação.{" "}
           <Link href="/login?next=/adm" className="font-medium text-[var(--accent)] hover:underline">
-            Aceder ao ADM mestre
+            ADM mestre
           </Link>
         </>
       }

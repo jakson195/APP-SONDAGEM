@@ -90,7 +90,7 @@ export function LoginForm({ next }: Props) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-[var(--accent)] py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-70"
+          className="dg-btn-primary w-full py-2.5 disabled:opacity-70"
         >
           {loading ? "A entrar..." : "Entrar"}
         </button>

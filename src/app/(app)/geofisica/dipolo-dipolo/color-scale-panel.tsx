@@ -5,6 +5,7 @@ import {
   type ResistivityColorScale,
   type ResistivityPalette,
 } from "@/lib/geofisica/dipolo2d/colormap";
+import type { ModelDisplayScale } from "@/lib/geofisica/dipolo2d/model-visual-scale";
 
 type Props = {
   scale: ResistivityColorScale;
@@ -12,6 +13,8 @@ type Props = {
   suggestedMin?: number;
   suggestedMax?: number;
   title?: string;
+  displayScale?: ModelDisplayScale;
+  onDisplayScaleChange?: (s: ModelDisplayScale) => void;
 };
 
 const PALETTES: { id: ResistivityPalette; label: string }[] = [
@@ -28,17 +31,48 @@ export function ColorScalePanel({
   suggestedMin,
   suggestedMax,
   title = "Escala de cor (ρa)",
+  displayScale = "log",
+  onDisplayScaleChange,
 }: Props) {
   return (
     <div className="space-y-3 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 text-sm">
       <p className="font-medium text-[var(--text)]">{title}</p>
+
+      {onDisplayScaleChange && (
+        <fieldset className="space-y-1">
+          <legend className="text-xs text-[var(--muted)]">Escala de visualização</legend>
+          <div className="flex flex-wrap gap-3">
+            <label className="flex items-center gap-1.5 text-xs">
+              <input
+                type="radio"
+                name="display-scale"
+                checked={displayScale === "log"}
+                onChange={() => onDisplayScaleChange("log")}
+              />
+              Log₁₀(ρ) — RES2DINV
+            </label>
+            <label className="flex items-center gap-1.5 text-xs">
+              <input
+                type="radio"
+                name="display-scale"
+                checked={displayScale === "linear"}
+                onChange={() => onDisplayScaleChange("linear")}
+              />
+              Linear (Ω·m)
+            </label>
+          </div>
+        </fieldset>
+      )}
+
       <label className="flex items-center gap-2">
         <input
           type="checkbox"
           checked={scale.auto}
           onChange={(e) => onChange({ ...scale, auto: e.target.checked })}
         />
-        <span className="text-[var(--muted)]">Automática (min/max dos dados)</span>
+        <span className="text-[var(--muted)]">
+          Automática (P5–P95 do modelo / dados)
+        </span>
       </label>
       {!scale.auto && (
         <div className="grid grid-cols-2 gap-2">

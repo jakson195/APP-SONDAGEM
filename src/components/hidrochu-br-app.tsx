@@ -224,12 +224,12 @@ export function HidroChuBrApp() {
 
   const gumbel = useMemo(() => {
     if (valoresGumbel.length < 5) return null;
-    return ajustarGumbelChow(valoresGumbel);
+    return ajustarGumbelChow({ duracaoDias: 1, valores: valoresGumbel });
   }, [valoresGumbel]);
 
   const p1Tr10 = useMemo(() => {
     if (!gumbel) return 80;
-    const row = tabelaQuantis(gumbel, [10])[0];
+    const row = tabelaQuantis(gumbel).find((r) => r.T === 10);
     return row?.x ?? 80;
   }, [gumbel]);
 
@@ -588,7 +588,7 @@ export function HidroChuBrApp() {
                   </tr>
                 </thead>
                 <tbody>
-                  {tabelaQuantis(gumbel, [...PERIODOS_RETORNO]).map((r) => (
+                  {tabelaQuantis(gumbel).map((r) => (
                     <tr key={r.T}>
                       <td>{r.T}</td>
                       <td>{fmt(r.x, 1)}</td>

@@ -57,9 +57,11 @@ function MethodThumb({
         factorDepth: params.factorDepth,
         iterations: r.iterations,
         rmsLog10: r.rmsLog10,
+        rmsPercent: r.rmsPercent,
         maskMode,
         colorLevels: 18,
-        displaySmoothPasses: 1,
+        displaySmoothPasses: 0,
+        logContrast: "res2dinv",
       },
     );
   }, [row.result, params, colorScale, maskMode, activeReadings, row.id]);

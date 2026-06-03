@@ -13,9 +13,14 @@ import {
   objective,
   prepareInvertProblem,
   pushIterationRecord,
+  roughnessAnisoFromModel,
   roughnessL2FromModel,
+  solveGaussNewtonIncrement,
   solveRegularized,
 } from "./invert-core-2d";
+
+const regX = (p: Dipolo2DInvertParams) => p.lambdaX ?? 0.1;
+const regZ = (p: Dipolo2DInvertParams) => p.lambdaZ ?? 0.4;
 import type {
   Dipolo2DInvertMethodId,
   Dipolo2DInvertParams,
@@ -186,7 +191,7 @@ function invertOccam(
   );
 }
 
-/** 3. Gauss-Newton — passos iterativos na matriz normal com busca em linha. */
+/** 3. Gauss-Newton — δd ≈ J δm, J≈G, atualização iterativa + IRLS L1 nos resíduos. */
 function invertGaussNewton(
   prob: NonNullable<ReturnType<typeof prepareInvertProblem>>,
   p: Dipolo2DInvertParams,
@@ -197,7 +202,19 @@ function invertGaussNewton(
   const history: Dipolo2DInvertResult["iterationHistory"] = [];
   let prevPhi: number | null = null;
 
-  let best = objective(G, yObs, m, wData, p.huberC, lambda, nx, nz, 1);
+  let best = objective(
+    G,
+    yObs,
+    m,
+    wData,
+    p.huberC,
+    lambda,
+    nx,
+    nz,
+    0,
+    regX(p),
+    regZ(p),
+  );
   pushIterationRecord(
     history,
     0,
@@ -205,32 +222,44 @@ function invertGaussNewton(
     nd,
     lambda,
     best.phi,
-    roughnessL2FromModel(m, nx, nz),
+    roughnessAnisoFromModel(m, nx, nz, regX(p), regZ(p)),
     null,
   );
   prevPhi = best.phi;
 
   for (let iter = 1; iter <= p.maxIter; iter++) {
-    const w = wData.map((wd) => wd);
-    const candidate = solveRegularized(G, yObs, w, Hreg, lambda, nm, ridge);
-    if (!candidate) break;
+    const wL1 = l1IrlsWeights(best.res);
+    const w = wL1.map((wl, d) => wl * (wData[d] ?? 1));
+    const dm =
+      solveGaussNewtonIncrement(G, yObs, m, w, Hreg, lambda, nm, ridge) ??
+      null;
+    if (!dm) break;
 
-    const step = acceptLineSearch(
-      G,
-      yObs,
-      m,
-      candidate,
-      wData,
-      p.huberC,
-      lambda,
-      nx,
-      nz,
-      best,
-      1,
-    );
-    m = step.m;
-    best = step.best;
-    if (!step.accepted) break;
+    const alphas = [1, 0.75, 0.5, 0.3, 0.15];
+    let accepted = false;
+    for (const alpha of alphas) {
+      const trialM = m.map((v, i) => v + alpha * (dm[i] ?? 0));
+      const trial = objective(
+        G,
+        yObs,
+        trialM,
+        wData,
+        p.huberC,
+        lambda,
+        nx,
+        nz,
+        0,
+        regX(p),
+        regZ(p),
+      );
+      if (trial.phi < best.phi) {
+        m = trialM;
+        best = trial;
+        accepted = true;
+        break;
+      }
+    }
+    if (!accepted) break;
 
     pushIterationRecord(
       history,
@@ -239,7 +268,7 @@ function invertGaussNewton(
       nd,
       lambda,
       best.phi,
-      roughnessL2FromModel(m, nx, nz),
+      roughnessAnisoFromModel(m, nx, nz, regX(p), regZ(p)),
       prevPhi,
     );
     const gain = prevPhi != null && prevPhi > 0 ? (prevPhi - best.phi) / prevPhi : 0;
@@ -452,7 +481,7 @@ function invertHybrid(
   );
 }
 
-/** 6. Inversão robusta L1 — IRLS com pesos 1/|resíduo|. */
+/** 6. Inversão robusta L1 — min Σ|d_obs−d_calc| via IRLS + Gauss-Newton. */
 function invertRobustL1(
   prob: NonNullable<ReturnType<typeof prepareInvertProblem>>,
   p: Dipolo2DInvertParams,
@@ -463,7 +492,19 @@ function invertRobustL1(
   const history: Dipolo2DInvertResult["iterationHistory"] = [];
   let prevPhi: number | null = null;
 
-  let best = objective(G, yObs, m, wData, p.huberC, lambda, nx, nz, 0);
+  let best = objective(
+    G,
+    yObs,
+    m,
+    wData,
+    p.huberC,
+    lambda,
+    nx,
+    nz,
+    0,
+    regX(p),
+    regZ(p),
+  );
   pushIterationRecord(
     history,
     0,
@@ -471,7 +512,7 @@ function invertRobustL1(
     nd,
     lambda,
     best.phi,
-    roughnessL2FromModel(m, nx, nz),
+    roughnessAnisoFromModel(m, nx, nz, regX(p), regZ(p)),
     null,
   );
   prevPhi = best.phi;
@@ -479,25 +520,36 @@ function invertRobustL1(
   for (let iter = 1; iter <= p.maxIter; iter++) {
     const wL1 = l1IrlsWeights(best.res, Math.max(1e-4, p.huberC * 0.25));
     const w = wL1.map((wl, d) => wl * (wData[d] ?? 1));
-    const candidate = solveRegularized(G, yObs, w, Hreg, lambda, nm, ridge);
-    if (!candidate) break;
+    const dm =
+      solveGaussNewtonIncrement(G, yObs, m, w, Hreg, lambda, nm, ridge) ??
+      null;
+    if (!dm) break;
 
-    const step = acceptLineSearch(
-      G,
-      yObs,
-      m,
-      candidate,
-      wData,
-      p.huberC,
-      lambda,
-      nx,
-      nz,
-      best,
-      0,
-    );
-    m = step.m;
-    best = step.best;
-    if (!step.accepted) break;
+    const alphas = [1, 0.75, 0.5, 0.3, 0.15];
+    let accepted = false;
+    for (const alpha of alphas) {
+      const trialM = m.map((v, i) => v + alpha * (dm[i] ?? 0));
+      const trial = objective(
+        G,
+        yObs,
+        trialM,
+        wData,
+        p.huberC,
+        lambda,
+        nx,
+        nz,
+        0,
+        regX(p),
+        regZ(p),
+      );
+      if (trial.phi < best.phi) {
+        m = trialM;
+        best = trial;
+        accepted = true;
+        break;
+      }
+    }
+    if (!accepted) break;
 
     pushIterationRecord(
       history,
@@ -506,7 +558,7 @@ function invertRobustL1(
       nd,
       lambda,
       best.phi,
-      roughnessL2FromModel(m, nx, nz),
+      roughnessAnisoFromModel(m, nx, nz, regX(p), regZ(p)),
       prevPhi,
     );
     const gain = prevPhi != null && prevPhi > 0 ? (prevPhi - best.phi) / prevPhi : 0;

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useObraModulos } from "@/components/obra-context";
 import type { ChangeEvent, MouseEvent as ReactMouseEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -410,9 +411,11 @@ function sortedDipoloLeituras(
 
 export function VesGeofisicaClient() {
   const searchParams = useSearchParams();
+  const { selectedObraId: ctxObraId, setObraContext } = useObraModulos();
   const obraIdQ = searchParams?.get("obraId");
   const initialObraId = obraIdQ ? Number(obraIdQ) : Number.NaN;
   const [obras, setObras] = useState<ObraListItem[]>([]);
+  const [obrasLoadError, setObrasLoadError] = useState<string | null>(null);
   const [selectedObraId, setSelectedObraId] = useState<number | null>(
     Number.isFinite(initialObraId) ? initialObraId : null,
   );
@@ -449,16 +452,52 @@ export function VesGeofisicaClient() {
   const dipoloAVal = Number(dipoloAM.replace(",", "."));
 
   useEffect(() => {
+    if (Number.isFinite(initialObraId) && initialObraId > 0) {
+      setSelectedObraId(initialObraId);
+      setObraContext(initialObraId);
+      return;
+    }
+    if (ctxObraId != null) {
+      setSelectedObraId(ctxObraId);
+    }
+  }, [initialObraId, ctxObraId, setObraContext]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch(apiUrl("/api/obra"), { cache: "no-store" });
-        const data = (await r.json().catch(() => [])) as ObraListItem[];
-        if (!cancelled && r.ok && Array.isArray(data)) {
-          setObras(data);
+        const r = await fetch(apiUrl("/api/obra"), {
+          cache: "no-store",
+          credentials: "include",
+        });
+        const data = (await r.json().catch(() => null)) as
+          | ObraListItem[]
+          | { error?: string }
+          | null;
+        if (cancelled) return;
+        if (!r.ok || !Array.isArray(data)) {
+          setObras([]);
+          setObrasLoadError(
+            typeof data === "object" &&
+            data !== null &&
+            !Array.isArray(data) &&
+            typeof data.error === "string"
+              ? data.error
+              : "Não foi possível carregar obras.",
+          );
+          return;
         }
+        setObras(data);
+        setObrasLoadError(
+          data.length === 0
+            ? "Nenhuma obra encontrada — crie uma em «Nova obra»."
+            : null,
+        );
       } catch {
-        /* ignore */
+        if (!cancelled) {
+          setObras([]);
+          setObrasLoadError("Falha de rede ao carregar obras.");
+        }
       }
     })();
     return () => {
@@ -1640,9 +1679,11 @@ export function VesGeofisicaClient() {
             {tabBtn("inversao", "Inversão")}
             <select
               value={selectedObraId ?? ""}
-              onChange={(e) =>
-                setSelectedObraId(e.target.value ? Number(e.target.value) : null)
-              }
+              onChange={(e) => {
+                const next = e.target.value ? Number(e.target.value) : null;
+                setSelectedObraId(next);
+                setObraContext(next);
+              }}
               className="max-w-72 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm dark:bg-gray-900"
             >
               <option value="">Selecione a obra (obrigatório)</option>
@@ -1726,7 +1767,12 @@ export function VesGeofisicaClient() {
 
       {tab === "dados" && (
         <div className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
-          {selectedObraId == null && (
+          {obrasLoadError && (
+            <p className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+              {obrasLoadError}
+            </p>
+          )}
+          {selectedObraId == null && !obrasLoadError && (
             <p className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
               Selecione a obra para criar, abrir e salvar ensaios de resistividade.
             </p>

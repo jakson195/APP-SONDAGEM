@@ -1,4 +1,5 @@
 import { syncUserFromSupabase } from "@/lib/auth-user-sync";
+import { clientIpFromRequest, checkRateLimit } from "@/lib/auth/rate-limit";
 import { prisma } from "@/lib/prisma";
 import { isSupabaseAuthConfigured } from "@/lib/supabase/config";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route-handler";
@@ -9,6 +10,14 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const ip = clientIpFromRequest(req);
+  const limited = checkRateLimit(`login:${ip}`, 20, 15 * 60 * 1000);
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: `Muitas tentativas. Aguarde ${limited.retryAfterSec}s.` },
+      { status: 429 },
+    );
+  }
   let body: { email?: string; password?: string };
   try {
     body = await req.json();

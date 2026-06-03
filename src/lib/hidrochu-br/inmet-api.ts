@@ -19,7 +19,13 @@ export async function listarEstacoesInmet(): Promise<
   });
   if (!res.ok) return [];
 
-  const data = (await res.json()) as Record<string, Record<string, string>>;
+  const data = (await res.json()) as Record<
+    string,
+    Record<
+      string,
+      { DC_NOME?: string; VL_LATITUDE?: string; VL_LONGITUDE?: string }
+    >
+  >;
   const out: { codigo: string; nome: string; uf: string; lat: number; lon: number }[] = [];
   for (const uf of Object.keys(data)) {
     for (const cod of Object.keys(data[uf] ?? {})) {

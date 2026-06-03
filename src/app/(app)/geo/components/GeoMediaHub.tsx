@@ -45,7 +45,7 @@ export function GeoMediaHub() {
   const searchParams = useSearchParams();
   const { selectedObraId, setObraContext } = useObraModulos();
 
-  const queryObraId = Number(searchParams.get("obraId") ?? "");
+  const queryObraId = Number(searchParams?.get("obraId") ?? "");
   const activeObraId =
     selectedObraId ??
     (Number.isFinite(queryObraId) && queryObraId > 0 ? queryObraId : null);

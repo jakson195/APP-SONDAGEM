@@ -6,6 +6,7 @@ import numpy as np
 from scipy.sparse.linalg import spsolve
 
 from .fdm_forward import (
+    _apparent_rho_ohm_m,
     _build_system,
     _conductivity_from_log10,
     _inject_source,
@@ -110,8 +111,6 @@ def jacobian_adjoint(
     nd = len(readings)
     nm = m_log10.size
     j = np.zeros((nd, nm), dtype=float)
-    ln10 = math.log(10.0)
-
     for k, r in enumerate(readings):
         station_m = float(r["station_m"])
         n = int(r["n"])
@@ -130,22 +129,37 @@ def jacobian_adjoint(
             j[k, :] = 0.0
             continue
 
+        m_node = _nearest_node(mesh, layout.m_x)
+        n_node = _nearest_node(mesh, layout.n_x)
+        if m_node is None or n_node is None:
+            continue
+
         v_m = _potential_at(mesh, u, layout.m_x)
         v_n = _potential_at(mesh, u, layout.n_x)
         delta_v = v_m - v_n
-        rho_a = layout.k_geom * abs(delta_v) / max(i_a, 1e-6)
+        if not np.isfinite(delta_v) or abs(delta_v) < 1e-10:
+            continue
+
+        rho_a = _apparent_rho_ohm_m(m_log10, mesh, layout, delta_v, current_ma)
         rho_a = max(rho_a, 1e-6)
 
+        # ∂(log10 ρa)/∂V — mesma calibração SOLODATA que o forward FDM
+        eps_v = max(1e-7, 1e-4 * max(abs(delta_v), 1e-3))
+        rho_p = _apparent_rho_ohm_m(
+            m_log10, mesh, layout, delta_v + eps_v, current_ma
+        )
+        dlog_dv = (np.log10(max(rho_p, 1e-6)) - np.log10(rho_a)) / eps_v
+        if not np.isfinite(dlog_dv):
+            continue
+        dlog_dv = float(np.clip(dlog_dv, -80.0, 80.0))
+
         adj_rhs = np.zeros(mesh.nx * mesh.nz, dtype=float)
-        pot_scale = layout.k_geom / (max(i_a, 1e-6) * rho_a * ln10)
-        m_node = _nearest_node(mesh, layout.m_x)
-        n_node = _nearest_node(mesh, layout.n_x)
         if m_node is not None:
             mi, mj = m_node
-            adj_rhs[idx(mi, mj, mesh.nz)] += pot_scale
+            adj_rhs[idx(mi, mj, mesh.nz)] += dlog_dv
         if n_node is not None:
             ni, nj = n_node
-            adj_rhs[idx(ni, nj, mesh.nz)] -= pot_scale
+            adj_rhs[idx(ni, nj, mesh.nz)] -= dlog_dv
 
         try:
             lam = spsolve(mat.transpose(), adj_rhs)
@@ -157,9 +171,16 @@ def jacobian_adjoint(
                 if not mesh.active[ci, cj]:
                     continue
                 cell_k = idx(ci, cj, mesh.nz)
-                d_rho = -_cell_dA_dot_u(mesh, sigma, u, lam, ci, cj)
+                d_log_rhoa_d_sigma = -_cell_dA_dot_u(mesh, sigma, u, lam, ci, cj)
                 s_c = float(sigma[ci, cj])
-                j[k, cell_k] = (s_c / rho_a) * d_rho / ln10
+                # m = log₁₀(ρ), σ = 10^(−m)  →  ∂σ/∂m = −σ·ln(10)
+                val = d_log_rhoa_d_sigma * (-s_c) * math.log(10.0)
+                if np.isfinite(val):
+                    j[k, cell_k] = float(np.clip(val, -50.0, 50.0))
+
+        row_max = float(np.max(np.abs(j[k])))
+        if row_max > 500.0:
+            j[k, :] = 0.0
 
     if np.allclose(j, 0.0):
         from .jacobian import jacobian_fd

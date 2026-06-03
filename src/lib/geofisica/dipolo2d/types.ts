@@ -25,6 +25,7 @@ export type Dipolo2DInvertMethodId =
   | "gauss_newton"
   | "smoothness"
   | "robust_l1"
+  | "blocky_l1"
   | "hybrid";
 
 export const DIPOLO2D_INVERT_METHODS: {
@@ -50,8 +51,13 @@ export const DIPOLO2D_INVERT_METHODS: {
   },
   {
     id: "robust_l1",
-    label: "Robusta L1 (proxy IRLS)",
+    label: "Robusta L1 (IRLS)",
     short: "L1",
+  },
+  {
+    id: "blocky_l1",
+    label: "Blocky L1 (∇m IRLS, motor físico)",
+    short: "Blocky",
   },
   {
     id: "hybrid",
@@ -67,8 +73,12 @@ export type Dipolo2DInvertParams = {
   sigmaXM: number;
   /** Largura vertical da sensibilidade (m). */
   sigmaZM: number;
-  /** Peso da regularização (Laplaciano discreto). */
+  /** Peso global da regularização (λ_reg, estilo RES2DINV ≈ 0,15). */
   lambda: number;
+  /** Regularização anisotrópica horizontal D_x (≈ 0,1). */
+  lambdaX: number;
+  /** Regularização anisotrópica vertical D_z (≈ 0,4). */
+  lambdaZ: number;
   /** Limiar Huber em espaço log₁₀(ρ); residuals acima são down-weighted. */
   huberC: number;
   maxIter: number;
@@ -126,4 +136,8 @@ export type Dipolo2DInvertResult = {
   chi2Reduced?: number;
   chi2Target?: number;
   ndData?: number;
+  /** Células activas (topo/malha), ordem i*nz+j. */
+  activeCells?: boolean[];
+  /** Profundidade com sensibilidade por coluna (m), do motor físico. */
+  zCoverM?: number[];
 };

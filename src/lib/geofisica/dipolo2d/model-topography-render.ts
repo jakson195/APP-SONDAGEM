@@ -4,9 +4,11 @@
  */
 
 import { paletteColor, rhoToNormalized } from "./colormap";
+import { quantizeDisplayT } from "./res2dinv-colormap";
 import type { ResistivityColorScale } from "./colormap";
 import {
   bilinearLogRho,
+  cellLogRhoAt,
   smoothLogModelForDisplay,
   zCoverInterpolated,
   type ModelRasterOptions,
@@ -162,7 +164,7 @@ export function rasterizeModelWithTopography(
   const { xPlot0, xPlot1, elevBottom, elevTop } = bounds;
   const elevSpan = Math.max(1e-6, elevTop - elevBottom);
 
-  const smoothPasses = opts.displaySmoothPasses ?? 2;
+  const smoothPasses = opts.displaySmoothPasses ?? 0;
   const smoothed =
     smoothPasses > 0
       ? smoothLogModelForDisplay(mLog, nx, nz, smoothPasses)
@@ -231,10 +233,15 @@ export function rasterizeModelWithTopography(
         continue;
       }
 
-      const logR = bilinearLogRho(smoothed, nx, nz, fi, fj);
+      const logR =
+        (opts.renderMode ?? "cells") === "cells"
+          ? cellLogRhoAt(smoothed, nx, nz, fi, fj)
+          : bilinearLogRho(smoothed, nx, nz, fi, fj);
       const rho = 10 ** logR;
-      const tRaw = rhoToNormalized(rho, logLo, logHi);
-      const t = Math.round(tRaw * (levels - 1)) / Math.max(1, levels - 1);
+      const tRaw = opts.normalizeRho
+        ? opts.normalizeRho(rho)
+        : rhoToNormalized(rho, logLo, logHi);
+      const t = quantizeDisplayT(tRaw, levels);
       const [r, g, b] = paletteColor(opts.colorScale.palette, t);
       rgba[o] = r | 0;
       rgba[o + 1] = g | 0;

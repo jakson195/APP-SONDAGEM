@@ -33,10 +33,9 @@ function DrawControl({ onBbox }: DrawControlProps) {
       displayControlsDefault: false,
       controls: {
         polygon: true,
-        rectangle: true,
         trash: true,
       },
-      defaultMode: "draw_rectangle",
+      defaultMode: "draw_polygon",
     });
 
     const sync = () => {

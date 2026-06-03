@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   addGeophysSection,
-  GEOPHYS_PROJECT_STORAGE_KEY,
+  geophysProjectStorageKey,
   loadGeophysProject,
+  loadGeophysProjectAsync,
   removeGeophysSection,
   setPendingQcLoad,
   setPendingVolumeLoad,
@@ -15,6 +16,8 @@ import {
 } from "@/lib/geofisica/geophys-project/geophys-project-storage";
 
 type GeophysSectionsPanelProps = {
+  /** Obra activa — secções guardadas por obra no navegador */
+  obraId?: number | null;
   /** Mensagem após guardar ou remover */
   onNotice?: (msg: string) => void;
   /** Mostrar botão para abrir secções no modelo 3D */
@@ -29,6 +32,7 @@ type GeophysSectionsPanelProps = {
 };
 
 export function GeophysSectionsPanel({
+  obraId = null,
   onNotice,
   showVolumeActions = true,
   showQcActions = false,
@@ -36,27 +40,32 @@ export function GeophysSectionsPanel({
   refreshKey = 0,
   className = "",
 }: GeophysSectionsPanelProps) {
+  const storageKey = geophysProjectStorageKey(obraId);
   const [project, setProject] = useState<GeophysProjectStore>(() =>
-    loadGeophysProject(),
+    loadGeophysProject(obraId),
   );
 
   const refresh = useCallback(() => {
-    setProject(loadGeophysProject());
-  }, []);
+    if (obraId != null && obraId > 0) {
+      void loadGeophysProjectAsync(obraId).then(setProject);
+    } else {
+      setProject(loadGeophysProject(obraId));
+    }
+  }, [obraId]);
 
   useEffect(() => {
     refresh();
-  }, [refreshKey, refresh]);
+  }, [refreshKey, refresh, obraId]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === GEOPHYS_PROJECT_STORAGE_KEY) {
+      if (e.key === storageKey) {
         refresh();
       }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [refresh]);
+  }, [refresh, storageKey]);
 
   const handleRemove = (section: SavedGeophysSection) => {
     if (
@@ -66,7 +75,7 @@ export function GeophysSectionsPanel({
     ) {
       return;
     }
-    const next = removeGeophysSection(section.id);
+    const next = removeGeophysSection(section.id, obraId);
     setProject(next);
     onNotice?.(`${section.code} removida do projeto.`);
   };
@@ -102,6 +111,23 @@ export function GeophysSectionsPanel({
     onNotice?.("A abrir secções no QC…");
   };
 
+  if (obraId == null) {
+    return (
+      <div
+        className={`rounded-lg border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100 ${className}`}
+      >
+        <p className="font-medium">Selecione a obra do projeto</p>
+        <p className="mt-1 text-xs opacity-90">
+          Use o selector «Obra (projeto)» no topo da página (ou em{" "}
+          <Link href="/obras" className="underline">
+            Obras
+          </Link>
+          ) para vincular secções ERT a esta obra.
+        </p>
+      </div>
+    );
+  }
+
   if (project.sections.length === 0) {
     return (
       <div
@@ -111,8 +137,8 @@ export function GeophysSectionsPanel({
           Secções do projeto (GEO01, GEO02…)
         </p>
         <p className="mt-1 text-xs">
-          Ainda não há secções guardadas. Após calcular o modelo invertido no
-          Dipolo-Dipolo, use «Guardar secção no projeto».
+          Ainda não há secções guardadas nesta obra. Após calcular o modelo
+          invertido no Dipolo-Dipolo, use «Guardar secção no projeto».
         </p>
       </div>
     );
@@ -253,8 +279,9 @@ export function GeophysSectionsPanel({
 /** Guarda secção e devolve o projeto actualizado. */
 export function persistGeophysSection(
   section: SavedGeophysSection,
+  obraId: number | null = null,
 ): GeophysProjectStore {
-  return addGeophysSection(section);
+  return addGeophysSection(section, obraId);
 }
 
 export { suggestNextGeoCode, loadGeophysProject };

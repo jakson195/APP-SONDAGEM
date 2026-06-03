@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
+import { withGeophysicsApi } from "@/lib/geofisica/geophys-api-guard";
 import { fetchDemElevations } from "@/lib/geofisica/geodata/fetch-elevation-dem";
 import { localMToLatLng } from "@/lib/hydraulic-interpolation";
 
 const MAX_GRID_POINTS = 3600;
 const CHUNK_SIZE = 90;
 
-export async function POST(req: Request) {
+export const dynamic = "force-dynamic";
+
+async function handleElevationSurface(req: Request) {
   try {
     const body = (await req.json()) as {
       anchorLat?: number;
@@ -127,4 +130,10 @@ export async function POST(req: Request) {
     const msg = e instanceof Error ? e.message : "Erro ao consultar DEM";
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
+}
+
+export async function POST(req: Request) {
+  return withGeophysicsApi(req, async (_ctx, r) => handleElevationSurface(r), {
+    allowGlobalScope: true,
+  });
 }

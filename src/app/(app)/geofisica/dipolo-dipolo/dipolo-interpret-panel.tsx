@@ -496,8 +496,6 @@ export function DipoloInterpretPanel({
         return;
       }
 
-      const lat = location?.lat ?? GARUVA_DEFAULT_LOCATION.lat;
-      const lng = location?.lng ?? GARUVA_DEFAULT_LOCATION.lng;
       applyRegionalAndTable(data.regional, lat, lng);
       setAiAvailable(Boolean(data.aiAvailable));
       const rows = classificationRowsFromRegional(data.regional);

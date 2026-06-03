@@ -5,8 +5,8 @@ import {
   geophysInvertPostResponse,
 } from "@/lib/geofisica/geophys-invert-proxy";
 
-/** Literal exigido pelo Next.js (não usar import de constante). */
-export const maxDuration = 1200;
+/** Literal exigido pelo Next.js. Máx. 800s no plano Vercel Pro. */
+export const maxDuration = 800;
 export const dynamic = "force-dynamic";
 
 /** Health do motor Python — sem auth/assinatura (evita falso «motor offline»). */

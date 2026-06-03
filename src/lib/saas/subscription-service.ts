@@ -1,4 +1,5 @@
 import type { SaasPlanSlug, SubscriptionStatus } from "@prisma/client";
+import { isAuthBypassEnabled } from "@/lib/auth-bypass";
 import { prisma } from "@/lib/prisma";
 import { PLAN_LIMITS } from "@/lib/saas/plan-limits";
 
@@ -141,10 +142,7 @@ export async function assertSubscriptionAllowsAccess(
 ): Promise<SubscriptionAccessResult> {
   const sub = await getOrProvisionSubscription(companyId);
   if (!sub) {
-    const bypass =
-      process.env.AUTH_BYPASS === "1" ||
-      (process.env.NODE_ENV !== "production" && process.env.AUTH_BYPASS_LOCAL === "1");
-    if (bypass) {
+    if (isAuthBypassEnabled()) {
       return { ok: true };
     }
     return {

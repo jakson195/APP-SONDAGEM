@@ -40,7 +40,7 @@ export function MarketingNav() {
         </nav>
 
         <div className="hidden items-center gap-2 sm:flex">
-          <Link href="/login" className="site-btn-outline px-4 py-2">
+          <Link href="/dashboard" className="site-btn-outline px-4 py-2">
             Entrar
           </Link>
           <Link href="/cadastro?plan=trial" className="site-btn-primary px-4 py-2">
@@ -73,7 +73,7 @@ export function MarketingNav() {
               </Link>
             ))}
             <hr className="border-dg-border" />
-            <Link href="/login" className="px-3 py-2 text-sm" onClick={() => setOpen(false)}>
+            <Link href="/dashboard" className="px-3 py-2 text-sm" onClick={() => setOpen(false)}>
               Entrar
             </Link>
             <Link

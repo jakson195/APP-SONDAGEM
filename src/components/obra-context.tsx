@@ -13,8 +13,10 @@ import type { ModuloProjetoChave } from "@/lib/modulos-projeto";
 
 const STORAGE_KEY = "datageo-digital:obraContextId";
 const AUTH_BYPASS =
-  process.env.NEXT_PUBLIC_AUTH_BYPASS === "1" ||
-  process.env.NEXT_PUBLIC_AUTH_BYPASS_LOCAL === "1";
+  process.env.NEXT_PUBLIC_AUTH_REQUIRE_LOGIN !== "1" &&
+  (process.env.NEXT_PUBLIC_AUTH_BYPASS === "1" ||
+    process.env.NEXT_PUBLIC_AUTH_BYPASS_LOCAL === "1" ||
+    process.env.NODE_ENV === "production");
 
 type ObraModulosCtx = {
   selectedObraId: number | null;

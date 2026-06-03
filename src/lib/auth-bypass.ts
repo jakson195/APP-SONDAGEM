@@ -8,12 +8,18 @@ type AuthUser = {
   systemRole: SystemRole;
 };
 
-/** Bypass temporário sem login (local: AUTH_BYPASS_LOCAL=1; qualquer ambiente: AUTH_BYPASS=1). */
+/** Bypass temporário sem login. Desactivar em produção: AUTH_REQUIRE_LOGIN=1 */
 export function isAuthBypassEnabled(): boolean {
+  if (process.env.AUTH_REQUIRE_LOGIN === "1") return false;
   if (process.env.AUTH_BYPASS === "1") return true;
-  return (
-    process.env.NODE_ENV !== "production" && process.env.AUTH_BYPASS_LOCAL === "1"
-  );
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.AUTH_BYPASS_LOCAL === "1"
+  ) {
+    return true;
+  }
+  // datageodigital.com.br (Vercel): sem variáveis extra, entrada directa por agora
+  return process.env.NODE_ENV === "production";
 }
 
 /** @deprecated Prefer isAuthBypassEnabled */

@@ -8,8 +8,17 @@ type AuthUser = {
   systemRole: SystemRole;
 };
 
+/** Bypass temporário sem login (local: AUTH_BYPASS_LOCAL=1; qualquer ambiente: AUTH_BYPASS=1). */
+export function isAuthBypassEnabled(): boolean {
+  if (process.env.AUTH_BYPASS === "1") return true;
+  return (
+    process.env.NODE_ENV !== "production" && process.env.AUTH_BYPASS_LOCAL === "1"
+  );
+}
+
+/** @deprecated Prefer isAuthBypassEnabled */
 export function isLocalAuthBypassEnabled(): boolean {
-  return process.env.NODE_ENV !== "production" && process.env.AUTH_BYPASS_LOCAL === "1";
+  return isAuthBypassEnabled();
 }
 
 const LOCAL_BYPASS_FALLBACK_USER: AuthUser = {
@@ -20,7 +29,7 @@ const LOCAL_BYPASS_FALLBACK_USER: AuthUser = {
 };
 
 export async function getLocalBypassAuthUser(): Promise<AuthUser | null> {
-  if (!isLocalAuthBypassEnabled()) return null;
+  if (!isAuthBypassEnabled()) return null;
 
   try {
     return await resolveLocalBypassAuthUser();

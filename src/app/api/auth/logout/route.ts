@@ -1,5 +1,5 @@
 import { authCookieName, authCookieOptions } from "@/lib/server-auth";
-import { isSupabaseAuthConfigured } from "@/lib/supabase/config";
+import { isSupabaseAuthConfigured } from "@/lib/supabase";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route-handler";
 import { NextResponse } from "next/server";
 

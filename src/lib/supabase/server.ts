@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import { assertSupabaseAuthConfigured } from "@/lib/supabase/config";
+import { assertSupabaseAuthConfigured } from "@/lib/supabase";
 import { enableLocalSupabaseTlsWorkaround } from "@/lib/supabase/server-runtime";
 
 export async function createSupabaseServerClient() {

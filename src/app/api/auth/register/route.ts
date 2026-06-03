@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import {
-  createClientSignupAccount,
-  createJwtSignupAccount,
-} from "@/lib/auth-user-sync";
+import { createClientSignupAccount } from "@/lib/auth-user-sync";
 import { clientIpFromRequest, checkRateLimit } from "@/lib/auth/rate-limit";
-import { authCookieName, authCookieOptions, signAuthToken } from "@/lib/server-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { isSupabaseAuthConfigured } from "@/lib/supabase/config";
+import {
+  isSupabaseAuthConfigured,
+  missingSupabaseAuthEnv,
+  supabaseAuthSetupMessage,
+} from "@/lib/supabase";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route-handler";
 
 export const dynamic = "force-dynamic";
@@ -57,98 +57,69 @@ export async function POST(req: Request) {
       typeof body.companyEmail === "string" ? body.companyEmail.trim() || null : null,
   };
 
-  if (isSupabaseAuthConfigured()) {
-    const admin = createSupabaseAdminClient();
-    let createdAuthUserId: string | null = null;
-
-    try {
-      const { data, error } = await admin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { name },
-      });
-      if (error || !data.user) {
-        return NextResponse.json(
-          { error: error?.message ?? "Não foi possível criar a conta." },
-          { status: 400 },
-        );
-      }
-      createdAuthUserId = data.user.id;
-
-      const { company, localUser } = await createClientSignupAccount({
-        authUser: data.user,
-        ...common,
-        email: common.companyEmail,
-      });
-
-      const { supabase, applyCookies } = await createSupabaseRouteHandlerClient();
-      const signIn = await supabase.auth.signInWithPassword({ email, password });
-      if (signIn.error) {
-        return NextResponse.json(
-          { error: "Conta criada, mas o login automático falhou." },
-          { status: 500 },
-        );
-      }
-
-      const response = NextResponse.json({
-        ok: true,
-        authProvider: "supabase",
-        company: { id: company.id, slug: company.slug, name: company.name, plan: company.plan },
-        user: { id: localUser.id, email: localUser.email, name: localUser.name },
-        checkoutRequired: plan === "pro",
-      });
-      return applyCookies(response);
-    } catch (e) {
-      if (createdAuthUserId) {
-        try {
-          await admin.auth.admin.deleteUser(createdAuthUserId);
-        } catch {
-          /* cleanup */
-        }
-      }
-      console.error(e);
-      return NextResponse.json(
-        { error: "Falha ao criar cliente no sistema." },
-        { status: 500 },
-      );
-    }
-  }
-
-  if (!process.env.JWT_SECRET) {
+  if (!isSupabaseAuthConfigured()) {
     return NextResponse.json(
-      { error: "Configure JWT_SECRET ou Supabase Auth." },
+      {
+        error: supabaseAuthSetupMessage(),
+        missing: missingSupabaseAuthEnv(),
+      },
       { status: 503 },
     );
   }
 
+  const admin = createSupabaseAdminClient();
+  let createdAuthUserId: string | null = null;
+
   try {
-    const { company, localUser } = await createJwtSignupAccount({
-      name,
+    const { data, error } = await admin.auth.admin.createUser({
       email,
       password,
+      email_confirm: true,
+      user_metadata: { name },
+    });
+    if (error || !data.user) {
+      return NextResponse.json(
+        { error: error?.message ?? "Não foi possível criar a conta." },
+        { status: 400 },
+      );
+    }
+    createdAuthUserId = data.user.id;
+
+    const { company, localUser } = await createClientSignupAccount({
+      authUser: data.user,
       ...common,
+      email: common.companyEmail,
     });
 
-    const token = signAuthToken({
-      userId: localUser.id,
-      systemRole: localUser.systemRole,
-    });
+    const { supabase, applyCookies } = await createSupabaseRouteHandlerClient();
+    const signIn = await supabase.auth.signInWithPassword({ email, password });
+    if (signIn.error) {
+      return NextResponse.json(
+        { error: "Conta criada, mas o login automático falhou." },
+        { status: 500 },
+      );
+    }
 
     const response = NextResponse.json({
       ok: true,
-      authProvider: "legacy",
+      authProvider: "supabase",
       company: { id: company.id, slug: company.slug, name: company.name, plan: company.plan },
       user: { id: localUser.id, email: localUser.email, name: localUser.name },
       checkoutRequired: plan === "pro",
     });
-    response.cookies.set(authCookieName(), token, authCookieOptions());
-    return response;
+    return applyCookies(response);
   } catch (e) {
-    if (e instanceof Error && e.message === "EMAIL_IN_USE") {
-      return NextResponse.json({ error: "Este email já está registado." }, { status: 409 });
+    if (createdAuthUserId) {
+      try {
+        await admin.auth.admin.deleteUser(createdAuthUserId);
+      } catch {
+        /* cleanup */
+      }
     }
     console.error(e);
-    return NextResponse.json({ error: "Falha ao criar conta." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Falha ao criar cliente no sistema." },
+      { status: 500 },
+    );
   }
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { consumePasswordResetToken } from "@/lib/auth/password-reset";
 import { clientIpFromRequest, checkRateLimit } from "@/lib/auth/rate-limit";
-import { isSupabaseAuthConfigured } from "@/lib/supabase/config";
+import { isSupabaseAuthConfigured } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 

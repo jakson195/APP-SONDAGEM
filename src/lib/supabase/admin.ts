@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { assertSupabaseServiceRoleConfigured } from "@/lib/supabase/config";
+import { assertSupabaseServiceRoleConfigured } from "@/lib/supabase";
 import { enableLocalSupabaseTlsWorkaround } from "@/lib/supabase/server-runtime";
 
 export function createSupabaseAdminClient() {

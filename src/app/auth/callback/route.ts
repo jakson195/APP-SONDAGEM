@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isSupabaseAuthConfigured } from "@/lib/supabase/config";
+import { isSupabaseAuthConfigured } from "@/lib/supabase";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route-handler";
 
 export const dynamic = "force-dynamic";

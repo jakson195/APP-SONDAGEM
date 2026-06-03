@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createPasswordResetForEmail } from "@/lib/auth/password-reset";
 import { clientIpFromRequest, checkRateLimit } from "@/lib/auth/rate-limit";
-import { assertSupabaseAuthConfigured, isSupabaseAuthConfigured } from "@/lib/supabase/config";
+import { createSupabaseClient, isSupabaseAuthConfigured } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -30,10 +29,7 @@ export async function POST(req: Request) {
   }
 
   if (isSupabaseAuthConfigured()) {
-    const { url, anonKey } = assertSupabaseAuthConfigured();
-    const supabase = createClient(url, anonKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabase = createSupabaseClient();
     const redirectTo = new URL("/auth/callback?next=/redefinir-senha", req.url).toString();
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
     if (error) {

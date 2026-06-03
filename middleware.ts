@@ -2,8 +2,8 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { AUTH_TOKEN_COOKIE } from "@/lib/auth-constants";
 import { isPublicPath, isAppRoute } from "@/lib/auth/public-routes";
-import { isLocalAuthBypassEnabled } from "@/lib/auth-bypass";
-import { isSupabaseAuthConfigured } from "@/lib/supabase/config";
+import { isAuthBypassEnabled } from "@/lib/auth-bypass";
+import { isSupabaseAuthConfigured } from "@/lib/supabase";
 import { updateSupabaseSession } from "@/lib/supabase/middleware";
 
 const ADMIN_PREFIXES = ["/adm", "/admin"] as const;
@@ -25,7 +25,7 @@ async function isAuthenticated(req: NextRequest): Promise<boolean> {
 }
 
 export async function middleware(req: NextRequest) {
-  if (isLocalAuthBypassEnabled()) {
+  if (isAuthBypassEnabled()) {
     return NextResponse.next();
   }
 

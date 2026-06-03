@@ -12,7 +12,8 @@ import { apiUrl } from "@/lib/api-url";
 import type { ModuloProjetoChave } from "@/lib/modulos-projeto";
 
 const STORAGE_KEY = "datageo-digital:obraContextId";
-const AUTH_BYPASS_LOCAL =
+const AUTH_BYPASS =
+  process.env.NEXT_PUBLIC_AUTH_BYPASS === "1" ||
   process.env.NEXT_PUBLIC_AUTH_BYPASS_LOCAL === "1";
 
 type ObraModulosCtx = {
@@ -38,7 +39,7 @@ export function ObraModulosProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     try {
-      if (AUTH_BYPASS_LOCAL) {
+      if (AUTH_BYPASS) {
         localStorage.removeItem(STORAGE_KEY);
         setSelectedObraId(null);
         return;

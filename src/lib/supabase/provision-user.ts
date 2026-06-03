@@ -3,7 +3,10 @@ import type { SystemRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { syncUserFromSupabase } from "@/lib/auth-user-sync";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { isSupabaseAuthConfigured } from "@/lib/supabase/config";
+import {
+  isSupabaseAuthConfigured,
+  supabaseAuthSetupMessage,
+} from "@/lib/supabase";
 
 type Input = {
   email: string;
@@ -91,6 +94,10 @@ export async function provisionPlatformUser(input: Input) {
       });
     }
     return local;
+  }
+
+  if (!isSupabaseAuthConfigured()) {
+    throw new Error(supabaseAuthSetupMessage());
   }
 
   if (!input.password || input.password.length < 8) {

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { ObraModulosProvider } from "@/components/obra-context";
-import { isLocalAuthBypassEnabled } from "@/lib/auth-bypass";
+import { isAuthBypassEnabled } from "@/lib/auth-bypass";
 import { getActiveCompanyContext } from "@/lib/auth/active-company";
 import { assertSubscriptionAllowsAccess } from "@/lib/saas/subscription-service";
 import { getAuthUserFromCookies } from "@/lib/server-auth";
@@ -19,7 +19,7 @@ export default async function AppGroupLayout({
 
   const company = await getActiveCompanyContext(user);
   const access =
-    isLocalAuthBypassEnabled() || company == null
+    isAuthBypassEnabled() || company == null
       ? { ok: true as const }
       : await assertSubscriptionAllowsAccess(company.companyId);
 

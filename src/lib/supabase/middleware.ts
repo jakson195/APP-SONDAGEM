@@ -1,6 +1,6 @@
 import type { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { assertSupabaseAuthConfigured, isSupabaseAuthConfigured } from "@/lib/supabase/config";
+import { assertSupabaseAuthConfigured, isSupabaseAuthConfigured } from "@/lib/supabase";
 import { enableLocalSupabaseTlsWorkaround } from "@/lib/supabase/server-runtime";
 
 export async function updateSupabaseSession(req: NextRequest, res: NextResponse) {

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
-import { assertSupabaseAuthConfigured } from "@/lib/supabase/config";
+import { assertSupabaseAuthConfigured } from "@/lib/supabase";
 import { enableLocalSupabaseTlsWorkaround } from "@/lib/supabase/server-runtime";
 
 type PendingCookie = {

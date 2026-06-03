@@ -1,6 +1,5 @@
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
 import type { SystemRole } from "@prisma/client";
 import { AUTH_TOKEN_COOKIE } from "@/lib/auth-constants";
 import { getLocalBypassAuthUser } from "@/lib/auth-bypass";
@@ -8,8 +7,9 @@ import { syncUserFromSupabase } from "@/lib/auth-user-sync";
 import { prisma } from "@/lib/prisma";
 import {
   assertSupabaseAuthConfigured,
+  createSupabaseClient,
   isSupabaseAuthConfigured,
-} from "@/lib/supabase/config";
+} from "@/lib/supabase";
 import { enableLocalSupabaseTlsWorkaround } from "@/lib/supabase/server-runtime";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -109,10 +109,7 @@ async function getSupabaseUserFromRequest(req: Request) {
     const token = auth.slice(7).trim();
     if (token) {
       enableLocalSupabaseTlsWorkaround();
-      const { url, anonKey } = assertSupabaseAuthConfigured();
-      const supabase = createClient(url, anonKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      });
+      const supabase = createSupabaseClient();
       const { data, error } = await supabase.auth.getUser(token);
       if (!error && data.user) return data.user;
     }

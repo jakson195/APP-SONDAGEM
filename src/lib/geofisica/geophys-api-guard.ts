@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveGeoScopeFromRequest, type GeoScope } from "@/lib/geo-scope";
-import { isLocalAuthBypassEnabled } from "@/lib/auth-bypass";
+import { isAuthBypassEnabled } from "@/lib/auth-bypass";
 import { requireAuth } from "@/lib/auth/require-auth";
 import { assertGeophysicsModuleAllowed } from "@/lib/saas/enforce-limits";
 import { assertSubscriptionAllowsAccess } from "@/lib/saas/subscription-service";
@@ -89,7 +89,7 @@ export async function requireGeophysicsApi(
     };
   }
 
-  if (!isLocalAuthBypassEnabled()) {
+  if (!isAuthBypassEnabled()) {
     const subCheck = await assertSubscriptionAllowsAccess(scoped.scope.companyId);
     if (!subCheck.ok) {
       return {

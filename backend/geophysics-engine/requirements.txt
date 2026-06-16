@@ -1,0 +1,22 @@
+# Motor ERT nativo (:8092) — dependências mínimas
+numpy>=1.24
+scipy>=1.10
+fastapi>=0.104
+uvicorn[standard]>=0.24
+pydantic>=2.0
+
+# Instalar:
+#   pip install -r requirements.txt
+#
+# Iniciar motor:
+#   uvicorn server:app --host 0.0.0.0 --port 8092 --reload
+#   # ou: python server.py
+#
+# Testar health:
+#   curl http://localhost:8092/health
+
+# Motores opcionais (legado / frontend completo)
+# matplotlib>=3.7
+# pandas>=2.0
+# resipy>=3.6,<3.7   # pip install -r ../../app-web/python-engine/geophysics/requirements-resipy.txt
+# pygimli           # conda install -c gimli pygimli

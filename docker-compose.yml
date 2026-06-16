@@ -1,0 +1,63 @@
+# SOILSUL — monólito (porta 3000)
+#   app-web  → Next.js UI + API /api + /api/geo
+#   postgres-core → Prisma (obras, sondagem, auth)
+#   postgres-geo  → PostGIS (Digital Twin, opcional)
+
+name: soilsul
+
+services:
+  postgres-core:
+    image: postgres:16-alpine
+    container_name: soilsul-postgres-core
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${CORE_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${CORE_POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${CORE_POSTGRES_DB:-soilsul_db}
+    ports:
+      - "${CORE_POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - postgres_core_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-geo:
+    image: postgis/postgis:16-3.4
+    container_name: soilsul-postgres-geo
+    restart: unless-stopped
+    profiles: ["geo"]
+    environment:
+      POSTGRES_USER: ${GEO_POSTGRES_USER:-digitaltwin}
+      POSTGRES_PASSWORD: ${GEO_POSTGRES_PASSWORD:-change_me}
+      POSTGRES_DB: ${GEO_POSTGRES_DB:-digital_twin}
+    ports:
+      - "${GEO_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_geo_data:/var/lib/postgresql/data
+      - ./digital-twin/database/init:/docker-entrypoint-initdb.d:ro
+
+  app:
+    build:
+      context: .
+      dockerfile: app-web/Dockerfile
+    container_name: soilsul-app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${CORE_DATABASE_URL:-postgresql://postgres:postgres@postgres-core:5432/soilsul_db}
+      GEO_DATABASE_URL: ${GEO_DATABASE_URL:-postgresql://digitaltwin:change_me@postgres-geo:5432/digital_twin}
+      JWT_SECRET: ${JWT_SECRET:-change_me}
+      NEXT_PUBLIC_GEO_API_URL: /api/geo
+    depends_on:
+      postgres-core:
+        condition: service_healthy
+
+volumes:
+  postgres_core_data:
+  postgres_geo_data:

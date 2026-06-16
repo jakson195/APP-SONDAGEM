@@ -1,0 +1,188 @@
+{
+  "type": "FeatureCollection",
+  "name": "hidrogeo-brasil-seed-rivers",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rio Amazonas",
+        "strahler_order": 6,
+        "basin": "Amazônica",
+        "hydro_region": "Amazônica",
+        "length_km": 6400
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [-69.94, -4.25],
+            [-65.0, -3.5],
+            [-60.0, -3.2],
+            [-55.0, -2.5],
+            [-50.0, -1.95],
+            [-45.0, -1.5]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rio São Francisco",
+        "strahler_order": 5,
+        "basin": "São Francisco",
+        "hydro_region": "São Francisco",
+        "length_km": 2860
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [-45.9, -20.8],
+            [-44.5, -18.5],
+            [-43.5, -15.0],
+            [-42.0, -11.0],
+            [-40.5, -8.0],
+            [-38.5, -5.5],
+            [-36.4, -3.5]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rio Paraná",
+        "strahler_order": 5,
+        "basin": "Paraná",
+        "hydro_region": "Paraná",
+        "length_km": 2570
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [-54.6, -22.0],
+            [-53.0, -22.5],
+            [-51.5, -23.0],
+            [-50.0, -24.0],
+            [-49.0, -25.5],
+            [-48.5, -27.0],
+            [-47.0, -28.5],
+            [-45.5, -30.0]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rio Tocantins",
+        "strahler_order": 5,
+        "basin": "Tocantins-Araguaia",
+        "hydro_region": "Tocantins-Araguaia",
+        "length_km": 2410
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [-48.5, -10.0],
+            [-49.0, -8.0],
+            [-49.5, -6.0],
+            [-49.8, -4.0],
+            [-49.5, -2.0],
+            [-48.5, -1.0]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rio Itajaí-Açu",
+        "strahler_order": 4,
+        "basin": "Itajaí",
+        "hydro_region": "Atlântico Sul",
+        "length_km": 150
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [-49.5, -27.2],
+            [-49.2, -27.0],
+            [-49.0, -26.85],
+            [-48.85, -26.7]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rio Doce",
+        "strahler_order": 4,
+        "basin": "Doce",
+        "hydro_region": "Atlântico Sudeste",
+        "length_km": 853
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [-42.0, -20.5],
+            [-41.5, -20.0],
+            [-41.0, -19.5],
+            [-40.5, -19.2],
+            [-40.0, -19.0]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rio Negro",
+        "strahler_order": 5,
+        "basin": "Amazônica",
+        "hydro_region": "Amazônica",
+        "length_km": 2300
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [-67.0, -1.0],
+            [-64.0, -1.5],
+            [-61.0, -2.0],
+            [-60.0, -2.8],
+            [-59.5, -3.2]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rio Madeira",
+        "strahler_order": 5,
+        "basin": "Amazônica",
+        "hydro_region": "Amazônica",
+        "length_km": 3380
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [-65.5, -10.5],
+            [-64.0, -8.0],
+            [-63.0, -6.0],
+            [-62.0, -4.5],
+            [-60.5, -3.5]
+          ]
+        ]
+      }
+    }
+  ]
+}

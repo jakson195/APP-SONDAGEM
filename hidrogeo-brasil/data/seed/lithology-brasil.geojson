@@ -1,0 +1,84 @@
+{
+  "type": "FeatureCollection",
+  "name": "cprm-litologia-seed",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "unit_name": "Craton do São Francisco",
+        "rock_type": "Granito-Gnáisse",
+        "age": "Arqueano-Proterozoico",
+        "description": "Núcleo cratônico estável do oriente brasileiro."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-47,-21],[-38,-21],[-38,-12],[-47,-12],[-47,-21]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "unit_name": "Bacias Sedimentares Amazônicas",
+        "rock_type": "Arenito-Conglomerado",
+        "age": "Paleozoico-Cenozoico",
+        "description": "Cobertura sedimentar da região norte."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-72,-10],[-48,-10],[-48,5],[-72,5],[-72,-10]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "unit_name": "Dobramentos Andinos Brasileiros",
+        "rock_type": "Metassedimento",
+        "age": "Paleozoico",
+        "description": "Província geológica do sul — dobramentos da Colisão Gondwana."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-58,-34],[-48,-34],[-48,-25],[-58,-25],[-58,-34]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "unit_name": "Bacia do Paraná",
+        "rock_type": "Basalto-Siltito",
+        "age": "Mesozoico",
+        "description": "Traps basálticos do Serra Geral e sedimentos associados."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-58,-30],[-47,-30],[-47,-20],[-58,-20],[-58,-30]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "unit_name": "Província Mantiqueira",
+        "rock_type": "Granito",
+        "age": "Neoproterozoico",
+        "description": "Cinturão de dobramentos da margem oriental."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-48,-24],[-39,-24],[-39,-18],[-48,-18],[-48,-24]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "unit_name": "Complexo Costeiro Atlântico",
+        "rock_type": "Metassedimento-Granito",
+        "age": "Proterozoico-Fanerozoico",
+        "description": "Domínios do litoral sudeste e sul."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-52,-29],[-38,-29],[-38,-20],[-52,-20],[-52,-29]]]
+      }
+    }
+  ]
+}

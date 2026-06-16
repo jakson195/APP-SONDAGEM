@@ -1,0 +1,117 @@
+{"timestamp":"00:11:24.126","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.136","source":"Server","level":"ERROR","message":"⨯ \"unhandledRejection:\" Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.142","source":"Server","level":"ERROR","message":"⨯ \"unhandledRejection: \" Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.344","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.352","source":"Server","level":"ERROR","message":"⨯ \"unhandledRejection:\" Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.356","source":"Server","level":"ERROR","message":"⨯ \"unhandledRejection: \" Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.450","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.454","source":"Server","level":"ERROR","message":"⨯ \"unhandledRejection:\" Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.458","source":"Server","level":"ERROR","message":"⨯ \"unhandledRejection: \" Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.562","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.565","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.574","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.577","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.767","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.770","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.826","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.830","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.840","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.844","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.949","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.952","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:24.996","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:25.000","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:25.036","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:25.040","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:25.086","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:11:25.091","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:12:31.670","source":"Server","level":"LOG","message":"prisma:error \"Error in PostgreSQL connection: Error { kind: Closed, cause: None }\""}
+{"timestamp":"00:12:31.685","source":"Server","level":"LOG","message":"prisma:error \"Error in PostgreSQL connection: Error { kind: Closed, cause: None }\""}
+{"timestamp":"00:13:10.973","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:13:10.976","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:13:15.520","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:13:15.521","source":"Server","level":"ERROR","message":"⨯ \"unhandledRejection:\" Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:13:15.523","source":"Server","level":"ERROR","message":"⨯ \"unhandledRejection: \" Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:13:15.540","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:13:15.542","source":"Server","level":"ERROR","message":"⨯ \"unhandledRejection:\" Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:13:15.543","source":"Server","level":"ERROR","message":"⨯ \"unhandledRejection: \" Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:13:15.555","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:13:15.558","source":"Server","level":"ERROR","message":"⨯ \"unhandledRejection:\" Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:13:15.559","source":"Server","level":"ERROR","message":"⨯ \"unhandledRejection: \" Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:13:15.654","source":"Server","level":"ERROR","message":"⨯ Module not found: Error: Can't resolve 'next-flight-client-entry-loader' in 'C:\\VISION\\APP-SONDAGEM\\app-sondagem'"}
+{"timestamp":"00:18:29.866","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:18:29.871","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:18:34.820","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:18:34.826","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:24:17.751","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:24:17.754","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:41:26.027","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:41:26.033","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:41:55.450","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:41:55.452","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:46:35.737","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:46:35.741","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:47:39.752","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:47:39.754","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:49:12.018","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:49:12.023","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:51:18.822","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:51:18.825","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:51:24.741","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:51:24.747","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:51:56.828","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:51:56.830","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:52:25.216","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:52:25.222","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:53:04.011","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:53:04.014","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:53:25.224","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:53:25.227","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:54:04.650","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:54:04.656","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:54:10.458","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:54:10.460","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:54:48.175","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:54:48.179","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:54:52.547","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:54:52.549","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:55:36.750","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:55:36.756","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:57:35.555","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:57:35.557","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:58:02.268","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:58:02.272","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:58:50.120","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:58:50.121","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:59:22.215","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:59:22.218","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:59:52.534","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:59:52.536","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:59:56.293","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"00:59:56.298","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:00:30.258","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:00:30.261","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:00:46.009","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:00:46.011","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:01:20.383","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:01:20.388","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:01:45.080","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:01:45.082","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:01:56.296","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:01:56.307","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:04:26.565","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:04:26.567","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:05:05.913","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:05:05.917","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:06:08.754","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:06:08.775","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:06:48.228","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:06:48.257","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:07:04.681","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:07:04.688","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:08:14.715","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:08:14.719","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:08:20.185","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:08:20.192","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:09:43.445","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}
+{"timestamp":"01:09:43.447","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir 'C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app'"}

@@ -1,0 +1,10 @@
+API Geospatial — InSAR, LiDAR, alertas, previsão IA
+====================================================
+
+Código FastAPI: api-geospatial/app/
+Docker: api-geospatial/Dockerfile
+
+Endpoints: /api/v1/*  → gateway /api/geo/api/v1/*
+Base de dados: postgres-geo (PostGIS), porta host 5433
+
+Legado: digital-twin/backend/ (stub — usar esta pasta)

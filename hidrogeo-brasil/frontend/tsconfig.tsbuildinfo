@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/infopanel/infopanel.tsx","./src/components/layerpanel/layerpanel.tsx","./src/components/map/earthmap.tsx","./src/layers/buildlayers.ts","./src/layers/hydrography.ts","./src/store/layerstore.ts","./src/types/index.ts"],"errors":true,"version":"5.7.3"}

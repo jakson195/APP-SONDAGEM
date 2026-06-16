@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/furo/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"C:\\VISION\\APP-SONDAGEM\\app-sondagem\\app\\api\\furo\\route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};

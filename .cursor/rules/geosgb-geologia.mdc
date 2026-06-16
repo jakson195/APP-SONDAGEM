@@ -1,0 +1,47 @@
+---
+description: Integração GeoSGB/CPRM como verdade geológica na geofísica ERT
+globs:
+  - app-web/src/lib/geofisica/**
+  - app-web/src/app/**/geofisica/**
+  - app-web/src/app/api/geofisica/**
+---
+
+# GeoSGB / CPRM — fonte geológica principal
+
+## Prioridade de dados
+
+1. **GeoSGB / CPRM** (`geosgb`, `cprm_legacy`) — verdade geológica: litologia, unidades, estruturas, geofísica aérea.
+2. **Macrostrat** — contexto estratigráfico global (fallback).
+3. **USGS** — complemento: DEM/SRTM, hidrografia, sensoriamento (não substitui geologia BR).
+4. **Regras regionais** (`regional-geology.ts`) — só se serviços indisponíveis.
+
+## Onde está no código
+
+| Recurso | Caminho |
+|--------|---------|
+| Catálogo serviços | `app-web/src/lib/geofisica/geodata/geosgb-catalog.ts` |
+| Cliente identify/WMS | `app-web/src/lib/geofisica/geodata/geosgb-client.ts` |
+| USGS (complemento) | `app-web/src/lib/geofisica/geodata/usgs-catalog.ts` |
+| API catálogo | `GET /api/geofisica/geosgb/catalog` |
+| API consulta ponto | `GET /api/geofisica/geosgb/query?lat=&lng=` |
+| Geologia regional | `build-regional-geology.ts` → `fetchCprmGeology` |
+| Mapa Leaflet | `dipolo-location-map.tsx` — overlays GeoSGB |
+
+## URLs oficiais
+
+- GeoPortal REST: https://geoportal.sgb.gov.br/server/rest/services
+- GeoServer OGC: https://geoservicos.sgb.gov.br/geoserver/ows
+- Downloads SHP/GeoTIFF: https://geosgb.sgb.gov.br/downloads/
+- OpenData: https://opendata.sgb.gov.br/
+- USGS EarthExplorer: https://earthexplorer.usgs.gov/
+
+## Ao implementar interpretação / IA
+
+- Sempre chamar `queryGeosgbPoint` ou `/api/geofisica/geosgb/query` antes de inventar litologia.
+- Cruzar perfil invertido ρ com unidades CPRM e faixas em `lithology-resistivity-br.ts`.
+- Serviços HTTP legado (`arcgisserver.cprm.gov.br`) só no **servidor** (API route), não no browser.
+- Preferir endpoints **HTTPS** do `geoportal.sgb.gov.br` no cliente.
+
+## Downloads (SHP, GeoTIFF)
+
+Integração em massa via `geosgb.sgb.gov.br/downloads` é offline/batch — não misturar com consulta WMS em tempo real sem pipeline dedicado.

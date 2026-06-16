@@ -1,0 +1,12 @@
+API Core — SOILSUL (negócio)
+============================
+
+Next.js API routes: app/api/*
+Prisma, auth JWT, obras, sondagem, relatórios.
+
+Dev: cd api-core && npm run dev  → :3001
+Docker: api-core/Dockerfile
+
+Comunicação:
+  Browser → gateway:8080/api/* → api-core:3001
+  app-web (dev) reescreve /api/* → API_CORE_URL (default http://localhost:3001)

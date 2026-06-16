@@ -1,0 +1,7 @@
+
+node_modules/
+*.zip
+*.geojson
+hidrogeo-brasil/data/cache/
+hidrogeo-brasil/backend/data/cache/
+api-core/node_modules/

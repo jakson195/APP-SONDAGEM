@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from services.array_utils import writable
+
 
 @dataclass
 class Mesh2D:
@@ -47,8 +49,8 @@ def build_mesh(
 ) -> Mesh2D:
     x_edges = np.linspace(x0, x1, nx + 1)
     z_edges = _z_edges_depth(nz, z_max, geometric_z)
-    x_centers = 0.5 * (x_edges[:-1] + x_edges[1:])
-    z_centers = 0.5 * (z_edges[:-1] + z_edges[1:])
+    x_centers = writable(0.5 * (x_edges[:-1] + x_edges[1:]))
+    z_centers = writable(0.5 * (z_edges[:-1] + z_edges[1:]))
 
     if topography:
         topo_x = np.array([p[0] for p in topography], dtype=float)

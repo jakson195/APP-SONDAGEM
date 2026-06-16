@@ -11,14 +11,17 @@ import {
 import type { SolodataLinhaRow, SolodataLinhaState } from "@/lib/geofisica/dipolo2d/solodata-linha-types";
 import { parseSolodataLinhaPaste } from "@/lib/geofisica/dipolo2d/parse-solodata-linha-paste";
 import {
+  applyElectrodeFieldToRows,
   applyElectrodeToRows,
   applyGridToSolodataRows,
   applySpViToRows,
   emptySolodataRow,
   isMultiCellPaste,
   looksLikeElectrodeBlock,
+  looksLikeElectrodeFieldBlock,
   parseClipboardGrid,
   parseElectrodeBlock,
+  parseElectrodeFieldBlock,
   parseNumCell,
   parseSpViBlock,
 } from "@/lib/geofisica/dipolo2d/solodata-grid-paste";
@@ -85,6 +88,9 @@ const COLS: ColDef[] = [
 
 const COL_KEYS = COLS.map((c) => c.key);
 
+/** Índice da coluna A (eléctrodos) — ignora MED./PIQ./ESP. na colagem Excel. */
+const COL_IDX_A = COL_KEYS.indexOf("a");
+
 function cellVal(n: number | null | undefined): string | number {
   return n != null && Number.isFinite(n) ? n : "";
 }
@@ -144,7 +150,7 @@ export function SolodataLinhaSheet({ state, onChange, defaultAM }: Props) {
   const [pasteInfo, setPasteInfo] = useState<string | null>(null);
   const [editing, setEditing] = useState<Record<string, string>>({});
   const pasteAreaRef = useRef<HTMLTextAreaElement>(null);
-  const lastFocusRef = useRef({ row: 0, col: 0 });
+  const lastFocusRef = useRef({ row: 0, col: COL_IDX_A >= 0 ? COL_IDX_A : 3 });
 
   const rowsComputed = useMemo(
     () => rows.map((row) => computeSolodataLinhaRow(row, defaultAM)),
@@ -252,21 +258,43 @@ export function SolodataLinhaSheet({ state, onChange, defaultAM }: Props) {
           return finish(`A / B / M / N / NIV. — ${rowsBlock.length} linha(s) colada(s)`);
         };
 
-        // Colagem ancorada numa célula (ex.: colar A..NIV começando na coluna A)
-        if (startCol > 0 || startRow > 0) {
-          if (colCount === 5 && startCol === 3) {
-            const { rows: el } = parseElectrodeBlock(trimmed);
-            if (el.length > 0) return applyElectrodePaste(el);
+        const applyElectrodeFieldPaste = (
+          rowsBlock: ReturnType<typeof parseElectrodeFieldBlock>["rows"],
+        ) => {
+          onChange((prev) => ({
+            ...prev,
+            rows: applyElectrodeFieldToRows(prev.rows, rowsBlock, startRow, espDef),
+          }));
+          return finish(
+            `A / B / M / N / NIV. + SP / V / i — ${rowsBlock.length} linha(s) colada(s)`,
+          );
+        };
+
+        // Excel: 8 colunas A B M N NIV. SP V i (sem MED./PIQ./ESP.)
+        if (colCount === 8) {
+          const { rows: ef } = parseElectrodeFieldBlock(trimmed);
+          if (ef.length > 0 && looksLikeElectrodeFieldBlock(ef)) {
+            return applyElectrodeFieldPaste(ef);
           }
-          if (grid.length > 0 && colCount >= 1) return applyPositionalGrid();
         }
 
-        // Bloco 5 colunas A B M N NIV (sem MED./PIQ./ESP.)
+        // Excel: 5 colunas A B M N NIV.
         if (colCount === 5) {
           const { rows: el } = parseElectrodeBlock(trimmed);
           if (el.length > 0 && looksLikeElectrodeBlock(el)) {
             return applyElectrodePaste(el);
           }
+        }
+
+        // Colagem ancorada numa célula (região parcial da folha)
+        if (startCol > 0 || startRow > 0) {
+          if (grid.length > 0 && colCount >= 1) return applyPositionalGrid();
+        }
+
+        // Bloco 5 colunas — fallback se não passou looksLike
+        if (colCount === 5) {
+          const { rows: el } = parseElectrodeBlock(trimmed);
+          if (el.length > 0) return applyElectrodePaste(el);
         }
 
         const { rows: parsed } = parseSolodataLinhaPaste(trimmed, defaultAM);
@@ -464,9 +492,10 @@ export function SolodataLinhaSheet({ state, onChange, defaultAM }: Props) {
         Colunas <strong>G, K, Rap</strong> e posições em metros (A/B/M/N do perfil) são{" "}
         <strong>calculadas automaticamente</strong> (fórmulas Excel SOLODATA:{" "}
         G=1/((1/H)−2/(H+1)+1/(H+2)), K=2π·G·ESP, Rap=|((V−SP)/i)·K|).{" "}
-        <strong>Ctrl+V</strong> na célula <strong>A</strong> (ou na primeira coluna
-        do bloco) — cola blocos do Excel (A/B/M/N/NIV., SP/V/i, folha completa ou
-        qualquer região). Use vírgula ou ponto decimal.
+        <strong>Ctrl+V</strong> na célula <strong>A</strong> (ou em qualquer célula da
+        tabela) — cola blocos do Excel:{" "}
+        <strong>8 colunas</strong> (A/B/M/N/NIV./SP/V/i), 5 colunas (A/B/M/N/NIV.),
+        SP/V/i, folha completa ou qualquer região. Use vírgula ou ponto decimal.
       </p>
 
       {pasteInfo && (

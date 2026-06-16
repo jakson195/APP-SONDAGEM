@@ -1,5 +1,6 @@
 /**
- * Seis métodos de inversão 2D dipolo-dipolo (modelo linear log₁₀ ρ + sensibilidade gaussiana).
+ * Inversão gaussiana 2D no browser (matriz G + regularização).
+ * Para inversão física ResIPy R2, usar `invertDipolo2DPhysics` (:8092).
  */
 
 import {
@@ -582,29 +583,43 @@ function invertRobustL1(
   );
 }
 
+/** Inversão gaussiana instantânea (browser) — preset original da UI. */
 export function invertDipolo2D(
   readings: Dipolo2DReading[],
   p: Dipolo2DInvertParams,
   method: Dipolo2DInvertMethodId = "smoothness",
   qcByRow?: Map<number, { qualityScore: number; isSpike: boolean }>,
 ): Dipolo2DInvertResult | null {
-  const prob = prepareInvertProblem(readings, p, qcByRow);
+  const active = readings.filter((r) => !r.excluded && r.rhoApparentOhmM > 0);
+  if (active.length < 4) return null;
+
+  const prob = prepareInvertProblem(active, p, qcByRow);
   if (!prob) return null;
 
+  let result: Dipolo2DInvertResult | null = null;
   switch (method) {
     case "least_squares":
-      return invertLeastSquares(prob, p);
+      result = invertLeastSquares(prob, p);
+      break;
     case "occam":
-      return invertOccam(prob, p);
+      result = invertOccam(prob, p);
+      break;
     case "gauss_newton":
-      return invertGaussNewton(prob, p);
+      result = invertGaussNewton(prob, p);
+      break;
     case "smoothness":
-      return invertSmoothness(prob, p);
-    case "hybrid":
-      return invertHybrid(prob, p);
+      result = invertSmoothness(prob, p);
+      break;
     case "robust_l1":
-      return invertRobustL1(prob, p);
+    case "blocky_l1":
+      result = invertRobustL1(prob, p);
+      break;
+    case "hybrid":
+      result = invertHybrid(prob, p);
+      break;
     default:
-      return invertSmoothness(prob, p);
+      result = invertSmoothness(prob, p);
   }
+  if (!result) return null;
+  return { ...result, engine: "proxy" };
 }

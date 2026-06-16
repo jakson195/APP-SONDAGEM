@@ -1,6 +1,6 @@
 import type { SolodataLinhaRow } from "./solodata-linha-types";
 import { parseDipolo2DPaste } from "./parse-paste";
-import { parseNumCell } from "./solodata-grid-paste";
+import { parseNumCell, looksLikeElectrodeBlock, isElectrodeFieldHeader, isElectrodeHeader } from "./solodata-grid-paste";
 
 function parseNum(raw: string): number | null {
   return parseNumCell(raw);
@@ -120,6 +120,41 @@ function rowFromCells(cells: string[]): SolodataLinhaRow | null {
       rap: null,
     };
   }
+  if (nums.length === 8) {
+    const probe = {
+      a: nums[0],
+      b: nums[1],
+      m: nums[2],
+      nEl: nums[3],
+      nivel: nums[4],
+    };
+    if (looksLikeElectrodeBlock([probe])) {
+      return {
+        medida: null,
+        piquete: null,
+        espM: null,
+        a: nums[0],
+        b: nums[1],
+        m: nums[2],
+        nEl: nums[3],
+        nivel: nums[4],
+        spMv: nums[5],
+        vMv: nums[6],
+        iMa: nums[7],
+        g: null,
+        k: null,
+        rapCalc: null,
+        a2: null,
+        b2: null,
+        m2: null,
+        n2: null,
+        dist: null,
+        esp: null,
+        nSep: nums[4],
+        rap: null,
+      };
+    }
+  }
   if (nums.length >= 8 && nums.length < 11) {
     return {
       medida: nums[0],
@@ -203,7 +238,13 @@ function rowFromCells(cells: string[]): SolodataLinhaRow | null {
 
 function isHeaderLine(cells: string[]): boolean {
   const u = cells.join(" ").toUpperCase();
-  return u.includes("MEDIDA") || u.includes("PIQUETE") || u.includes("DIST");
+  return (
+    u.includes("MEDIDA") ||
+    u.includes("PIQUETE") ||
+    u.includes("DIST") ||
+    isElectrodeFieldHeader(cells) ||
+    (cells.length <= 5 && isElectrodeHeader(cells))
+  );
 }
 
 /**

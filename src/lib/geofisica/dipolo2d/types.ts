@@ -34,44 +34,48 @@ export const DIPOLO2D_INVERT_METHODS: {
   short: string;
 }[] = [
   {
-    id: "least_squares",
-    label: "Mínimos quadrados (proxy LS)",
-    short: "LS",
+    id: "blocky_l1",
+    label: "Blocky — contraste geológico (ResIPy R2)",
+    short: "Blocky",
   },
-  { id: "occam", label: "Occam (proxy)", short: "Occam" },
+  {
+    id: "robust_l1",
+    label: "Robusta L1 — dados (ResIPy R2)",
+    short: "L1",
+  },
   {
     id: "gauss_newton",
-    label: "Gauss-Newton (proxy linear)",
+    label: "Gauss-Newton L2 (ResIPy R2)",
     short: "G-N",
   },
   {
     id: "smoothness",
-    label: "Suavizada (proxy Huber IRLS)",
+    label: "Suavizada L2 (ResIPy R2)",
     short: "Suave",
   },
   {
-    id: "robust_l1",
-    label: "Robusta L1 (IRLS)",
-    short: "L1",
+    id: "least_squares",
+    label: "Mínimos quadrados L2 (ResIPy R2)",
+    short: "LS",
   },
-  {
-    id: "blocky_l1",
-    label: "Blocky L1 (∇m IRLS, motor físico)",
-    short: "Blocky",
-  },
-  {
-    id: "hybrid",
-    label: "Híbrida L2/L1 (proxy)",
-    short: "Hybrid",
-  },
+  { id: "occam", label: "Occam (ResIPy R2)", short: "Occam" },
 ];
 
+/** Métodos expostos na UI — apenas ResIPy (sem proxy gaussiano). */
+export const RESIPY_INVERT_METHODS = DIPOLO2D_INVERT_METHODS.filter(
+  (m) => m.id !== "least_squares",
+);
+
 export type Dipolo2DInvertParams = {
-  /** Profundidade pseudo z ≈ factorDepth × n × a (m). */
+  /** Pseudoprofundidade / sensibilidade z ≈ factorDepth × n × a (ResIPy FMD ≈ 0,286). */
   factorDepth: number;
-  /** Largura horizontal da sensibilidade (m). */
+  /** Profundidade máxima do modelo RES2DINV: factor × n × a (tip. 1,0). */
+  modelDepthFactor?: number;
+  /** Extensão extra do modelo («model depth range» RES2DINV, tip. 1,05–1,30). */
+  modelDepthRange?: number;
+  /** @deprecated Proxy gaussiano removido — mantido só para compat. de presets. */
   sigmaXM: number;
-  /** Largura vertical da sensibilidade (m). */
+  /** @deprecated Proxy gaussiano removido — mantido só para compat. de presets. */
   sigmaZM: number;
   /** Peso global da regularização (λ_reg, estilo RES2DINV ≈ 0,15). */
   lambda: number;
@@ -96,16 +100,38 @@ export type Dipolo2DInvertParams = {
    * 1 = L2 puro (Huber), 0 = L1 puro. Ignorado pelos outros métodos.
    */
   hybridAlpha: number;
+  /** Limites ρ modelo (Ω·m) — estilo ResIPy/RES2DINV. */
+  rhoMinOhmM?: number;
+  rhoMaxOhmM?: number;
+  /** Malha ResIPy: trian | quad. */
+  meshType?: "trian" | "quad";
+  meshClFactor?: number;
+  meshRefine?: number;
+  meshFmdM?: number | null;
+  tolerance?: number;
+  aWgt?: number;
+  bWgt?: number;
+  filterReciprocal?: boolean;
+  filterNegative?: boolean;
+  filterDuplicates?: boolean;
+  filterPctError?: number | null;
+  contourSmoothPasses?: number;
+  cropCorners?: boolean;
+  sensitivityOverlay?: boolean;
+  doiEstimate?: boolean;
 };
 
 export type Dipolo2DIterationRecord = {
   iter: number;
   rmsLog10: number;
+  /** RMS relativo em % (motor físico). */
+  rmsPercent?: number;
   lambda: number;
   phi: number;
   roughnessL2: number;
   /** Ganho relativo da função objetivo vs iteração anterior. */
   relativeGain: number | null;
+  chi2Reduced?: number;
 };
 
 export type Dipolo2DInvertResult = {
@@ -128,9 +154,11 @@ export type Dipolo2DInvertResult = {
   nz: number;
   methodId: Dipolo2DInvertMethodId;
   methodLabel: string;
-  /** proxy = sensibilidade gaussiana (rápido); physics = FDM/FEM + Jacobiana. */
+  /** Motor: proxy gaussiano (browser) ou ResIPy R2 (physics). */
   engine?: "proxy" | "physics";
   physicsMessage?: string;
+  /** Etapas do motor ResIPy (logs de progresso). */
+  progressLog?: string[];
   excludedReadingIndices?: number[];
   forwardModel?: "fdm" | "fem";
   chi2Reduced?: number;

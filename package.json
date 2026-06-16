@@ -29,9 +29,10 @@
     "vercel:prod": "vercel --prod",
     "vercel:pull": "vercel env pull .env.local",
     "landsat:engine": "cd python-engine/landsat && uvicorn main:app --reload --port 8093",
-    "geophysics:engine": "cd python-engine/geophysics && python -m uvicorn main:app --host 127.0.0.1 --port 8092",
-    "geophysics:engine:dev": "cd python-engine/geophysics && uvicorn main:app --reload --host 127.0.0.1 --port 8092",
-    "geophysics:kill-port": "powershell -NoProfile -Command \"Get-NetTCPConnection -LocalPort 8092 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Get-CimInstance Win32_Process -Filter \\\"Name='python.exe'\\\" | Where-Object { $_.CommandLine -match 'uvicorn main:app' -and $_.CommandLine -match '8092' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; Get-CimInstance Win32_Process -Filter \\\"Name='python.exe'\\\" | Where-Object { $_.CommandLine -match 'multiprocessing.spawn' -and $_.CommandLine -match 'geophysics' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }\""
+    "geophysics:engine": "cd ../backend/geophysics-engine && (if exist ..\\..\\app-web\\python-engine\\geophysics\\.venv-geophysics\\Scripts\\python.exe (..\\..\\app-web\\python-engine\\geophysics\\.venv-geophysics\\Scripts\\python.exe server.py) else (python server.py))",
+    "geophysics:engine:dev": "cd ../backend/geophysics-engine && set GEOPHYS_RELOAD=1&& (if exist ..\\..\\app-web\\python-engine\\geophysics\\.venv-geophysics\\Scripts\\python.exe (..\\..\\app-web\\python-engine\\geophysics\\.venv-geophysics\\Scripts\\python.exe server.py) else (python server.py))",
+    "geophysics:install-resipy": "powershell -NoProfile -ExecutionPolicy Bypass -File python-engine/geophysics/scripts/install_resipy_local.ps1",
+    "geophysics:kill-port": "powershell -NoProfile -Command \"Get-NetTCPConnection -LocalPort 8092 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Get-CimInstance Win32_Process -Filter \\\"Name='python.exe'\\\" | Where-Object { ($_.CommandLine -match 'server.py' -or $_.CommandLine -match 'uvicorn') -and $_.CommandLine -match '8092' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; Get-CimInstance Win32_Process -Filter \\\"Name='python.exe'\\\" | Where-Object { $_.CommandLine -match 'multiprocessing.spawn' -and $_.CommandLine -match 'geophysics' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }\""
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

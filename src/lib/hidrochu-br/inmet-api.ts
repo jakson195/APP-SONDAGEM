@@ -1,4 +1,5 @@
 import type { RegistroDiarioBr } from "./types";
+import { fetchUrlText } from "@/lib/http/fetch-server";
 
 export type InmetImportResult = {
   registros: RegistroDiarioBr[];
@@ -93,10 +94,20 @@ export async function fetchInmetSerie(
 
   const cod = codigoInmet.toUpperCase();
   const url = `https://apitempo.inmet.gov.br/token/estacao/${cod}/${dataInicio}/${dataFim}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-    next: { revalidate: 3600 },
-  });
+
+  let res: { ok: boolean; status: number; text: string };
+  try {
+    res = await fetchUrlText(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "rede";
+    return {
+      registros: [],
+      fonte: "INMET",
+      aviso: `INMET API indisponível (${msg}).`,
+    };
+  }
 
   if (!res.ok) {
     return {
@@ -106,7 +117,7 @@ export async function fetchInmetSerie(
     };
   }
 
-  const json = await res.json();
+  const json = JSON.parse(res.text) as unknown;
   const registros = parseInmetDailyJson(json, cod);
   return {
     registros,

@@ -15,6 +15,8 @@ const coreNav = [
   { href: "/dashboard", label: "📊 Painel" },
   { href: "/hidrologia/chuvas-sc", label: "🌧️ Chuvas SC (HidroChu)" },
   { href: "/hidrologia/chuvas-br", label: "🇧🇷 HidroBrasil (ANA + IA)" },
+  { href: "/hidrologia/hidrogeo-brasil", label: "🗺️ HidroGeo Brasil (CPRM + ANM)" },
+  { href: "/mineracao/leilao-anm", label: "⛏️ ANM · Leilão SOPLE" },
   { href: "/obras", label: "📁 Obras · mapas" },
   { href: "/obra", label: "🏗️ Nova obra" },
   { href: "/gestao-empresa", label: "🏢 Gestão · empresas" },

@@ -9,6 +9,7 @@ import type {
   Dipolo2DInvertResult,
   Dipolo2DReading,
 } from "./types";
+import { computeModelZMaxM } from "./model-depth";
 import { res2dinvDataPreset } from "./smooth-invert-2d";
 
 function parseNum(raw: string): number | null {
@@ -52,14 +53,7 @@ function meshFromReadings(
   const xMin = xs.length ? Math.min(...xs) : 0;
   const xMax = xs.length ? Math.max(...xs) : 100;
   const margin = Math.max(1e-6, (xMax - xMin) * 0.05 + 0.5);
-  const aMed =
-    valid.reduce((acc, L) => acc + L.aM, 0) / Math.max(1, valid.length) || 15;
-  const nMax = valid.length ? Math.max(...valid.map((L) => L.n)) : 5;
-  const zMax = Math.max(
-    aMed * nMax * params.factorDepth * 1.25,
-    aMed * 2,
-    10,
-  );
+  const zMax = computeModelZMaxM(valid, params);
   return { x0: xMin - margin, x1: xMax + margin, zMax };
 }
 

@@ -1,31 +1,29 @@
 """
-Inversão 2D ERT via pyGIMLi (referência open-source estilo RES2DINV).
+Inversão 2D ERT via pyGIMLi (motor open-source recomendado, estilo RES2DINV).
 
-Requer: pip install pygimli  (Windows: conda install -c gimli pygimli recomendado)
+Requer: pip install pygimli  (Windows: conda install -c gimli pygimli)
 """
 
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 import numpy as np
 
-from schemas.invert_2d import (
-    Invert2DRequest,
-    Invert2DResponse,
-    IterationRecordOut,
-    MethodId,
-)
+from services.array_utils import writable
+
+from schemas.invert_2d import Invert2DRequest, Invert2DResponse, IterationRecordOut, MethodId
 from .fdm_forward import electrode_layout
-from .mesh import build_mesh, idx
+from .invert_common import (
+    build_display_mesh,
+    build_invert_response,
+    prepare_inversion_data,
+    resample_rho_to_display_grid,
+    rms_metrics,
+)
 from .method_map import PYGIMLI_METHOD, PYGIMLI_METHOD_LABEL
-from .sensitivity_depth import column_sensitivity_depth_m
 
 logger = logging.getLogger("geophysics.pygimli_invert")
-
-if TYPE_CHECKING:
-    import pygimli as pg
 
 _PYGIMLI: object | None = None
 _ERT: object | None = None
@@ -64,27 +62,10 @@ def _ert():
     return ert
 
 
-def _reading_dicts(req: Invert2DRequest) -> list[dict]:
-    return [
-        {
-            "station_m": r.station_m,
-            "n": r.n,
-            "a_m": r.a_m,
-            "rho_ohm_m": r.rho_ohm_m,
-            "i_ma": r.i_ma or 50.0,
-            "excluded": r.excluded,
-        }
-        for r in req.readings
-    ]
-
-
-def _build_ert_data(req: Invert2DRequest):
+def _build_ert_data(req: Invert2DRequest, active, reading_dicts):
     """DataContainerERT com leituras dipolo-dipolo (layout SOLODATA)."""
     pg = _pg()
     ert = _ert()
-    active = [r for r in req.readings if not r.excluded and r.rho_ohm_m > 0]
-    if len(active) < 4:
-        raise ValueError("Mínimo 4 leituras activas para pyGIMLi.")
 
     x_to_id: dict[float, int] = {}
 
@@ -95,8 +76,8 @@ def _build_ert_data(req: Invert2DRequest):
         return x_to_id[key]
 
     layouts = []
-    for r in active:
-        ly = electrode_layout(r.station_m, r.n, r.a_m)
+    for r, d in zip(active, reading_dicts):
+        ly = electrode_layout(d["station_m"], d["n"], d["a_m"])
         layouts.append(ly)
         for x in (ly.a_x, ly.b_x, ly.m_x, ly.n_x):
             sensor_id(x)
@@ -108,8 +89,7 @@ def _build_ert_data(req: Invert2DRequest):
     data = pg.DataContainerERT()
     data.setSensorPositions(positions)
 
-    rhoa = []
-    a_idx, b_idx, m_idx, n_idx = [], [], [], []
+    rhoa, a_idx, b_idx, m_idx, n_idx = [], [], [], [], []
     for r, ly in zip(active, layouts):
         a_idx.append(sensor_id(ly.a_x))
         b_idx.append(sensor_id(ly.b_x))
@@ -132,7 +112,6 @@ def _build_ert_data(req: Invert2DRequest):
     data.estimateError(relativeError=0.03, absoluteU=0.0)
 
     if req.topography:
-        # Cotas nos sensores por interpolação linear em estação
         topo = sorted((p.station_m, p.elevation_m) for p in req.topography)
         if len(topo) >= 2:
             st = np.array([t[0] for t in topo])
@@ -144,7 +123,7 @@ def _build_ert_data(req: Invert2DRequest):
                 pos[i, 2] = z
             data.setSensorPositions(pos)
 
-    return data, active
+    return data
 
 
 def _pygimli_lambda(req: Invert2DRequest, method: MethodId) -> float:
@@ -153,87 +132,108 @@ def _pygimli_lambda(req: Invert2DRequest, method: MethodId) -> float:
     lam = base * float(cfg["lam_scale"]) * 100.0
     if method == "occam":
         lam = max(lam, 15.0)
+    if method == "blocky_l1":
+        lam = max(lam * 0.85, 8.0)
     return float(np.clip(lam, 5.0, 500.0))
 
 
-def _resample_to_grid(
-    para_mesh,
-    model_rho: np.ndarray,
-    display_mesh,
-) -> np.ndarray:
-    """Interpola modelo pyGIMLi (malha não estruturada) na grelha nx×nz da UI."""
+def _resample_pygimli_model(para_mesh, model_rho, display_mesh) -> np.ndarray:
     pg = _pg()
-    m = np.zeros(display_mesh.nx * display_mesh.nz, dtype=float)
-    for i in range(display_mesh.nx):
-        for j in range(display_mesh.nz):
-            if not display_mesh.active[i, j]:
-                continue
-            u = idx(i, j, display_mesh.nz)
-            x = float(display_mesh.x_centers[i])
-            z = float(display_mesh.z_centers[j])
-            try:
-                val = float(
-                    pg.interpolate(
-                        para_mesh,
-                        model_rho,
-                        np.array([[x, z]]),
-                        fillValue=np.nan,
-                    )[0]
-                )
-            except Exception:
-                val = np.nan
-            if np.isfinite(val) and val > 0:
-                m[u] = np.log10(val)
-            else:
-                m[u] = np.nan
-    finite = m[np.isfinite(m)]
-    fill = float(np.mean(finite)) if finite.size else 2.0
-    return np.nan_to_num(m, nan=fill)
+
+    def interp(x: float, z: float) -> float:
+        try:
+            val = float(
+                pg.interpolate(
+                    para_mesh,
+                    model_rho,
+                    np.array([[x, z]]),
+                    fillValue=np.nan,
+                )[0]
+            )
+        except Exception:
+            val = np.nan
+        return val
+
+    return resample_rho_to_display_grid(interp, display_mesh)
 
 
 def _synthetic_response(data, model_rho, para_mesh) -> np.ndarray:
-    """ρa sintética nas leituras do data container."""
     ert = _ert()
     fop = ert.ERTModelling()
     fop.setData(data)
     fop.setMesh(para_mesh)
-    resp = np.asarray(fop.response(model_rho), dtype=float)
+    resp = writable(fop.response(model_rho))
     return np.maximum(resp, 1e-6)
 
 
+def _extract_iteration_history(
+    mgr,
+    lam: float,
+    y_obs: np.ndarray,
+    y_syn: np.ndarray,
+    m_log10: np.ndarray,
+) -> list[IterationRecordOut]:
+    history: list[IterationRecordOut] = []
+    inv = getattr(mgr, "inv", None)
+    if inv is not None:
+        try:
+            n_iters = int(getattr(inv, "iter", 0) or 0)
+            chi2_list = []
+            if hasattr(inv, "chi2History"):
+                chi2_list = list(inv.chi2History())
+            elif hasattr(inv, "getPhi"):
+                for it in range(max(1, n_iters)):
+                    try:
+                        chi2_list.append(float(inv.getPhi(it)))
+                    except Exception:
+                        break
+            for it, phi in enumerate(chi2_list or [float(np.sum((y_obs - y_syn) ** 2))]):
+                rho = 10.0**m_log10
+                history.append(
+                    IterationRecordOut(
+                        iter=it + 1,
+                        rms_log10=float(np.sqrt(phi / max(len(y_obs), 1))),
+                        rms_percent=rms_metrics(y_obs, y_syn)[1],
+                        lambda_reg=lam,
+                        phi=float(phi),
+                        roughness_l2=float(np.std(m_log10[np.isfinite(m_log10)])),
+                        relative_gain=None,
+                        rho_min_ohm_m=float(np.min(rho)),
+                        rho_max_ohm_m=float(np.max(rho)),
+                        rho_std_ohm_m=float(np.std(rho)),
+                    )
+                )
+        except Exception as e:
+            logger.debug("histórico pyGIMLi indisponível: %s", e)
+
+    if not history:
+        rms_log10, rms_percent = rms_metrics(y_obs, y_syn)
+        rho = 10.0**m_log10
+        history.append(
+            IterationRecordOut(
+                iter=1,
+                rms_log10=rms_log10,
+                rms_percent=rms_percent,
+                lambda_reg=lam,
+                phi=rms_log10,
+                roughness_l2=float(np.std(m_log10[np.isfinite(m_log10)])),
+                relative_gain=None,
+                rho_min_ohm_m=float(np.min(rho)),
+                rho_max_ohm_m=float(np.max(rho)),
+                rho_std_ohm_m=float(np.std(rho)),
+            )
+        )
+    return history
+
+
 def run_pygimli_invert(req: Invert2DRequest) -> Invert2DResponse:
-    pg = _pg()
     ert = _ert()
     method = req.method
     cfg = PYGIMLI_METHOD.get(method, PYGIMLI_METHOD["gauss_newton"])
 
-    data, active_readings = _build_ert_data(req)
-    reading_dicts = _reading_dicts(req)
-    active_dicts = [
-        d for d in reading_dicts if not d.get("excluded") and d["rho_ohm_m"] > 0
-    ]
-
-    xs = [d["station_m"] for d in active_dicts]
-    electrode_xs: list[float] = []
-    for d in active_dicts:
-        ly = electrode_layout(d["station_m"], d["n"], d["a_m"])
-        electrode_xs.extend([ly.a_x, ly.b_x, ly.m_x, ly.n_x])
-    x_min = min(min(xs), min(electrode_xs)) - 5.0
-    x_max = max(max(xs), max(electrode_xs)) + 5.0
-
-    topo = None
-    if req.topography:
-        topo = [(p.station_m, p.elevation_m) for p in req.topography]
-
-    display_mesh = build_mesh(
-        x_min,
-        x_max,
-        req.params.nx,
-        req.params.nz,
-        10,
-        topo,
-        geometric_z=req.params.geometric_z_layers,
-    )
+    active, y_obs, w, reading_dicts, excluded, x0, x1 = prepare_inversion_data(req)
+    display_mesh = build_display_mesh(req, x0, x1, reading_dicts)
+    data = _build_ert_data(req, active, reading_dicts)
 
     mgr = ert.ERTManager(data)
     lam = _pygimli_lambda(req, method)
@@ -243,6 +243,13 @@ def run_pygimli_invert(req: Invert2DRequest) -> Invert2DResponse:
     if blocky and hasattr(mgr, "inv"):
         try:
             mgr.inv.setBlockyModel(True)
+        except Exception:
+            pass
+
+    robust = bool(cfg.get("robust_data"))
+    if robust and hasattr(mgr, "inv"):
+        try:
+            mgr.inv.setRobustData(True)
         except Exception:
             pass
 
@@ -257,77 +264,37 @@ def run_pygimli_invert(req: Invert2DRequest) -> Invert2DResponse:
     except TypeError:
         model_vec = mgr.invert(lam=lam, maxIter=max_iter, verbose=verbose)
 
-    model_rho = np.asarray(model_vec, dtype=float)
+    model_rho = writable(model_vec)
     para_mesh = mgr.paraDomain
-    m_log10 = _resample_to_grid(para_mesh, model_rho, display_mesh)
+    m_log10 = _resample_pygimli_model(para_mesh, model_rho, display_mesh)
 
-    y_obs = np.log10(np.maximum(np.asarray(data["rhoa"], dtype=float), 1e-6))
     try:
         y_syn_lin = _synthetic_response(data, model_rho, para_mesh)
         y_syn = np.log10(y_syn_lin)
     except Exception:
         y_syn = y_obs.copy()
 
-    res = y_obs - y_syn
-    rms_log10 = float(np.sqrt(np.mean(np.square(res))))
-    obs_lin = 10.0**y_obs
-    syn_lin = 10.0**y_syn
-    rms_percent = float(
-        np.sqrt(np.mean(np.square((obs_lin - syn_lin) / np.maximum(obs_lin, 1e-6))))
-        * 100.0
-    )
-
-    rho_cells = 10.0**m_log10
-    roughness = float(np.std(np.diff(m_log10[np.isfinite(m_log10)])) if m_log10.size > 1 else 0.0)
-
-    history = [
-        IterationRecordOut(
-            iter=1,
-            rms_log10=rms_log10,
-            rms_percent=rms_percent,
-            lambda_reg=lam,
-            phi=rms_log10,
-            roughness_l2=roughness,
-            relative_gain=None,
-            rho_min_ohm_m=float(np.min(rho_cells)),
-            rho_max_ohm_m=float(np.max(rho_cells)),
-            rho_std_ohm_m=float(np.std(rho_cells)),
-        )
-    ]
-
-    excluded = [i for i, r in enumerate(req.readings) if r.excluded]
+    history = _extract_iteration_history(mgr, lam, y_obs, y_syn, m_log10)
     label = PYGIMLI_METHOD_LABEL.get(method, f"pyGIMLi ({method})")
 
-    return Invert2DResponse(
-        ok=True,
+    return build_invert_response(
+        req=req,
         engine="pygimli",
-        forward_model="fdm",
         method=method,
         method_label=label,
-        nx=display_mesh.nx,
-        nz=display_mesh.nz,
-        x_edges_m=display_mesh.x_edges.tolist(),
-        z_edges_m=display_mesh.z_edges.tolist(),
-        m_log10=m_log10.tolist(),
-        active_cells=[
-            bool(display_mesh.active[i, j])
-            for i in range(display_mesh.nx)
-            for j in range(display_mesh.nz)
-        ],
-        z_cover_m=column_sensitivity_depth_m(
-            display_mesh, active_dicts, req.params.factor_depth
-        ).tolist(),
-        y_obs_log10=y_obs.tolist(),
-        y_syn_log10=y_syn.tolist(),
-        rms_log10=rms_log10,
-        rms_percent=rms_percent,
-        roughness_l2=roughness,
-        iterations=1,
+        forward_model="fdm",
+        display_mesh=display_mesh,
+        m_log10=m_log10,
+        y_obs=y_obs,
+        y_syn=y_syn,
+        reading_dicts=reading_dicts,
+        excluded=excluded,
+        data_weights=w.tolist(),
+        iterations=len(history),
         iteration_history=history,
-        excluded_indices=excluded,
-        data_weights=[1.0] * len(y_obs),
+        lambda_reg=lam,
         message=(
-            f"Inversão pyGIMLi (estilo RES2DINV) — λ={lam:.1f}, "
-            f"malha {display_mesh.nx}×{display_mesh.nz}, blocky={'sim' if blocky else 'não'}"
+            f"Inversão pyGIMLi — λ={lam:.1f}, malha {display_mesh.nx}×{display_mesh.nz}, "
+            f"blocky={'sim' if blocky else 'não'}, {len(history)} reg. iterações"
         ),
     )

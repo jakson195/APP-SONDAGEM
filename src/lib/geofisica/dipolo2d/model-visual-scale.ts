@@ -7,12 +7,16 @@ export type ModelDisplayScale = "log" | "linear";
 export type ModelContrastMode =
   | "auto"
   | "percentile"
+  | "log_percentile"
   | "minmax"
   | "standard"
   | "equalize"
   | "stdstretch"
   | "manual"
   | "res2dinv";
+
+/** Percentis usados na legenda (escala log real do modelo invertido). */
+export const LOG_PERCENTILE_LEGEND_PCTS = [2, 10, 25, 50, 75, 90, 98] as const;
 
 export type ModelDisplayBounds = {
   logLo: number;
@@ -49,6 +53,79 @@ export function rhoPercentileBounds(
     rhoMax = sorted[sorted.length - 1]!;
   }
   return { rhoMin, rhoMax };
+}
+
+/** Valor de ρ (Ω·m) no percentil p (0–100) da amostra. */
+export function percentileValueAt(rhoValues: number[], pPercent: number): number {
+  const positive = rhoValues.filter((v) => v > 0 && Number.isFinite(v));
+  if (!positive.length) return 100;
+  const sorted = [...positive].sort((a, b) => a - b);
+  const idx = Math.max(
+    0,
+    Math.min(
+      sorted.length - 1,
+      Math.floor((sorted.length - 1) * (pPercent / 100)),
+    ),
+  );
+  return sorted[idx]!;
+}
+
+/** Rótulos da barra de cores em Ω·m (percentis do modelo). */
+export function logPercentileLegendTicks(
+  rhoValues: number[],
+  percentiles: readonly number[] = LOG_PERCENTILE_LEGEND_PCTS,
+): number[] {
+  return percentiles.map((p) => percentileValueAt(rhoValues, p));
+}
+
+export type LogPercentileScale = {
+  logLo: number;
+  logHi: number;
+  rhoMinOhmM: number;
+  rhoMaxOhmM: number;
+  normalizeRho: (rhoOhmM: number) => number;
+  legendTicksOhmM: number[];
+  scaleLabel: string;
+};
+
+/**
+ * Escala log₁₀ contínua: limites PpLo–PpHi e legenda nos percentis dos ρ invertidos.
+ */
+export function buildLogPercentileScale(
+  rhoValues: number[],
+  options?: {
+    pLo?: number;
+    pHi?: number;
+    legendPercentiles?: readonly number[];
+  },
+): LogPercentileScale {
+  const pLo = options?.pLo ?? 5;
+  const pHi = options?.pHi ?? 95;
+  const { rhoMin, rhoMax } = rhoPercentileBounds(rhoValues, pLo, pHi);
+  let logLo = Math.log10(Math.max(rhoMin, 1e-6));
+  let logHi = Math.log10(Math.max(rhoMax, 1e-6));
+  const span = logHi - logLo;
+  const pad = Math.max(0.03, span * 0.04);
+  logLo -= pad;
+  logHi += pad;
+  const spanFinal = logHi - logLo || 0.15;
+  const normalizeRho = (rhoOhmM: number) => {
+    const logV = Math.log10(Math.max(rhoOhmM, 1e-12));
+    return clamp01((logV - logLo) / spanFinal);
+  };
+  const legendTicksOhmM = logPercentileLegendTicks(
+    rhoValues,
+    options?.legendPercentiles ?? LOG_PERCENTILE_LEGEND_PCTS,
+  );
+  return {
+    logLo,
+    logHi,
+    rhoMinOhmM: 10 ** logLo,
+    rhoMaxOhmM: 10 ** logHi,
+    normalizeRho,
+    legendTicksOhmM,
+    scaleLabel: `log₁₀ P${pLo}–P${pHi} (modelo invertido)`,
+  };
 }
 
 export function resolveModelDisplayBounds(
@@ -105,10 +182,14 @@ export function resolveModelDisplayBounds(
       ({ rhoMin, rhoMax } = rhoPercentileBounds(positive, 2, 98));
       scaleLabel = "P2–P98 (legenda)";
       break;
+    case "log_percentile":
     case "percentile":
     default:
       ({ rhoMin, rhoMax } = rhoPercentileBounds(positive, 5, 95));
-      scaleLabel = "P5–P95 do modelo (RES2DINV)";
+      scaleLabel =
+        contrast === "log_percentile"
+          ? "log₁₀ P5–P95 (percentis do modelo)"
+          : "P5–P95 do modelo";
       break;
   }
 
@@ -246,6 +327,17 @@ export function rhoToNormalizedLinear(
   rhoMax: number,
 ): number {
   return clamp01((rhoOhmM - rhoMin) / (rhoMax - rhoMin || 1));
+}
+
+/**
+ * Cópia elemento a elemento (não usa TypedArray.set / Float64Array.from).
+ * Evita "buffer source array is read-only" com buffers imutáveis do React/state.
+ */
+export function cloneFloat64Array(src: ArrayLike<number>): Float64Array {
+  const n = src.length;
+  const out = new Float64Array(n);
+  for (let i = 0; i < n; i++) out[i] = +src[i]!;
+  return out;
 }
 
 /** Substitui NaN/Inf por média das células finitas (evita canvas vazio). */

@@ -4,7 +4,8 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { VolumeAiResult } from "@/lib/geofisica/ai/volume-interpret-ai";
-import { invertDipolo2D } from "@/lib/geofisica/dipolo2d/invert-methods-2d";
+import { invertDipolo2DPhysics } from "@/lib/geofisica/dipolo2d/physics-invert-2d";
+import { RES2DINV_DEFAULT_METHOD } from "@/lib/geofisica/dipolo2d/res2dinv-preset";
 import {
   parseDipoloImportFile,
   parseRes2dinvDatWithTopography,
@@ -828,7 +829,7 @@ export function Volume3DClient() {
     }
   };
 
-  const invertLine = (id: string) => {
+  const invertLine = async (id: string) => {
     const line = lines.find((l) => l.id === id);
     if (!line || line.readings.length === 0) {
       setNotice("Linha sem leituras.");
@@ -840,42 +841,64 @@ export function Volume3DClient() {
       setNotice("Mínimo 4 leituras activas para inversão.");
       return;
     }
+    setBusy(true);
     try {
-      const result = invertDipolo2D(active, params, "smoothness");
+      const result = await invertDipolo2DPhysics(
+        active,
+        params,
+        RES2DINV_DEFAULT_METHOD,
+        line.topography,
+        undefined,
+        "fdm",
+        { physicsBackend: "resipy" },
+      );
       if (!result) {
-        setNotice(`${line.name}: inversão falhou (dados insuficientes).`);
+        setNotice(`${line.name}: inversão ResIPy falhou (dados insuficientes).`);
         return;
       }
       updateLine(id, { invertResult: result });
-      setNotice(`${line.name}: RMS log₁₀ = ${result.rmsLog10.toFixed(4)}`);
+      setNotice(
+        `${line.name}: ResIPy R2 — RMS log₁₀ = ${result.rmsLog10.toFixed(4)}`,
+      );
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : "Erro na inversão.");
+      setNotice(e instanceof Error ? e.message : "Erro na inversão ResIPy.");
+    } finally {
+      setBusy(false);
     }
   };
 
-  const invertAll = () => {
+  const invertAll = async () => {
     setBusy(true);
     let ok = 0;
-    setLines((prev) =>
-      prev.map((line) => {
-        if (line.readings.length === 0) return line;
-        const params = line.invertParams ?? defaultInvertParams;
-        const active = line.readings.filter((r) => !r.excluded);
-        if (active.length < 4) return line;
-        try {
-          const result = invertDipolo2D(active, params, "smoothness");
-          if (!result) return line;
-          ok++;
-          return { ...line, invertResult: result };
-        } catch {
-          return line;
-        }
-      }),
-    );
+    const next = [...lines];
+    for (let i = 0; i < next.length; i++) {
+      const line = next[i]!;
+      if (line.readings.length === 0) continue;
+      const params = line.invertParams ?? defaultInvertParams;
+      const active = line.readings.filter((r) => !r.excluded);
+      if (active.length < 4) continue;
+      try {
+        const result = await invertDipolo2DPhysics(
+          active,
+          params,
+          RES2DINV_DEFAULT_METHOD,
+          line.topography,
+          undefined,
+          "fdm",
+          { physicsBackend: "resipy" },
+        );
+        if (!result) continue;
+        next[i] = { ...line, invertResult: result };
+        ok++;
+      } catch {
+        /* linha seguinte */
+      }
+    }
+    setLines(next);
     setBusy(false);
     setNotice(
       ok >= 2
-        ? `Inversão concluída: ${ok} linha(s) pronta(s) para o volume 3D.`
+        ? `Inversão RES2DINV concluída: ${ok} linha(s) pronta(s) para o volume 3D.`
         : ok === 1
           ? "Só 1 linha invertida — são necessárias pelo menos 2."
           : "Nenhuma linha invertida. Verifique leituras (mín. 4 activas por linha).",
@@ -1644,7 +1667,7 @@ export function Volume3DClient() {
                   {!line.invertResult && line.readings.length >= 4 && (
                     <button
                       type="button"
-                      onClick={() => invertLine(line.id)}
+                      onClick={() => void invertLine(line.id)}
                       className="rounded bg-slate-600 px-2 py-0.5 text-xs text-white"
                     >
                       Inverter

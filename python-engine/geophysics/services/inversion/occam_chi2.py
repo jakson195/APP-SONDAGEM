@@ -5,6 +5,8 @@ from typing import Callable
 
 import numpy as np
 
+from services.array_utils import writable
+
 
 def data_sigma_log10(weights: np.ndarray, huber_c: float) -> np.ndarray:
     """
@@ -17,8 +19,8 @@ def data_sigma_log10(weights: np.ndarray, huber_c: float) -> np.ndarray:
 
 def chi2_reduced(residual: np.ndarray, sigma: np.ndarray) -> float:
     """χ² = Σ (r_i / σ_i)² — reduzido (não dividido por nd)."""
-    r = np.asarray(residual, dtype=float)
-    s = np.maximum(np.asarray(sigma, dtype=float), 1e-8)
+    r = writable(residual)
+    s = np.maximum(writable(sigma), 1e-8)
     return float(np.sum(np.square(r / s)))
 
 

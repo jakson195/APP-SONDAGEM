@@ -36,6 +36,34 @@ export const GEOSGB_CATALOG: GeodataCatalogEntry[] = [
     role: "structure",
   },
   {
+    id: "sgb-magnetometry-ternary",
+    provider: "geosgb",
+    label: "GeoSGB — Magnetometria (mapa ternário)",
+    category: "magnetometria",
+    priority: 28,
+    type: "arcgis_mapserver",
+    url: "https://geoportal.sgb.gov.br/server/rest/services/Mapas_Tern_Mag_MIL1/MapServer",
+    wmsLayers: "0",
+    https: true,
+    role: "geophysics",
+    notes: "TERN_Brasil.tif — cobertura aerogeofísica CPRM",
+    docsUrl: "https://www.sgb.gov.br/aerogeofisica",
+  },
+  {
+    id: "sgb-magnetometry-anomaly",
+    provider: "geosgb",
+    label: "GeoSGB — Magnetometria (anomalia magnética)",
+    category: "magnetometria",
+    priority: 29,
+    type: "arcgis_mapserver",
+    url: "https://geoportal.sgb.gov.br/server/rest/services/Mapas_Tern_Mag_MIL1/MapServer",
+    wmsLayers: "1",
+    https: true,
+    role: "geophysics",
+    notes: "AM_Brasil.tif — anomalia magnética total",
+    docsUrl: "https://www.sgb.gov.br/aerogeofisica",
+  },
+  {
     id: "sgb-aespectral",
     provider: "geosgb",
     label: "GeoSGB — Aerogamaespectrometria",
@@ -131,6 +159,8 @@ export const GEOSGB_MAP_OVERLAYS: {
   category: GeodataCatalogEntry["category"];
   defaultOn?: boolean;
   opacity?: number;
+  /** Índice WMS / subcamada ArcGIS (ex. "0", "1"). */
+  wmsLayerIndex?: string;
 }[] = [
   {
     id: "overlay-geologia-ingeo",
@@ -148,6 +178,23 @@ export const GEOSGB_MAP_OVERLAYS: {
       "https://geoportal.sgb.gov.br/server/rest/services/geologia/Estruturas_GIS_Brasil_2004/MapServer",
     category: "estruturas",
     opacity: 0.65,
+  },
+  {
+    id: "overlay-mag-ternary",
+    label: "Magnetometria — mapa ternário",
+    mapServerUrl:
+      "https://geoportal.sgb.gov.br/server/rest/services/Mapas_Tern_Mag_MIL1/MapServer",
+    category: "magnetometria",
+    opacity: 0.72,
+  },
+  {
+    id: "overlay-mag-anomaly",
+    label: "Magnetometria — anomalia magnética",
+    mapServerUrl:
+      "https://geoportal.sgb.gov.br/server/rest/services/Mapas_Tern_Mag_MIL1/MapServer",
+    category: "magnetometria",
+    wmsLayerIndex: "1",
+    opacity: 0.75,
   },
   {
     id: "overlay-aespectral",

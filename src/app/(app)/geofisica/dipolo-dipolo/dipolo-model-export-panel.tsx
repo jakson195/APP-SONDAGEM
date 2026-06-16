@@ -141,7 +141,9 @@ export function DipoloModelExportPanel({
                 }}
               />
             </div>
-            <span className="mt-0.5 block text-[10px]">1 = natural · &gt;1 exagera profundidade</span>
+            <span className="mt-0.5 block text-[10px]">
+              1 = escala natural do perfil · &gt;1 exagera profundidade
+            </span>
           </label>
         </div>
         <div className="flex flex-wrap gap-2">

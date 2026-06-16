@@ -7,6 +7,7 @@ import {
 } from "./geotechnical-section-render";
 import {
   buildModelZCoverProfile,
+  putRgbaOnCanvas,
   rasterizeModelSection,
   zCoverInterpolated,
 } from "./model-section-render";
@@ -48,7 +49,7 @@ function blitRaster(
   off.height = rh;
   const octx = off.getContext("2d");
   if (!octx) return;
-  octx.putImageData(new ImageData(new Uint8ClampedArray(rgba), rw, rh), 0, 0);
+  putRgbaOnCanvas(octx, rgba, rw, rh);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   if (clip) {

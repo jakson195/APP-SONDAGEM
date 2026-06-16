@@ -8,6 +8,7 @@ import type {
   Dipolo2DIterationRecord,
   Dipolo2DReading,
 } from "./types";
+import { computeModelZMaxM } from "./model-depth";
 
 export const NM = (nx: number, nz: number) => nx * nz;
 
@@ -395,7 +396,6 @@ export function finalizeResult(
     nz,
     methodId,
     methodLabel,
-    engine: "proxy",
   };
 }
 
@@ -453,10 +453,7 @@ export function prepareInvertProblem(
   const margin = Math.max(1e-6, (xMax - xMin) * 0.05 + 0.5);
   const x0 = xMin - margin;
   const x1 = xMax + margin;
-  const aMed =
-    valid.reduce((acc, L) => acc + L.aM, 0) / Math.max(1, valid.length);
-  const nMax = Math.max(...valid.map((L) => L.n));
-  const zMax = Math.max(aMed * nMax * p.factorDepth * 1.25, aMed * 2);
+  const zMax = computeModelZMaxM(valid, p);
 
   const { nx, nz } = p;
   const { G } = buildSensitivityMatrix(

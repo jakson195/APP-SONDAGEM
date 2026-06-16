@@ -5,7 +5,7 @@ import type { ResistivityColorScale } from "./colormap";
 
 /** Quebras típicas da legenda RES2DINV (Ω·m). */
 export const RES2DINV_CLASS_BREAKS_OHM = [
-  0, 60, 80, 150, 300, 700, 1500, 4500, 10000,
+  10, 40, 80, 120, 200, 400, 800, 1500, 3000, 8000,
 ] as const;
 
 export const RES2DINV_COLOR_LEVELS = 16;
@@ -13,8 +13,8 @@ export const RES2DINV_COLOR_LEVELS = 16;
 /** Escala fixa log₁₀ — evita modelo todo verde por auto-contraste. */
 export const RES2DINV_FIXED_COLOR_SCALE: ResistivityColorScale = {
   auto: false,
-  rhoMinOhmM: 1,
-  rhoMaxOhmM: 5000,
+  rhoMinOhmM: 10,
+  rhoMaxOhmM: 8000,
   palette: "x2ipi",
 };
 
@@ -58,3 +58,8 @@ export function res2dinvLegendLabels(
 ): number[] {
   return [...breaks];
 }
+
+/** Quebras da legenda vertical ResIPy Results (jet, escala linear 0–7500 Ω·m). */
+export const RESIPY_RESULTS_LEGEND_BREAKS_OHM = [
+  0, 1250, 2500, 3750, 5000, 6250, 7500,
+] as const;

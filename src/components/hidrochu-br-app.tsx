@@ -25,7 +25,7 @@ import {
   type CatalogoBrasil,
 } from "@/lib/hidrochu-br/estacoes-catalog";
 import { preverEnchenteFromSerie } from "@/lib/hidrochu-br/flood-predict";
-import { autoImportFromFonte } from "@/lib/hidrochu-br/auto-import-client";
+import { autoImportFromFonte, bulkImportNacional, fetchEstacoesApi } from "@/lib/hidrochu-br/auto-import-client";
 import { FONTES_HIDRO_BR } from "@/lib/hidrochu-br/sources";
 import type {
   ContextoEnchenteInformado,
@@ -99,6 +99,16 @@ export function HidroChuBrApp() {
   });
   const [fontePreferida, setFontePreferida] = useState<FonteHidrologica>("ANA");
   const [autoImport, setAutoImport] = useState(true);
+  const [catalogoFonte, setCatalogoFonte] = useState<"seed" | "ana">("seed");
+  const [estacoesAna, setEstacoesAna] = useState<EstacaoBrasil[]>([]);
+  const [catalogoLabel, setCatalogoLabel] = useState("seed");
+  const [maxBulk, setMaxBulk] = useState(10);
+  const [tipoCatalogo, setTipoCatalogo] = useState<"" | "Pluviometrica" | "Fluviometrica">(
+    "Pluviometrica",
+  );
+  const [soTelemetrica, setSoTelemetrica] = useState(false);
+  const [bulkResumo, setBulkResumo] = useState<string | null>(null);
+  const [seriesNacionais, setSeriesNacionais] = useState<Record<string, RegistroDiarioBr[]>>({});
 
   const selecionarEstacaoRef = useRef<(e: EstacaoBrasil) => void>(() => {});
 
@@ -107,7 +117,11 @@ export function HidroChuBrApp() {
       .then((c) => {
         setCatalogo(c);
         const list = buscarEstacoes(c, { uf: "SC" });
-        if (list[0]) selecionarEstacaoRef.current(list[0]);
+        const preferida =
+          list.find((e) => e.codigo === "02652000") ??
+          list.find((e) => e.codigo === "02650000") ??
+          list[0];
+        if (preferida) selecionarEstacaoRef.current(preferida);
       })
       .catch(() => setImportMsg("Catálogo nacional não carregou."));
   }, []);
@@ -124,6 +138,7 @@ export function HidroChuBrApp() {
       if (p.autoImportEnabled != null) setAutoImport(p.autoImportEnabled);
       const cod = p.estacoesFavoritas?.[0];
       if (cod && p.series?.[cod]) setSerie(p.series[cod]!);
+      if (p.series && Object.keys(p.series).length > 1) setSeriesNacionais(p.series);
     } catch {
       /* ignore */
     }
@@ -157,7 +172,9 @@ export function HidroChuBrApp() {
       const serie1 = maxAnuais.length >= 5 ? maxAnuais.join("\n") : serie1dia;
       if (maxAnuais.length >= 5) setSerie1dia(serie1);
       setImportMsg(
-        `Importação automática (${fonteUsada}): ${regs.length} registos.${avisos.length ? ` ${avisos.join(" ")}` : ""}`,
+        avisos.length
+          ? `Importação (${fonteUsada}): ${regs.length} registos.\n${avisos.join("\n")}`
+          : `Importação (${fonteUsada}): ${regs.length} registos.`,
       );
       const estSave = est ?? estacao;
       if (estSave) {
@@ -211,10 +228,130 @@ export function HidroChuBrApp() {
 
   selecionarEstacaoRef.current = selecionarEstacao;
 
+  const carregarCatalogoAna = useCallback(
+    async (refresh = false) => {
+      setLoading(true);
+      setImportMsg(`A carregar inventário ANA (${uf})…`);
+      try {
+        const data = await fetchEstacoesApi({
+          uf,
+          q: busca || undefined,
+          fonte: "ana",
+          refresh,
+          tipo: tipoCatalogo || undefined,
+          telemetrica: soTelemetrica ? "1" : undefined,
+        });
+        setEstacoesAna(data.estacoes);
+        setCatalogoLabel(data.fonte);
+        setImportMsg(
+          data.aviso
+            ? `Catálogo ANA: ${data.total} estações (${uf}).\n${data.aviso}`
+            : `Catálogo ANA: ${data.total} estações em ${uf}.`,
+        );
+      } catch (e) {
+        setImportMsg(e instanceof Error ? e.message : "Erro ao carregar catálogo ANA");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [uf, busca, tipoCatalogo, soTelemetrica],
+  );
+
+  const importarNacional = useCallback(async () => {
+    setLoading(true);
+    setBulkResumo(null);
+    setImportMsg(`Importação nacional (${uf}) — até ${maxBulk} estações…`);
+    try {
+      const data = await bulkImportNacional({
+        uf,
+        fonteCatalogo: "ana",
+        tipo: tipoCatalogo || undefined,
+        telemetrica: soTelemetrica ? "1" : undefined,
+        dataInicio: dataIni,
+        dataFim: dataFim,
+        fonte: fontePreferida,
+        maxEstacoes: maxBulk,
+      });
+      setSeriesNacionais((prev) => ({ ...prev, ...data.series }));
+      const fav = Object.keys(data.series);
+      const p: HidroBrPersisted = {
+        estacoesFavoritas: fav,
+        series: { ...seriesNacionais, ...data.series },
+        estacaoAtiva: estacao ?? undefined,
+        serie1dia,
+        contextoEnchente: ctx,
+        fontePreferida,
+        autoImportEnabled: autoImport,
+        ultimaImportacao: new Date().toISOString(),
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(p));
+      const firstOk = data.itens.find((i) => i.ok);
+      if (firstOk && data.series[firstOk.codigo]) {
+        setSerie(data.series[firstOk.codigo]!);
+        setEstacao({
+          codigo: firstOk.codigo,
+          nome: firstOk.nome,
+          uf,
+          municipio: "",
+          tipo: "Pluviometrica",
+          latitude: 0,
+          longitude: 0,
+          fonte: "ANA",
+        });
+      }
+      setBulkResumo(
+        `${data.sucesso}/${data.processadas} com série · ${Object.keys(data.series).length} guardadas`,
+      );
+      setImportMsg(
+        [
+          `Importação nacional: ${data.sucesso} OK, ${data.falhas} falhas (${data.processadas} processadas).`,
+          ...data.avisos,
+          data.itens
+            .slice(0, 8)
+            .map((i) => `${i.codigo} ${i.nome}: ${i.ok ? i.total + " reg (" + i.fonteUsada + ")" : "falhou"}`)
+            .join("\n"),
+          data.itens.length > 8 ? `… e mais ${data.itens.length - 8} estações` : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      );
+    } catch (e) {
+      setImportMsg(e instanceof Error ? e.message : "Erro na importação nacional");
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    uf,
+    tipoCatalogo,
+    soTelemetrica,
+    dataIni,
+    dataFim,
+    fontePreferida,
+    maxBulk,
+    estacao,
+    serie1dia,
+    ctx,
+    autoImport,
+    seriesNacionais,
+  ]);
+
   const estacoesFiltradas = useMemo(() => {
+    if (catalogoFonte === "ana") {
+      let list = estacoesAna;
+      if (busca.trim()) {
+        const q = busca.trim().toLowerCase();
+        list = list.filter(
+          (e) =>
+            e.nome.toLowerCase().includes(q) ||
+            e.municipio.toLowerCase().includes(q) ||
+            e.codigo.includes(q),
+        );
+      }
+      return list.slice(0, 300);
+    }
     if (!catalogo) return [];
     return buscarEstacoes(catalogo, { uf, q: busca });
-  }, [catalogo, uf, busca]);
+  }, [catalogo, catalogoFonte, estacoesAna, uf, busca]);
 
   const valoresGumbel = useMemo(() => {
     const fromSerie = serieMaximasAnuaisValores(serie);
@@ -360,7 +497,13 @@ export function HidroChuBrApp() {
       </nav>
 
       {importMsg && (
-        <p className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900 dark:border-teal-900/50 dark:bg-teal-950/40 dark:text-teal-100">
+        <p
+          className={`whitespace-pre-line rounded-lg border px-3 py-2 text-sm ${
+            importMsg.includes("(Demo)")
+              ? "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
+              : "border-teal-200 bg-teal-50 text-teal-900 dark:border-teal-900/50 dark:bg-teal-950/40 dark:text-teal-100"
+          }`}
+        >
           {importMsg}
         </p>
       )}
@@ -402,6 +545,24 @@ export function HidroChuBrApp() {
             )}
           </Panel>
           <Panel title="Filtro nacional">
+            <div className="mb-2 flex flex-wrap gap-3 text-xs">
+              <label className="flex items-center gap-1">
+                <input
+                  type="radio"
+                  checked={catalogoFonte === "seed"}
+                  onChange={() => setCatalogoFonte("seed")}
+                />
+                Catálogo seed (30)
+              </label>
+              <label className="flex items-center gap-1">
+                <input
+                  type="radio"
+                  checked={catalogoFonte === "ana"}
+                  onChange={() => setCatalogoFonte("ana")}
+                />
+                ANA inventário (UF)
+              </label>
+            </div>
             <div className="flex flex-wrap gap-2">
               <select
                 value={uf}
@@ -422,10 +583,53 @@ export function HidroChuBrApp() {
                 className="min-w-[12rem] flex-1 rounded border border-[var(--border)] px-2 py-1 text-sm"
               />
             </div>
+            {catalogoFonte === "ana" && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <select
+                  value={tipoCatalogo}
+                  onChange={(e) =>
+                    setTipoCatalogo(e.target.value as typeof tipoCatalogo)
+                  }
+                  className="rounded border border-[var(--border)] px-2 py-1 text-xs"
+                >
+                  <option value="">Todos os tipos</option>
+                  <option value="Pluviometrica">Pluviométricas</option>
+                  <option value="Fluviometrica">Fluviométricas</option>
+                </select>
+                <label className="flex items-center gap-1 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={soTelemetrica}
+                    onChange={(e) => setSoTelemetrica(e.target.checked)}
+                  />
+                  Só telemétricas
+                </label>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => void carregarCatalogoAna(false)}
+                  className="rounded bg-teal-600/90 px-2 py-1 text-xs text-white hover:bg-teal-700 disabled:opacity-50"
+                >
+                  Carregar ANA
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => void carregarCatalogoAna(true)}
+                  className="rounded border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--muted)]/10"
+                >
+                  Actualizar
+                </button>
+              </div>
+            )}
             <p className="mt-2 text-xs text-[var(--muted)]">
-              {catalogo
-                ? `${estacoesFiltradas.length} estações (catálogo seed: ${catalogo.estacoes.length} — expandível via ANA)`
-                : "Carregando…"}
+              {catalogoFonte === "ana"
+                ? estacoesAna.length
+                  ? `${estacoesFiltradas.length} listadas · ${estacoesAna.length} no inventário ANA (${uf})${estacoesFiltradas.length < estacoesAna.length ? " — use busca para filtrar" : ""}`
+                  : "Carregue o inventário ANA para esta UF (milhares de estações)."
+                : catalogo
+                  ? `${estacoesFiltradas.length} estações (catálogo seed: ${catalogo.estacoes.length})`
+                  : "Carregando…"}
             </p>
           </Panel>
           <Panel title="Estação selecionada">
@@ -456,6 +660,40 @@ export function HidroChuBrApp() {
 
       {tab === "importar" && (
         <div className="grid gap-4">
+          <Panel title="Importação nacional (lote ANA)">
+            <p className="text-xs text-[var(--muted)]">
+              Importa séries de várias estações da UF seleccionada. Use catálogo{" "}
+              <strong>ANA inventário</strong> na aba Estações para cobertura nacional por
+              estado (~22 000 pluviométricas no Brasil).
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-xs">UF: <strong>{uf}</strong></span>
+              <select
+                value={maxBulk}
+                onChange={(e) => setMaxBulk(Number(e.target.value))}
+                className="rounded border border-[var(--border)] px-2 py-1 text-sm"
+              >
+                {[5, 10, 15, 25, 50].map((n) => (
+                  <option key={n} value={n}>
+                    Máx. {n} estações
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void importarNacional()}
+                className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+              >
+                {loading ? "A importar lote…" : "Importar UF (lote ANA)"}
+              </button>
+            </div>
+            {bulkResumo && (
+              <p className="mt-2 text-xs font-medium text-teal-800 dark:text-teal-200">
+                {bulkResumo} · {Object.keys(seriesNacionais).length} séries em memória local
+              </p>
+            )}
+          </Panel>
           <Panel title="Importação automática por fonte">
             <p className="text-xs text-[var(--muted)]">
               ANA (TelemetriaWS) com fallback INMET; ou INMET com fallback ANA. Período
@@ -776,7 +1014,11 @@ export function HidroChuBrApp() {
         <a href="/hidrologia/chuvas-sc" className="text-teal-700 underline">
           HidroChuSC
         </a>
-        . Brasil: este módulo expande com ANA e previsão por IA.
+        . Mapa 3D nacional (ANA + CPRM):{" "}
+        <a href="/hidrologia/hidrogeo-brasil" className="text-teal-700 underline">
+          HidroGeo Brasil
+        </a>
+        .
       </p>
     </div>
   );

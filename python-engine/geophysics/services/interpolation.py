@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import numpy as np
+
+from services.array_utils import writable_float64
 from scipy.interpolate import RBFInterpolator
 
 from schemas.volume import SamplePoint3D, VolumeBounds, VolumeBuildRequest
@@ -87,7 +89,7 @@ def build_rbf_volume(req: VolumeBuildRequest) -> np.ndarray:
     rbf = RBFInterpolator(coords, values, kernel="multiquadric", epsilon=eps)
     pred = rbf(targets)
     out = pred.reshape(req.nx, req.ny, req.nz)
-    return out.astype(np.float64)
+    return writable_float64(out)
 
 
 def build_kriging_volume(req: VolumeBuildRequest) -> np.ndarray:

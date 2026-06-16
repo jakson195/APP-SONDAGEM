@@ -1,7 +1,7 @@
 import type { Dipolo2DReading } from "./types";
 import { applyTopographyToLinha } from "./topography-from-linha";
 import type { TopographyPoint } from "./topography-types";
-import { computeSolodataLinhaRow } from "./solodata-linha-compute";
+import { computeSolodataLinhaRow, withSolodataLinhaCalculations } from "./solodata-linha-compute";
 import type { SolodataLinhaRow, SolodataLinhaState } from "./solodata-linha-types";
 
 /** Leituras para inversão 2D a partir das colunas Dist, Esp, N, R ap (entrada vermelha). */
@@ -40,6 +40,20 @@ export function solodataLinhaToReadings(
     });
   }
   return out;
+}
+
+/** Aplica o mesmo ESP (m) a todas as linhas e recalcula K, Rap e posições. */
+export function applyGlobalEspToLinha(
+  state: SolodataLinhaState,
+  espM: number,
+): SolodataLinhaState {
+  const esp = espM > 0 && Number.isFinite(espM) ? espM : 15;
+  const rows = state.rows.map((row) => ({
+    ...row,
+    espM: esp,
+    esp: esp,
+  }));
+  return withSolodataLinhaCalculations({ ...state, rows }, esp);
 }
 
 export function activeReadingsForInversion(

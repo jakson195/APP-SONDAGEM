@@ -1,4 +1,5 @@
 import { fetchAnaSerieHistorica } from "./ana-telemetria";
+import { gerarSerieDemo } from "./demo-series";
 import { fetchInmetSerie, inmetCodigoMaisProximo } from "./inmet-api";
 import type { EstacaoBrasil, FonteHidrologica, RegistroDiarioBr } from "./types";
 
@@ -18,6 +19,37 @@ export type AutoImportResult = {
   maximasAnuais: { ano: number; maxMm: number }[];
   avisos: string[];
 };
+
+function uniqAvisos(items: string[]): string[] {
+  const seen = new Set<string>();
+  return items
+    .map((a) => a.trim())
+    .filter((a) => {
+      if (!a || seen.has(a)) return false;
+      seen.add(a);
+      return true;
+    });
+}
+
+/** Resume avisos técnicos numa mensagem curta para o utilizador. */
+function resumirAvisosDemo(avisos: string[]): string[] {
+  const deduped = uniqAvisos(avisos);
+  const anaOff = deduped.some((a) => /ANA TelemetriaWS/i.test(a));
+  const inmetOff = deduped.some((a) => /INMET/i.test(a));
+
+  if (anaOff && inmetOff) {
+    return [
+      "Série demo: ANA e INMET indisponíveis neste servidor.",
+      "Para dados reais: importe CSV em snirh.gov.br/hidroweb ou defina INMET_API_TOKEN no .env.local.",
+    ];
+  }
+  if (anaOff) {
+    return [
+      "Série demo: ANA indisponível. Importe CSV do HidroWeb para substituir.",
+    ];
+  }
+  return deduped.slice(0, 2);
+}
 
 function maximasFromRegs(regs: RegistroDiarioBr[]) {
   const byYear = new Map<number, number>();
@@ -71,7 +103,7 @@ async function importInmet(
       total: 0,
       maximasAnuais: [],
       avisos: [
-        "INMET: sem código de estação nem token/lista API. Configure INMET_API_TOKEN ou codigoInmet na estação.",
+        "INMET: token ou código de estação não configurado (INMET_API_TOKEN).",
       ],
     };
   }
@@ -109,9 +141,10 @@ export async function autoImportFromSource(
     const fallback = await importInmet(estacao, dataInicio, dataFim);
     if (fallback.ok) {
       avisos.push("ANA sem dados — utilizada fonte INMET (fallback).");
-      return { ...fallback, avisos: [...avisos, ...fallback.avisos] };
+      return { ...fallback, avisos: uniqAvisos([...avisos, ...fallback.avisos]) };
     }
-    return { ...r, avisos: [...avisos, ...fallback.avisos] };
+    avisos.push(...fallback.avisos);
+    return demoFallback(estacao, dataInicio, dataFim, avisos);
   }
 
   if (fonte === "INMET") {
@@ -121,9 +154,10 @@ export async function autoImportFromSource(
     const fallback = await importAna(estacao, dataInicio, dataFim, tipoAna);
     if (fallback.ok) {
       avisos.push("INMET sem dados — utilizada fonte ANA (fallback).");
-      return { ...fallback, avisos: [...avisos, ...fallback.avisos] };
+      return { ...fallback, avisos: uniqAvisos([...avisos, ...fallback.avisos]) };
     }
-    return { ...r, avisos: [...avisos, ...fallback.avisos] };
+    avisos.push(...fallback.avisos);
+    return demoFallback(estacao, dataInicio, dataFim, avisos);
   }
 
   if (fonte === "Manual" || fonte === "CPRM" || fonte === "CEMADEN" || fonte === "DadosAbertos") {
@@ -132,19 +166,32 @@ export async function autoImportFromSource(
       avisos.push(`Fonte ${fonte}: dados hidrológicos via ANA (automático).`);
       return { ...ana, avisos: [...avisos, ...ana.avisos] };
     }
-    return {
-      ok: false,
-      fonteUsada: fonte,
-      registros: [],
-      total: 0,
-      maximasAnuais: [],
-      avisos: [
-        ...avisos,
-        ...ana.avisos,
-        "Importe CSV manualmente ou configure fonte ANA/INMET.",
-      ],
-    };
+    return demoFallback(estacao, dataInicio, dataFim, [
+      ...avisos,
+      ...ana.avisos,
+      "Importe CSV manualmente ou configure fonte ANA/INMET.",
+    ]);
   }
 
   return importAna(estacao, dataInicio, dataFim, tipoAna);
+}
+
+function demoFallback(
+  estacao: EstacaoBrasil,
+  dataInicio: string,
+  dataFim: string,
+  avisos: string[],
+): AutoImportResult {
+  const registros = gerarSerieDemo(estacao, dataInicio, dataFim);
+  return {
+    ok: registros.length >= 3,
+    fonteUsada: "Demo",
+    registros,
+    total: registros.length,
+    maximasAnuais: maximasFromRegs(registros),
+    avisos: resumirAvisosDemo([
+      ...avisos,
+      "ANA/INMET indisponíveis — série pluviométrica demo gerada (substitua por CSV real).",
+    ]),
+  };
 }

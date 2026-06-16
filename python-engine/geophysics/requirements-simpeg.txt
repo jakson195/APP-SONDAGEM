@@ -1,0 +1,4 @@
+# Motor SimPEG (opcional)
+# pip install -r requirements-simpeg.txt
+simpeg>=0.21.0
+discretize>=0.8.0

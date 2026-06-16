@@ -66,12 +66,12 @@ def resolve_jacobian(
     if use_fd:
         from .jacobian import jacobian_fd
 
-        return jacobian_fd(m_log10, mesh, readings, eps=0.02, forward_fn=fwd)
+        return jacobian_fd(m_log10, mesh, readings, eps=0.025, forward_fn=fwd)
     from .jacobian_adjoint import jacobian_adjoint
 
     j_adj = jacobian_adjoint(m_log10, mesh, readings)
     if _adjoint_needs_fd_fallback(j_adj, m_log10, mesh, readings, fwd):
         from .jacobian import jacobian_fd
 
-        return jacobian_fd(m_log10, mesh, readings, eps=0.02, forward_fn=fwd)
+        return jacobian_fd(m_log10, mesh, readings, eps=0.025, forward_fn=fwd)
     return j_adj

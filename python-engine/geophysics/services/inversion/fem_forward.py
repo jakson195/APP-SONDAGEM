@@ -170,7 +170,9 @@ def _homogeneous_rho_raw_fem(
     current_ma: float,
     rho_ref: float,
 ) -> float:
-    m_uni = np.full(mesh.nx * mesh.nz, np.log10(max(rho_ref, 1e-6)), dtype=float)
+    from .model_units import rho_ohm_to_m_ln
+
+    m_uni = np.full(mesh.nx * mesh.nz, rho_ohm_to_m_ln(max(rho_ref, 1e-6)), dtype=float)
     sigma = _conductivity_from_log10(m_uni, mesh)
     mat, rhs = _assemble_fem(sigma, mesh)
     i_a = max(current_ma, 1e-3) / 1000.0

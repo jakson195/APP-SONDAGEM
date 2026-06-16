@@ -27,6 +27,8 @@ export const PUBLIC_API_PREFIXES = [
 export function isPublicPath(pathname: string): boolean {
   if (PUBLIC_EXACT_PATHS.has(pathname)) return true;
   if (pathname.startsWith("/cliente/")) return true;
+  if (pathname.startsWith("/hidrogeo-viewer")) return true;
+  if (pathname.startsWith("/anm-leilao-viewer")) return true;
   if (PUBLIC_API_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     return true;
   }
@@ -49,6 +51,8 @@ export const APP_ROUTE_PREFIXES = [
   "/boreholes",
   "/digital-twin",
   "/hidrologia",
+  "/geotecnia",
+  "/mineracao",
   "/gestao-empresa",
   "/assinatura",
   "/empresa",

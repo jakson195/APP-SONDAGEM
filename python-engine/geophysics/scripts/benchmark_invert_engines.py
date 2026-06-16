@@ -23,6 +23,7 @@ from services.inversion.invert_2d import run_invert_2d
 from services.inversion.mesh import build_mesh, idx
 from services.inversion.fdm_forward import forward_log10_raw
 from services.inversion.pygimli_invert import is_pygimli_available
+from services.inversion.resipy_invert import is_resipy_available
 
 
 def build_two_layer(mesh, rho_top: float, rho_bot: float, z_frac: float = 0.45):
@@ -97,7 +98,8 @@ def main() -> int:
     args = parser.parse_args()
 
     print("=== Benchmark inversão 2D (100 / 3000 Ω·m) ===\n")
-    print(f"pyGIMLi instalado: {is_pygimli_available()}\n")
+    print(f"pyGIMLi instalado: {is_pygimli_available()}")
+    print(f"ResIPy instalado: {is_resipy_available()}\n")
 
     legacy = run_engine("legacy", args.method)
     print("[legacy FDM]")
@@ -116,6 +118,22 @@ def main() -> int:
         )
     else:
         print("\n[pyGIMLi] omitido — instale: pip install pygimli")
+
+    if is_resipy_available():
+        print()
+        try:
+            ri_out = run_engine("resipy", args.method)
+            print("[ResIPy R2]")
+            for k, v in ri_out.items():
+                print(f"  {k}: {v}")
+            print(
+                f"\nΔ RMS%: {ri_out['rms_percent'] - legacy['rms_percent']:.2f} "
+                f"(ResIPy − legacy)"
+            )
+        except Exception as e:
+            print(f"\n[ResIPy] falhou: {e}")
+    else:
+        print("\n[ResIPy] omitido — instale: pip install -r requirements-resipy.txt")
 
     return 0
 

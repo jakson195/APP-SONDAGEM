@@ -15,6 +15,7 @@ import {
 } from "./model-section-render";
 import { interpolateTopographyAt } from "./parse-topography";
 import type { TopographyPoint } from "./topography-types";
+import type { Dipolo2DReading } from "./types";
 
 export type TopographyElevBounds = {
   xPlot0: number;
@@ -33,7 +34,7 @@ export function resolveTopographyElevBounds(
   maxDepthM: number,
 ): TopographyElevBounds {
   const sorted = [...topography].sort((a, b) => a.stationM - b.stationM);
-  const xPlot0 = Math.min(x0, sorted[0]!.stationM);
+  const xPlot0 = Math.max(0, Math.min(x0, sorted[0]!.stationM));
   const xPlot1 = Math.max(x1, sorted[sorted.length - 1]!.stationM);
   let elevTop = -Infinity;
   let elevBottom = Infinity;
@@ -134,6 +135,50 @@ export function strokeTopographySurface(
   ctx.strokeStyle = "#111827";
   ctx.lineWidth = 2;
   ctx.stroke();
+}
+
+/** Posições A,B,M,N reconstruídas a partir das leituras dipolo-dipolo. */
+export function uniqueElectrodePositionsFromReadings(
+  readings: Dipolo2DReading[],
+): number[] {
+  const set = new Set<number>();
+  for (const r of readings) {
+    if (r.excluded) continue;
+    const a = r.aM;
+    const n = r.n;
+    if (!(a > 0) || !(n >= 1)) continue;
+    const sep = n * a;
+    const centerAB = r.stationM - sep / 2;
+    const centerMN = r.stationM + sep / 2;
+    for (const x of [
+      centerAB - a / 2,
+      centerAB + a / 2,
+      centerMN - a / 2,
+      centerMN + a / 2,
+    ]) {
+      set.add(Math.round(x * 1000) / 1000);
+    }
+  }
+  return [...set].sort((a, b) => a - b);
+}
+
+export function drawElectrodeDotsOnSurface(
+  ctx: CanvasRenderingContext2D,
+  electrodeXM: number[],
+  topography: TopographyPoint[],
+  sx: (x: number) => number,
+  syElev: (elev: number) => number,
+) {
+  ctx.fillStyle = "#111827";
+  for (const xM of electrodeXM) {
+    const surf = surfaceElevationAt(topography, xM);
+    if (surf == null) continue;
+    const px = sx(xM);
+    const py = syElev(surf);
+    ctx.beginPath();
+    ctx.arc(px, py, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 export function rasterizeModelWithTopography(

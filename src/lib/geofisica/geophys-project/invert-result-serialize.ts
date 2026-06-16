@@ -2,6 +2,7 @@ import type {
   Dipolo2DInvertResult,
   Dipolo2DIterationRecord,
 } from "../dipolo2d/types";
+import { cloneFloat64Array } from "../dipolo2d/model-visual-scale";
 
 /** Formato JSON para persistir o modelo invertido do Dipolo-Dipolo. */
 export type SerializedDipolo2DInvertResult = {
@@ -44,11 +45,11 @@ export function deserializeInvertResult(
   data: SerializedDipolo2DInvertResult,
 ): Dipolo2DInvertResult {
   return {
-    mLog10: Float64Array.from(data.mLog10),
-    xEdgesM: Float64Array.from(data.xEdgesM),
-    zEdgesM: Float64Array.from(data.zEdgesM),
-    yObsLog10: Float64Array.from(data.yObsLog10),
-    ySynLog10: Float64Array.from(data.ySynLog10),
+    mLog10: cloneFloat64Array(data.mLog10),
+    xEdgesM: cloneFloat64Array(data.xEdgesM),
+    zEdgesM: cloneFloat64Array(data.zEdgesM),
+    yObsLog10: cloneFloat64Array(data.yObsLog10),
+    ySynLog10: cloneFloat64Array(data.ySynLog10),
     rmsLog10: data.rmsLog10,
     roughnessL2: data.roughnessL2,
     iterations: data.iterations,

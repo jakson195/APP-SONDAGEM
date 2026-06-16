@@ -44,12 +44,12 @@ export const MAP_CONTEXT_LAYERS: MapContextLayerDef[] = [
     group:
       o.category === "estruturas"
         ? ("geologia" as const)
-        : o.category === "gamaespectrometria"
+        : o.category === "gamaespectrometria" || o.category === "magnetometria"
           ? ("geofisica" as const)
           : ("geologia" as const),
     kind: "wms" as const,
     url: `${o.mapServerUrl.replace(/\/+$/, "")}/WMSServer`,
-    wmsLayers: "0",
+    wmsLayers: o.wmsLayerIndex ?? "0",
     opacity: o.opacity ?? 0.7,
     attribution: "© GeoSGB/CPRM",
   })),

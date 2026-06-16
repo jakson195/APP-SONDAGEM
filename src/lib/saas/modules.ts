@@ -64,7 +64,15 @@ export const MARKETING_MODULES: MarketingModule[] = [
   {
     id: "hidrologia",
     title: "Hidrologia",
-    description: "Chuvas SC/BR e apoio a estudos hidrológicos regionais.",
+    description:
+      "Chuvas SC/BR, HidroGeo Brasil (mapa 3D ANA + CPRM) e apoio a estudos hidrológicos regionais.",
+    icon: BarChart3,
+  },
+  {
+    id: "geotecnia",
+    title: "Geotecnia",
+    description:
+      "SPT, sondagem, perfis estratigráficos e relatórios alinhados ao padrão de campo.",
     icon: BarChart3,
   },
   {

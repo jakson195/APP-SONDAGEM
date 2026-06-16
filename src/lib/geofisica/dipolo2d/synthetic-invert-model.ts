@@ -2,6 +2,7 @@
  * Modelo invertido sintético para testar renderização (sem motor Python).
  */
 import type { Dipolo2DInvertParams, Dipolo2DInvertResult, Dipolo2DReading } from "./types";
+import { computeModelZMaxM } from "./model-depth";
 
 export type SyntheticModelPattern = "layered" | "block" | "gradient";
 
@@ -18,15 +19,10 @@ export type BuildSyntheticModelOptions = {
   rhoBase?: number;
 };
 
-function mean(values: number[]): number {
-  if (!values.length) return 1;
-  return values.reduce((a, b) => a + b, 0) / values.length;
-}
-
 /** Extensão da malha alinhada ao motor físico (margem 8 %). */
 export function meshExtentsFromReadings(
   readings: Dipolo2DReading[],
-  factorDepth: number,
+  params: Pick<Dipolo2DInvertParams, "modelDepthFactor" | "modelDepthRange">,
 ): { x0: number; x1: number; zMax: number } {
   if (!readings.length) {
     return { x0: 0, x1: 100, zMax: 25 };
@@ -48,9 +44,7 @@ export function meshExtentsFromReadings(
   const xMax = Math.max(...xs, ...electrodeXs);
   const span = Math.max(xMax - xMin, 1);
   const margin = Math.max(0.5, span * 0.08);
-  const aMed = mean(readings.map((r) => r.aM));
-  const nMax = Math.max(...readings.map((r) => r.n));
-  const zMax = Math.max(aMed * nMax * factorDepth, aMed * 2);
+  const zMax = computeModelZMaxM(readings, params);
   return { x0: xMin - margin, x1: xMax + margin, zMax };
 }
 
@@ -111,18 +105,20 @@ function rhoAtCell(
  */
 export function buildSyntheticInvertResult(
   readings: Dipolo2DReading[],
-  params: Pick<Dipolo2DInvertParams, "nx" | "nz" | "factorDepth">,
+  params: Pick<
+    Dipolo2DInvertParams,
+    "nx" | "nz" | "factorDepth" | "modelDepthFactor" | "modelDepthRange"
+  >,
   options: BuildSyntheticModelOptions = {},
 ): Dipolo2DInvertResult {
   const nx = Math.max(8, options.nx ?? params.nx);
   const nz = Math.max(6, options.nz ?? params.nz);
-  const factorDepth = options.factorDepth ?? params.factorDepth;
   const pattern = options.pattern ?? "gradient";
   const rhoBg = options.rhoBackground ?? 100;
   const rhoHi = options.rhoContrast ?? 1000;
   const rhoLo = options.rhoBase ?? 300;
 
-  const { x0, x1, zMax } = meshExtentsFromReadings(readings, factorDepth);
+  const { x0, x1, zMax } = meshExtentsFromReadings(readings, params);
   const xEdges = Float64Array.from(
     { length: nx + 1 },
     (_, i) => x0 + (i / nx) * (x1 - x0),
@@ -192,9 +188,8 @@ export function buildSyntheticInvertResult(
     nz,
     methodId: "gauss_newton",
     methodLabel: `Modelo sintético (${patternLabel})`,
-    engine: "proxy",
     physicsMessage:
-      "Teste de renderização — não é saída da inversão FDM. Use «Limpar teste» para voltar.",
+      "Teste de renderização — não é saída da inversão ResIPy. Use «Limpar teste» para voltar.",
     activeCells,
     zCoverM: Array.from(zCoverM),
   };

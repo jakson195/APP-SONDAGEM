@@ -168,6 +168,78 @@ export function looksLikeElectrodeBlock(
   return hits >= Math.max(1, Math.ceil(block.length * 0.6));
 }
 
+/** Cabeçalho A, B, M, N, NIV., SP, V, i (8 colunas Excel). */
+export function isElectrodeFieldHeader(cells: string[]): boolean {
+  if (cells.length < 8) return false;
+  const u = cells.join(" ").toUpperCase().replace(/Í/g, "I").replace(/\./g, "");
+  if (!isElectrodeHeader(cells.slice(0, 5))) return false;
+  return u.includes("SP") || u.includes("MV") || u.includes("MA");
+}
+
+export type ElectrodeFieldPasteRow = Pick<
+  SolodataLinhaRow,
+  "a" | "b" | "m" | "nEl" | "nivel" | "spMv" | "vMv" | "iMa"
+>;
+
+/** Bloco Excel: A, B, M, N, NIV., SP (mV), V (mV), i (mA). */
+export function parseElectrodeFieldBlock(text: string): {
+  rows: ElectrodeFieldPasteRow[];
+} {
+  const grid = parseClipboardGrid(text);
+  const out: ElectrodeFieldPasteRow[] = [];
+  for (const line of grid) {
+    if (line.length < 8) continue;
+    if (isElectrodeFieldHeader(line)) continue;
+    if (isElectrodeHeader(line.slice(0, 5))) continue;
+    const a = parseNumCell(line[0]!);
+    const b = parseNumCell(line[1]!);
+    const m = parseNumCell(line[2]!);
+    const nEl = parseNumCell(line[3]!);
+    const nivel = parseNumCell(line[4]!);
+    const spMv = parseNumCell(line[5]!);
+    const vMv = parseNumCell(line[6]!);
+    const iMa = parseNumCell(line[7]!);
+    if (
+      a == null &&
+      b == null &&
+      m == null &&
+      nEl == null &&
+      nivel == null &&
+      spMv == null &&
+      vMv == null &&
+      iMa == null
+    ) {
+      continue;
+    }
+    out.push({ a, b, m, nEl, nivel, spMv, vMv, iMa });
+  }
+  return { rows: out };
+}
+
+export function looksLikeElectrodeFieldBlock(rows: ElectrodeFieldPasteRow[]): boolean {
+  if (rows.length === 0) return false;
+  return looksLikeElectrodeBlock(rows);
+}
+
+export function applyElectrodeFieldToRows(
+  rows: SolodataLinhaRow[],
+  block: ElectrodeFieldPasteRow[],
+  startRow: number,
+  defaultEspM = 15,
+): SolodataLinhaRow[] {
+  const next = rows.map((r) => ({ ...r }));
+  for (let i = 0; i < block.length; i++) {
+    const rowIdx = startRow + i;
+    while (rowIdx >= next.length) {
+      const med =
+        next.length > 0 ? (next[next.length - 1]!.medida ?? next.length) + 1 : 1;
+      next.push(emptySolodataRow(med, defaultEspM));
+    }
+    next[rowIdx] = { ...next[rowIdx]!, ...block[i]! };
+  }
+  return next;
+}
+
 export function parseSpViBlock(text: string): {
   rows: Pick<SolodataLinhaRow, "spMv" | "vMv" | "iMa">[];
 } {

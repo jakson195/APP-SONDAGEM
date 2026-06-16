@@ -202,7 +202,7 @@ export function buildMainModuleNav(options: {
   const items: { href: string; label: string }[] = [];
 
   const allow = (def: PlatformModuleDef): boolean => {
-    if (def.id === "insar" || def.id === "lidar") return false;
+    if (def.id === "insar" || def.id === "lidar" || def.id === "geofisica") return false;
     if (obraModules && def.obraKey) {
       const key = def.obraKey as string;
       if (key in obraModules && !obraModules[key]) return false;

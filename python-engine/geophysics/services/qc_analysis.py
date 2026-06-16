@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import numpy as np
+
+from services.array_utils import writable_float64
 from scipy import signal as scipy_signal
 from scipy.fft import rfft, rfftfreq
 
@@ -21,8 +23,8 @@ def analyze_line_qc(
     time_series: list[float] | None = None,
     sample_rate_hz: float | None = None,
 ) -> dict:
-    rho = np.asarray(rho_ohm_m, dtype=np.float64)
-    st = np.asarray(stations_m, dtype=np.float64)
+    rho = writable_float64(rho_ohm_m)
+    st = writable_float64(stations_m)
     if rho.size == 0:
         return {"grade": "red", "snr": 0.0, "summary": "Sem dados"}
 
@@ -52,7 +54,7 @@ def analyze_line_qc(
 
     p50 = p60 = 0.0
     if time_series and sample_rate_hz and len(time_series) >= 16:
-        ts = np.asarray(time_series, dtype=np.float64)
+        ts = writable_float64(time_series)
         ts = ts - np.mean(ts)
         f = rfftfreq(ts.size, d=1.0 / sample_rate_hz)
         p = np.abs(rfft(ts)) ** 2

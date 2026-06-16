@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from services.array_utils import writable
+
 from .mesh import idx
 
 
@@ -25,7 +27,7 @@ def roughness_matrix_anisotropic(
 ) -> np.ndarray:
     """
     Regularização anisotrópica estilo RES2DINV:
-    Φ_r = λ_x ‖D_x m‖² + λ_z ‖D_z m‖²  (m = log₁₀ ρ).
+    Φ_r = λ_x ‖D_x m‖² + λ_z ‖D_z m‖²  (m = ln ρ).
     """
     nm = nx * nz
     lx = max(float(lambda_x), 1e-12)
@@ -126,6 +128,7 @@ def blocky_reg_irls_matrix(
     Matriz R reponderada (IRLS) para inversão blocky:
     penaliza menos bordas já existentes (L1 em ∇m).
     """
+    m = writable(m)
     r0 = roughness_matrix_anisotropic(nx, nz, lambda_x, lambda_z)
     g = gradient_magnitude_per_cell(m, nx, nz)
     nm = nx * nz

@@ -1,0 +1,12 @@
+# ResIPy (R2) — motor opcional invert_engine=resipy
+# Windows nativo; Linux/macOS requer Wine para executar R2.
+# Python 3.10–3.12 recomendado (wheels cext; numpy<2).
+resipy>=3.6.0,<3.7
+numpy>=1.26,<2
+pandas>=2.0
+psutil>=5.9
+chardet>=5.0
+matplotlib>=3.7
+pyvista>=0.42
+gmsh>=4.11
+scipy>=1.11

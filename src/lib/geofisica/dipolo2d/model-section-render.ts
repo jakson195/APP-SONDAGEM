@@ -6,6 +6,7 @@
 import { paletteColor, rhoToNormalized } from "./colormap";
 import type { ResistivityColorScale } from "./colormap";
 import { quantizeDisplayT } from "./res2dinv-colormap";
+import { cloneFloat64Array } from "./model-visual-scale";
 import type { Dipolo2DReading } from "./types";
 
 /** Perfil de cobertura estrito (sem ganho nem suavização) — inversão física. */
@@ -103,11 +104,42 @@ export function buildModelZCoverProfile(
     }
   }
 
-  const smooth = Float64Array.from(raw);
+  const smooth = cloneFloat64Array(raw);
   for (let i = 1; i < nx - 1; i++) {
     smooth[i] = (raw[i - 1]! + raw[i]! * 2 + raw[i + 1]!) / 4;
   }
   return smooth;
+}
+
+/**
+ * Profundidade máxima no eixo Depth.
+ * Por defeito = fundo da malha (estilo RES2DINV, ex. ~109 m com ESP 8 m).
+ * Com cropToCoverage=true limita à pseudoprofundidade FMD (0,286·n·a).
+ */
+export function profileDisplayDepthMaxM(
+  modelZMax: number,
+  readings: Dipolo2DReading[],
+  factorDepth: number,
+  zCoverProfile: Float64Array | null,
+  cropToCoverage: boolean,
+): number {
+  if (!cropToCoverage || !(modelZMax > 0)) return modelZMax;
+
+  let zCov = 0;
+  for (const r of readings) {
+    if (r.aM > 0 && r.n >= 1) {
+      zCov = Math.max(zCov, factorDepth * r.n * r.aM);
+    }
+  }
+  if (zCoverProfile) {
+    for (let i = 0; i < zCoverProfile.length; i++) {
+      const v = zCoverProfile[i]!;
+      if (v > 0 && Number.isFinite(v)) zCov = Math.max(zCov, v);
+    }
+  }
+  if (zCov <= 0) return modelZMax;
+  const padded = Math.max(zCov * 1.02, zCov + 0.5);
+  return Math.min(modelZMax, padded);
 }
 
 export function zCoverInterpolated(
@@ -133,10 +165,10 @@ export function smoothLogModelHorizontalForDisplay(
   mLog: Float64Array,
   nx: number,
   nz: number,
-  passes = 1,
-  alpha = 0.18,
+  passes = 2,
+  alpha = 0.22,
 ): Float64Array {
-  let cur = Float64Array.from(mLog);
+  let cur = cloneFloat64Array(mLog);
   let next = new Float64Array(cur.length);
   const a = Math.max(0, Math.min(0.4, alpha));
 
@@ -173,7 +205,7 @@ export function smoothLogModelForDisplay(
   passes = 2,
   alpha = 0.24,
 ): Float64Array {
-  let cur = Float64Array.from(mLog);
+  let cur = cloneFloat64Array(mLog);
   let next = new Float64Array(cur.length);
   const a = Math.max(0, Math.min(0.45, alpha));
 
@@ -249,8 +281,8 @@ export function bilinearLogRho(
 }
 
 /**
- * Interpolação horizontal + camadas discretas em z (estilo RES2DINV).
- * Suave ao longo do perfil; contactos de camada permanecem horizontais.
+ * Interpolação horizontal + transição suave entre camadas em z.
+ * Cada linha z interpola em x; depois blend vertical entre linhas adjacentes.
  */
 export function horizontalLayerLogRho(
   mLog: Float64Array,
@@ -259,20 +291,67 @@ export function horizontalLayerLogRho(
   fi: number,
   fj: number,
 ): number {
-  const j = Math.max(0, Math.min(nz - 1, Math.floor(fj)));
-  const i0 = Math.max(0, Math.min(nx - 1, Math.floor(fi)));
-  const i1 = Math.min(nx - 1, i0 + 1);
-  const tx = Math.max(0, Math.min(1, fi - i0));
-  const v0 = mLog[idx(i0, j, nz)]!;
-  const v1 = mLog[idx(i1, j, nz)]!;
-  return v0 * (1 - tx) + v1 * tx;
+  const j0 = Math.max(0, Math.min(nz - 1, Math.floor(fj)));
+  const j1 = Math.min(nz - 1, j0 + 1);
+  const ty = Math.max(0, Math.min(1, fj - j0));
+
+  const sampleRow = (j: number): number => {
+    const i0 = Math.max(0, Math.min(nx - 1, Math.floor(fi)));
+    const i1 = Math.min(nx - 1, i0 + 1);
+    const tx = Math.max(0, Math.min(1, fi - i0));
+    const v0 = mLog[idx(i0, j, nz)]!;
+    const v1 = mLog[idx(i1, j, nz)]!;
+    return v0 * (1 - tx) + v1 * tx;
+  };
+
+  if (j0 === j1) return sampleRow(j0);
+  const r0 = sampleRow(j0);
+  const r1 = sampleRow(j1);
+  return r0 * (1 - ty) + r1 * ty;
+}
+
+/** Suavização leve só em z (preserva contactos horizontais, remove degraus). */
+export function featherHorizontalLayersVertically(
+  mLog: Float64Array,
+  nx: number,
+  nz: number,
+  passes = 1,
+  alpha = 0.14,
+): Float64Array {
+  let cur = cloneFloat64Array(mLog);
+  let next = new Float64Array(cur.length);
+  const a = Math.max(0, Math.min(0.35, alpha));
+
+  for (let p = 0; p < passes; p++) {
+    for (let i = 0; i < nx; i++) {
+      for (let j = 0; j < nz; j++) {
+        const u = idx(i, j, nz);
+        let sum = cur[u]!;
+        let n = 1;
+        if (j > 0) {
+          sum += cur[idx(i, j - 1, nz)]!;
+          n++;
+        }
+        if (j + 1 < nz) {
+          sum += cur[idx(i, j + 1, nz)]!;
+          n++;
+        }
+        const avg = sum / n;
+        next[u] = cur[u]! * (1 - a) + avg * a;
+      }
+    }
+    const swap = cur;
+    cur = next;
+    next = swap;
+  }
+  return cur;
 }
 
 export type ModelRasterMask = {
   isVisible: (xM: number, zM: number) => boolean;
 };
 
-export type ModelRenderMode = "cells" | "bilinear" | "fem_smooth";
+export type ModelRenderMode = "cells" | "bilinear" | "fem_smooth" | "layer_smooth";
 
 export type ModelRasterOptions = {
   logLo: number;
@@ -292,6 +371,24 @@ export type ModelRasterOptions = {
   zCoverProfile?: Float64Array | null;
 };
 
+function preprocessHorizontalLayers(
+  mLog: Float64Array,
+  nx: number,
+  nz: number,
+  passes: number,
+): Float64Array {
+  const px = Math.max(2, passes);
+  let s = smoothLogModelHorizontalForDisplay(mLog, nx, nz, px, 0.26);
+  s = featherHorizontalLayersVertically(
+    s,
+    nx,
+    nz,
+    Math.max(2, Math.ceil(px / 2)),
+    0.16,
+  );
+  return s;
+}
+
 function sampleLogRho(
   mLog: Float64Array,
   nx: number,
@@ -303,6 +400,9 @@ function sampleLogRho(
   if (mode === "cells") return cellLogRhoAt(mLog, nx, nz, fi, fj);
   if (mode === "fem_smooth") {
     return horizontalLayerLogRho(mLog, nx, nz, fi, fj);
+  }
+  if (mode === "layer_smooth" || mode === "bilinear") {
+    return bilinearLogRho(mLog, nx, nz, fi, fj);
   }
   return bilinearLogRho(mLog, nx, nz, fi, fj);
 }
@@ -418,13 +518,16 @@ export function rasterizeModelSection(
   const dz = (z1 - z0) / Math.max(1, nz);
 
   const smoothPasses = opts.displaySmoothPasses ?? 0;
-  const renderMode = opts.renderMode ?? "cells";
-  const smoothed =
-    smoothPasses > 0
-      ? renderMode === "fem_smooth"
-        ? smoothLogModelHorizontalForDisplay(mLog, nx, nz, smoothPasses)
-        : smoothLogModelForDisplay(mLog, nx, nz, smoothPasses)
-      : mLog;
+  const renderMode = opts.renderMode ?? "layer_smooth";
+  const isLayerRender =
+    renderMode === "fem_smooth" || renderMode === "layer_smooth";
+  let smoothed = mLog;
+  if (isLayerRender) {
+    const px = Math.max(2, smoothPasses || 3);
+    smoothed = preprocessHorizontalLayers(mLog, nx, nz, px);
+  } else if (smoothPasses > 0) {
+    smoothed = smoothLogModelForDisplay(mLog, nx, nz, smoothPasses);
+  }
 
   const levels = Math.max(8, opts.colorLevels ?? 24);
   const maskRgb = opts.maskRgb ?? [248, 250, 252];
@@ -455,6 +558,17 @@ export function rasterizeModelSection(
       const iCell = Math.max(0, Math.min(nx - 1, Math.floor(fi)));
       const jCell = Math.max(0, Math.min(nz - 1, Math.floor(fj)));
       const zCenter = z0 + (jCell + 0.5) * dz;
+      const zCov =
+        zCoverProfile != null ? (zCoverProfile[iCell] ?? z1) : z1;
+      const coverSlack = renderMode === "layer_smooth" ? dz * 0.85 : dz * 0.02;
+      if (opts.maskMode === "coverage" && zCoverProfile && zCenter > zCov + coverSlack) {
+        rgba[o] = maskRgb[0]!;
+        rgba[o + 1] = maskRgb[1]!;
+        rgba[o + 2] = maskRgb[2]!;
+        rgba[o + 3] = 255;
+        continue;
+      }
+
       if (
         !cellVisible(
           iCell,
@@ -465,7 +579,9 @@ export function rasterizeModelSection(
           { ...opts, zCoverProfile },
           zCoverProfile,
           dz,
-        )
+        ) &&
+        renderMode !== "layer_smooth" &&
+        renderMode !== "fem_smooth"
       ) {
         rgba[o] = maskRgb[0]!;
         rgba[o + 1] = maskRgb[1]!;
@@ -479,7 +595,10 @@ export function rasterizeModelSection(
       const tRaw = opts.normalizeRho
         ? opts.normalizeRho(rho)
         : rhoToNormalized(rho, logLo, logHi);
-      const t = quantizeDisplayT(tRaw, levels);
+      const t =
+        isLayerRender && levels >= 16
+          ? Math.max(0, Math.min(1, tRaw))
+          : quantizeDisplayT(tRaw, levels);
       const [r, g, b] = paletteColor(opts.colorScale.palette, t);
       rgba[o] = r | 0;
       rgba[o + 1] = g | 0;
@@ -489,4 +608,45 @@ export function rasterizeModelSection(
   }
 
   return rgba;
+}
+
+/**
+ * Escreve RGBA no canvas sem TypedArray.set nem ImageData(data, w, h).
+ * Evita "buffer source array is read-only" com buffers partilhados/imutáveis.
+ */
+export function putRgbaOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  rgba: Uint8ClampedArray,
+  width: number,
+  height: number,
+  destX = 0,
+  destY = 0,
+): void {
+  const w = Math.max(1, Math.floor(width));
+  const h = Math.max(1, Math.floor(height));
+  const nbytes = w * h * 4;
+  const n = Math.min(nbytes, rgba.length);
+
+  const off =
+    ctx.canvas.width === w && ctx.canvas.height === h
+      ? ctx.canvas
+      : document.createElement("canvas");
+  const octx =
+    off === ctx.canvas
+      ? ctx
+      : (() => {
+          (off as HTMLCanvasElement).width = w;
+          (off as HTMLCanvasElement).height = h;
+          return (off as HTMLCanvasElement).getContext("2d");
+        })();
+  if (!octx) return;
+
+  const img = octx.createImageData(w, h);
+  const dest = img.data;
+  for (let i = 0; i < n && i < dest.length; i++) dest[i] = rgba[i]!;
+  octx.putImageData(img, 0, 0);
+
+  if (octx !== ctx) {
+    ctx.drawImage(off as HTMLCanvasElement, destX, destY);
+  }
 }

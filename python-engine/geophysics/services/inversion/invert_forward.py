@@ -37,7 +37,7 @@ def build_invert_forward(
     ratios = obs_rho / np.maximum(syn_rho, 1e-6)
     ratios = ratios[np.isfinite(ratios) & (ratios > 1e-6)]
     scale = float(np.median(ratios)) if ratios.size else 1.0
-    scale = float(np.clip(scale, 0.25, 8.0))
+    scale = float(np.clip(scale, 0.08, 25.0))
     log10_scale = float(np.log10(scale))
 
     def forward_invert(
@@ -64,6 +64,8 @@ def resolve_invert_forward(
     mesh: Mesh2D,
     reading_dicts: list[dict],
     y_obs: np.ndarray,
+    *,
+    use_amplitude_scale: bool = False,
 ) -> ForwardFn:
     from .forward_dispatch import resolve_forward
 
@@ -71,4 +73,6 @@ def resolve_invert_forward(
         base = resolve_forward(forward_model)
     else:
         base = forward_log10_raw
-    return build_invert_forward(base, m_init, mesh, reading_dicts, y_obs)
+    if use_amplitude_scale:
+        return build_invert_forward(base, m_init, mesh, reading_dicts, y_obs)
+    return base

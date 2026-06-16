@@ -10,7 +10,6 @@ const MODULE_NAV_DEFS: {
   label: string;
 }[] = [
   { module: "geo", href: "/geo", label: "🧭 GEO" },
-  { module: "resistividade", href: "/geofisica", label: "⚡ Geofísica" },
   { module: "spt", href: "/spt", label: "📊 Sondagem SPT" },
   { module: "rotativa", href: "/rotativa", label: "🌀 Sondagem Rotativa" },
   { module: "trado", href: "/trado", label: "🪵 Sondagem Trado" },

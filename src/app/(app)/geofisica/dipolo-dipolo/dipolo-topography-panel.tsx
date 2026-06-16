@@ -172,10 +172,13 @@ export function DipoloTopographyPanel({
             type="file"
             accept=".csv,.tsv,.txt"
             className="hidden"
-            onChange={async (e) => {
-              const f = e.target.files?.[0];
-              if (f) await importFile(f);
-              e.currentTarget.value = "";
+            onChange={(e) => {
+              const input = e.currentTarget;
+              const f = input.files?.[0];
+              if (!f) return;
+              void importFile(f).finally(() => {
+                input.value = "";
+              });
             }}
           />
         </label>

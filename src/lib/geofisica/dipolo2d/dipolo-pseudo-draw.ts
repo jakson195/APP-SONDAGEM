@@ -7,6 +7,8 @@ import {
 } from "./colormap";
 import {
   buildAdaptiveContrastMapper,
+  buildLogPercentileScale,
+  cloneFloat64Array,
   makeHistogramEqualizeMapper,
   makeStdStretchMapper,
   resolveModelDisplayBounds,
@@ -18,11 +20,18 @@ import {
 import {
   res2dinvLegendLabels,
   rhoToRes2dinvNormalized,
+  RESIPY_RESULTS_LEGEND_BREAKS_OHM,
 } from "./res2dinv-colormap";
+import { RES2DINV_DISPLAY_SMOOTH_PASSES } from "./res2dinv-preset";
+import {
+  RES2DINV_MODEL_DEPTH_FACTOR,
+} from "./model-depth";
 import {
   buildModelZCoverProfile,
   buildSensitivityZCoverProfile,
   paintModelCellsOnCanvas,
+  profileDisplayDepthMaxM,
+  putRgbaOnCanvas,
   rasterizeModelSection,
   type ModelRenderMode,
 } from "./model-section-render";
@@ -31,12 +40,14 @@ import {
   strokeTrapezoidCoverage,
 } from "./geotechnical-section-render";
 import {
+  drawElectrodeDotsOnSurface,
   formatDistTick,
   formatElevTick,
   pathTopographyTrapezoid,
   rasterizeModelWithTopography,
   resolveTopographyElevBounds,
   strokeTopographySurface,
+  uniqueElectrodePositionsFromReadings,
 } from "./model-topography-render";
 import type { TopographyPoint } from "./topography-types";
 import type { Dipolo2DReading } from "./types";
@@ -111,8 +122,8 @@ export type ModelDrawOptions = {
   /** RMS relativo médio em % (Ω·m) — compatível com RES2DINV «Abs. error». */
   rmsPercent?: number;
   methodLabel?: string;
-  /** proxy = retroprojeção ρa; physics = inversão FDM/FEM. */
-  invertEngine?: "proxy" | "physics";
+  /** Motor de inversão (sempre ResIPy R2). */
+  invertEngine?: "physics";
   /** Exagero horizontal do perfil (1 = natural). */
   scaleXM?: number;
   /** Exagero vertical / profundidade (1 = natural). */
@@ -127,7 +138,7 @@ export type ModelDrawOptions = {
   displayScale?: ModelDisplayScale;
   /** full = sem trapézio (evita faixas brancas); coverage = máscara por profundidade. */
   maskMode?: "full" | "coverage";
-  /** Células discretas (FDM) vs bilinear (proxy). */
+  /** Células discretas vs bilinear (contour contínuo ResIPy). */
   renderMode?: ModelRenderMode;
   activeCells?: boolean[] | null;
   zCoverM?: number[] | null;
@@ -142,10 +153,23 @@ export type ModelDrawOptions = {
   showTopography?: boolean;
   /** Título superior (ex.: «Geofisica - GARUVA (LINHA 10)»). */
   sectionTitle?: string;
+  /** Fator profundidade máxima do modelo (× n × a) — trapézio / eixo Depth estilo RES2DINV. */
+  modelDepthFactor?: number;
+  /** Recorta eixo vertical à pseudoprofundidade (0,286·n·a); por defeito desligado. */
+  cropToCoverage?: boolean;
+  /** Proporção 1:1 entre distância e profundidade/cota (ResIPy «Equal»). Por defeito activo. */
+  equalAspect?: boolean;
+  /** Legenda vertical à direita (estilo ResIPy Results). */
+  legendStyle?: "bottom" | "resipy";
+  /** Rótulos «Distance [m]» / «Elevation [m]». */
+  resipyAxisLabels?: boolean;
+  /** Pontos nos eletrodos sobre a topografia. */
+  showElectrodes?: boolean;
 };
 
 const MODEL_PAD_L = 52;
 const MODEL_PAD_R = 24;
+const MODEL_PAD_R_RESIPY = 88;
 const MODEL_PAD_T = 28;
 const MODEL_PAD_B = 108;
 const MODEL_LEGEND_EXTRA = 56;
@@ -179,7 +203,7 @@ function modelCanvasLayout(
   const scaleX = clampScale(scaleXM);
   const scaleZ = clampScale(scaleZM);
   const padL = MODEL_PAD_L;
-  const padR = MODEL_PAD_R;
+  const padR = opts.legendStyle === "resipy" ? MODEL_PAD_R_RESIPY : MODEL_PAD_R;
   const padT = MODEL_PAD_T;
   const padB = MODEL_PAD_B;
   const isExport = Boolean(opts.exportWidthPx && opts.exportWidthPx > 0);
@@ -551,14 +575,18 @@ export function drawModelCanvasMessage(
 
 export function drawModelSection(
   canvas: HTMLCanvasElement,
-  mLog: Float64Array,
+  mLogIn: Float64Array,
   nx: number,
   nz: number,
-  xEdges: Float64Array,
-  zEdges: Float64Array,
+  xEdgesIn: Float64Array,
+  zEdgesIn: Float64Array,
   colorScale: ResistivityColorScale = defaultColorScale,
   opts: ModelDrawOptions = {},
 ) {
+  const mLog = mLogIn;
+  const xEdges = xEdgesIn;
+  const zEdges = zEdgesIn;
+
   const validationErr = validateModelForRender(
     mLog,
     nx,
@@ -571,18 +599,6 @@ export function drawModelSection(
     return;
   }
 
-  const layout = modelCanvasLayout(
-    canvas,
-    opts.scaleXM ?? 1,
-    opts.scaleZM ?? 1,
-    opts,
-  );
-  if (!layout) return;
-  const { ctx, plotW, plotH, plotTop } = layout;
-  const padL = MODEL_PAD_L;
-  const padT = MODEL_PAD_T;
-  const padB = MODEL_PAD_B;
-
   const topoMode =
     opts.showTopography &&
     opts.topography &&
@@ -593,28 +609,73 @@ export function drawModelSection(
   const x1 = xEdges[nx]!;
   const z0 = 0;
   const z1 = zEdges[nz]!;
-  const dx = (x1 - x0) / Math.max(1, nx);
-  const dz = (z1 - z0) / Math.max(1, nz);
-  const nLevels = opts.colorLevels ?? 16;
+
   const readings = opts.readings ?? [];
   const factorDepth = opts.factorDepth ?? 0.286;
   const maskMode =
     opts.maskMode ??
     (opts.invertEngine === "physics" ? "coverage" : "full");
-  const renderMode: ModelRenderMode =
-    opts.renderMode ??
-    (opts.invertEngine === "physics" ? "fem_smooth" : "bilinear");
+  const renderMode: ModelRenderMode = opts.renderMode ?? "layer_smooth";
   const isBlockCells = renderMode === "cells";
+  const isLayerRender =
+    renderMode === "fem_smooth" || renderMode === "layer_smooth";
   const useStrictCover =
-    opts.invertEngine === "physics" || isBlockCells;
+    (opts.invertEngine === "physics" && !isLayerRender) || isBlockCells;
+  /** Trapézio RES2DINV: 1,0·n·a (não FMD 0,286). */
+  const modelCoverFactor =
+    opts.modelDepthFactor ?? RES2DINV_MODEL_DEPTH_FACTOR;
+  const coverFactor = isLayerRender ? modelCoverFactor : factorDepth;
   const zCoverProfile =
     opts.zCoverM != null && opts.zCoverM.length === nx
-      ? Float64Array.from(opts.zCoverM)
+      ? cloneFloat64Array(opts.zCoverM)
       : readings.length > 0
         ? useStrictCover
           ? buildSensitivityZCoverProfile(readings, x0, x1, nx, factorDepth)
-          : buildModelZCoverProfile(readings, x0, x1, nx, z1, factorDepth)
+          : buildModelZCoverProfile(readings, x0, x1, nx, z1, coverFactor)
         : null;
+  const cropToCoverage = opts.cropToCoverage === true;
+  const zPlotMax = profileDisplayDepthMaxM(
+    z1,
+    readings,
+    factorDepth,
+    zCoverProfile,
+    cropToCoverage,
+  );
+
+  let scaleXM = opts.scaleXM ?? 1;
+  const userScaleZ = opts.scaleZM ?? 1;
+  let scaleZM = userScaleZ;
+  /** Proporção real distância:profundidade (ou cota em modo topografia). */
+  const useNaturalAspect = opts.equalAspect !== false;
+  if (useNaturalAspect) {
+    if (topoMode) {
+      const earlyBounds = resolveTopographyElevBounds(topography, x0, x1, z1);
+      const xSpan = earlyBounds.xPlot1 - earlyBounds.xPlot0;
+      const zSpan = earlyBounds.elevTop - earlyBounds.elevBottom;
+      if (xSpan > 0 && zSpan > 0) {
+        scaleZM =
+          ((zSpan / xSpan) * scaleXM) / MODEL_BASE_PLOT_ASPECT * userScaleZ;
+      }
+    } else {
+      const xSpan = x1 - x0;
+      const zSpan = zPlotMax - z0;
+      if (xSpan > 0 && zSpan > 0) {
+        scaleZM =
+          ((zSpan / xSpan) * scaleXM) / MODEL_BASE_PLOT_ASPECT * userScaleZ;
+      }
+    }
+  }
+
+  const layout = modelCanvasLayout(canvas, scaleXM, scaleZM, opts);
+  if (!layout) return;
+  const { ctx, plotW, plotH, plotTop } = layout;
+  const padL = MODEL_PAD_L;
+  const padT = MODEL_PAD_T;
+  const padB = MODEL_PAD_B;
+
+  const dx = (x1 - x0) / Math.max(1, nx);
+  const dz = (z1 - z0) / Math.max(1, nz);
+  const nLevels = opts.colorLevels ?? 16;
 
   const visibleRhos: number[] = [];
   for (let i = 0; i < nx; i++) {
@@ -641,12 +702,15 @@ export function drawModelSection(
       : allRhos.length > 0
         ? allRhos
         : [10, 100, 1000];
-  const contrastMode: ModelContrastMode = opts.logContrast ?? "auto";
+  const contrastMode: ModelContrastMode =
+    opts.logContrast ??
+    (opts.invertEngine === "physics" ? "log_percentile" : "auto");
   let displayScale: ModelDisplayScale = opts.displayScale ?? "log";
   let scaleAutoLabel: string;
   let normalizeRho: (rho: number) => number;
   let logLo: number;
   let logHi: number;
+  let legendPercentileBreaks: number[] | undefined;
   let legendBounds = resolveModelDisplayBounds(finiteRhos, "percentile");
 
   if (!colorScale.auto) {
@@ -688,13 +752,26 @@ export function drawModelSection(
     legendBounds = resolveModelDisplayBounds(finiteRhos, "percentile");
     logLo = legendBounds.logLo;
     logHi = legendBounds.logHi;
+  } else if (contrastMode === "log_percentile") {
+    const lp = buildLogPercentileScale(finiteRhos);
+    logLo = lp.logLo;
+    logHi = lp.logHi;
+    legendBounds = {
+      logLo: lp.logLo,
+      logHi: lp.logHi,
+      rhoMinOhmM: lp.rhoMinOhmM,
+      rhoMaxOhmM: lp.rhoMaxOhmM,
+      scaleLabel: lp.scaleLabel,
+    };
+    scaleAutoLabel = lp.scaleLabel;
+    displayScale = "log";
+    normalizeRho = lp.normalizeRho;
+    legendPercentileBreaks = lp.legendTicksOhmM;
   } else if (contrastMode === "res2dinv") {
-    legendBounds = resolveModelDisplayBounds(
-      finiteRhos,
-      "manual",
-      1,
-      5000,
-    );
+    const pct = resolveModelDisplayBounds(finiteRhos, "percentile");
+    const rhoMin = Math.min(10, pct.rhoMinOhmM);
+    const rhoMax = Math.max(8000, pct.rhoMaxOhmM);
+    legendBounds = resolveModelDisplayBounds(finiteRhos, "manual", rhoMin, rhoMax);
     logLo = legendBounds.logLo;
     logHi = legendBounds.logHi;
     scaleAutoLabel = "RES2DINV (classes discretas)";
@@ -717,8 +794,9 @@ export function drawModelSection(
   const rhoMinLabel = legendBounds.rhoMinOhmM;
   const rhoMaxLabel = legendBounds.rhoMaxOhmM;
 
-  const rasterW = Math.max(64, Math.ceil(plotW * 2));
-  const rasterH = Math.max(64, Math.ceil(plotH * 2));
+  const rasterScale = isLayerRender ? 3 : 2;
+  const rasterW = Math.max(64, Math.ceil(plotW * rasterScale));
+  const rasterH = Math.max(64, Math.ceil(plotH * rasterScale));
 
   let elevBounds: ReturnType<typeof resolveTopographyElevBounds> | null = null;
   let sx: (x: number) => number;
@@ -738,8 +816,14 @@ export function drawModelSection(
     syDepth = () => 0;
   } else {
     sx = (x: number) => padL + ((x - x0) / (x1 - x0 || 1)) * plotW;
-    syDepth = (z: number) => plotTop + ((z - z0) / (z1 - z0 || 1)) * plotH;
+    syDepth = (z: number) =>
+      plotTop + ((z - z0) / (zPlotMax - z0 || 1)) * plotH;
   }
+
+  /** Secção em profundidade (células discretas — independente do eixo de elevação). */
+  const sxDepth = (x: number) => padL + ((x - x0) / (x1 - x0 || 1)) * plotW;
+  const syDepthZ = (z: number) =>
+    plotTop + ((z - z0) / (zPlotMax - z0 || 1)) * plotH;
 
   const rasterOpts = {
     logLo,
@@ -750,8 +834,8 @@ export function drawModelSection(
     displaySmoothPasses:
       renderMode === "cells"
         ? 0
-        : renderMode === "fem_smooth"
-          ? (opts.displaySmoothPasses ?? 1)
+        : isLayerRender
+          ? (opts.displaySmoothPasses ?? RES2DINV_DISPLAY_SMOOTH_PASSES)
           : (opts.displaySmoothPasses ?? 0),
     maskMode,
     renderMode,
@@ -759,15 +843,23 @@ export function drawModelSection(
     zCoverProfile,
   };
 
-  const paintCellsDirect =
-    !topoMode && isBlockCells && !opts.exportWidthPx;
+  const paintCellsDirect = isBlockCells && !opts.exportWidthPx;
 
   if (paintCellsDirect) {
     ctx.fillStyle = "#f8fafc";
     ctx.fillRect(padL, plotTop, plotW, plotH);
     if (maskMode === "coverage" && zCoverProfile) {
       ctx.save();
-      pathTrapezoidCoverage(ctx, zCoverProfile, x0, x1, nx, z0, sx, syDepth);
+      pathTrapezoidCoverage(
+        ctx,
+        zCoverProfile,
+        x0,
+        x1,
+        nx,
+        z0,
+        sxDepth,
+        syDepthZ,
+      );
       ctx.clip();
     }
     paintModelCellsOnCanvas(
@@ -777,13 +869,34 @@ export function drawModelSection(
       nz,
       xEdges,
       zEdges,
-      sx,
-      syDepth,
+      sxDepth,
+      syDepthZ,
       rasterOpts,
     );
     if (maskMode === "coverage" && zCoverProfile) {
       ctx.restore();
-      strokeTrapezoidCoverage(ctx, zCoverProfile, x0, x1, nx, z0, sx, syDepth);
+      strokeTrapezoidCoverage(
+        ctx,
+        zCoverProfile,
+        x0,
+        x1,
+        nx,
+        z0,
+        sxDepth,
+        syDepthZ,
+      );
+    }
+    if (topoMode && elevBounds && syElev) {
+      strokeTopographySurface(ctx, topography, elevBounds, sx, syElev);
+      if (opts.showElectrodes && readings.length > 0) {
+        drawElectrodeDotsOnSurface(
+          ctx,
+          uniqueElectrodePositionsFromReadings(readings),
+          topography,
+          sx,
+          syElev,
+        );
+      }
     }
   } else {
     const rgba = topoMode
@@ -821,14 +934,11 @@ export function drawModelSection(
     off.height = rasterH;
     const octx = off.getContext("2d");
     if (octx) {
-      octx.putImageData(
-        new ImageData(new Uint8ClampedArray(rgba), rasterW, rasterH),
-        0,
-        0,
-      );
+      putRgbaOnCanvas(octx, rgba, rasterW, rasterH);
       ctx.imageSmoothingEnabled = renderMode !== "cells";
-      if (renderMode === "fem_smooth") {
-        ctx.imageSmoothingEnabled = false;
+      if (isLayerRender || renderMode === "bilinear") {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
       } else if (renderMode !== "cells") {
         ctx.imageSmoothingQuality = "high";
       }
@@ -853,6 +963,15 @@ export function drawModelSection(
         ctx.drawImage(off, padL, plotTop, plotW, plotH);
         ctx.restore();
         strokeTopographySurface(ctx, topography, elevBounds, sx, syElev);
+        if (opts.showElectrodes && readings.length > 0) {
+          drawElectrodeDotsOnSurface(
+            ctx,
+            uniqueElectrodePositionsFromReadings(readings),
+            topography,
+            sx,
+            syElev,
+          );
+        }
       } else if (maskMode === "coverage" && zCoverProfile) {
         ctx.save();
         pathTrapezoidCoverage(ctx, zCoverProfile, x0, x1, nx, z0, sx, syDepth);
@@ -890,17 +1009,8 @@ export function drawModelSection(
   }
   if (opts.methodLabel) {
     ctx.font = "10px Arial,sans-serif";
-    ctx.fillStyle = opts.invertEngine === "proxy" ? "#b45309" : "#4b5563";
+    ctx.fillStyle = "#4b5563";
     ctx.fillText(opts.methodLabel, padL + 280, 16);
-  }
-  if (opts.invertEngine === "proxy") {
-    ctx.font = "10px Arial,sans-serif";
-    ctx.fillStyle = "#b45309";
-    ctx.fillText(
-      "Preview: projeção da ρa aparente (não é inversão Poisson / RES2DINV)",
-      padL,
-      opts.methodLabel ? 40 : 28,
-    );
   }
   if (opts.iterations != null && (opts.rmsPercent != null || opts.rmsLog10 != null)) {
     const rmsPct =
@@ -926,7 +1036,11 @@ export function drawModelSection(
     ctx.fillStyle = "#374151";
     ctx.font = "11px Arial,sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText("Elev.", 8, plotTop + 14);
+    ctx.fillText(
+      opts.resipyAxisLabels ? "Elevation [m]" : "Elev.",
+      8,
+      plotTop + 14,
+    );
 
     const tickCount = 6;
     for (let t = 0; t <= tickCount; t++) {
@@ -966,6 +1080,13 @@ export function drawModelSection(
       ctx.fillText(formatDistTick(xVal), xv, plotTop - 7);
     }
 
+    if (opts.resipyAxisLabels) {
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#374151";
+      ctx.font = "11px Arial,sans-serif";
+      ctx.fillText("Distance [m]", padL + plotW / 2, plotTop - 18);
+    }
+
     ctx.strokeStyle = "#111827";
     ctx.lineWidth = 1;
     pathTopographyTrapezoid(
@@ -1001,7 +1122,7 @@ export function drawModelSection(
       const xv = padL + u * plotW;
       const xVal = x0 + (x1 - x0) * u;
       const yv = plotTop + u * plotH;
-      const zVal = z0 + (z1 - z0) * u;
+      const zVal = z0 + (zPlotMax - z0) * u;
 
       ctx.strokeStyle = "rgba(17,24,39,0.75)";
       ctx.lineWidth = 1;
@@ -1036,18 +1157,43 @@ export function drawModelSection(
     ctx.fillText("m.", padL + plotW + 4, plotTop + plotH + 16);
   }
 
-  drawBottomDiscreteColorBar(
-    ctx,
-    padL,
-    plotTop + plotH + 30,
-    plotW,
-    14,
-    logLo,
-    logHi,
-    colorScale,
-    nLevels,
-    contrastMode === "res2dinv" ? res2dinvLegendLabels() : undefined,
-  );
+  const resipyLegend = opts.legendStyle === "resipy";
+  const linearLegendBreaks =
+    resipyLegend &&
+    displayScale === "linear" &&
+    !colorScale.auto &&
+    colorScale.rhoMinOhmM != null &&
+    colorScale.rhoMaxOhmM != null
+      ? [...RESIPY_RESULTS_LEGEND_BREAKS_OHM]
+      : undefined;
+
+  if (resipyLegend) {
+    drawRightVerticalColorBar(
+      ctx,
+      padL + plotW + 12,
+      plotTop,
+      18,
+      plotH,
+      legendBounds.rhoMinOhmM,
+      legendBounds.rhoMaxOhmM,
+      colorScale,
+      nLevels,
+      linearLegendBreaks,
+    );
+  } else {
+    drawBottomDiscreteColorBar(
+      ctx,
+      padL,
+      plotTop + plotH + 30,
+      plotW,
+      14,
+      logLo,
+      logHi,
+      colorScale,
+      nLevels,
+      contrastMode === "res2dinv" ? res2dinvLegendLabels() : undefined,
+    );
+  }
   ctx.fillStyle = "#6b7280";
   ctx.font = "9px Arial,sans-serif";
   ctx.textAlign = "right";
@@ -1055,8 +1201,8 @@ export function drawModelSection(
     colorScale.auto
       ? `Escala ${displayScale === "log" ? "log₁₀" : "linear"}: ${formatRhoLabel(rhoMinLabel)} – ${formatRhoLabel(rhoMaxLabel)} Ω·m (${scaleAutoLabel})`
       : `Escala ${displayScale === "log" ? "log₁₀" : "linear"}: ${formatRhoLabel(rhoMinLabel)} – ${formatRhoLabel(rhoMaxLabel)} Ω·m (manual)`,
-    padL + plotW,
-    plotTop + plotH + 52,
+    padL + (resipyLegend ? plotW : plotW),
+    plotTop + plotH + (resipyLegend ? 8 : 52),
   );
   ctx.textAlign = "left";
 }
@@ -1080,6 +1226,48 @@ export function renderModelSectionCanvas(
   return canvas;
 }
 
+function drawRightVerticalColorBar(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  rhoMin: number,
+  rhoMax: number,
+  scale: ResistivityColorScale,
+  levels: number,
+  legendRhoBreaks?: number[],
+) {
+  const span = Math.max(1e-6, rhoMax - rhoMin);
+  const nSeg = Math.max(64, levels * 4);
+  const segH = h / nSeg;
+  for (let i = 0; i < nSeg; i++) {
+    const u = 1 - i / Math.max(1, nSeg - 1);
+    const [r, g, b] = paletteColor(scale.palette, u);
+    const y0 = y + i * segH;
+    ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+    ctx.fillRect(x, y0, w, segH + 1);
+  }
+  ctx.strokeStyle = "#111827";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, w, h);
+
+  const breaks =
+    legendRhoBreaks && legendRhoBreaks.length >= 2
+      ? legendRhoBreaks
+      : [rhoMin, rhoMax];
+  ctx.fillStyle = "#111827";
+  ctx.font = "10px Arial,sans-serif";
+  ctx.textAlign = "left";
+  for (const rho of breaks) {
+    const u = Math.max(0, Math.min(1, (rho - rhoMin) / span));
+    const yv = y + (1 - u) * h;
+    ctx.fillText(formatRhoLabel(rho), x + w + 6, yv + 3);
+  }
+  ctx.font = "9px Arial,sans-serif";
+  ctx.fillText("Resistivity (ohm.m)", x + w + 6, y + h + 14);
+}
+
 function drawBottomDiscreteColorBar(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -1091,13 +1279,36 @@ function drawBottomDiscreteColorBar(
   scale: ResistivityColorScale,
   levels: number,
   legendRhoBreaks?: number[],
+  legendLogTicks?: { logLo: number; logHi: number },
 ) {
   const breaks =
     legendRhoBreaks && legendRhoBreaks.length >= 2
       ? legendRhoBreaks
       : null;
+  const logLegend = legendLogTicks ?? null;
 
-  if (breaks) {
+  if (breaks && logLegend) {
+    const nSeg = Math.max(48, levels * 3);
+    const segW = w / nSeg;
+    for (let i = 0; i < nSeg; i++) {
+      const u = i / Math.max(1, nSeg - 1);
+      const [r, g, b] = paletteColor(scale.palette, u);
+      const x0 = x + i * segW;
+      ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+      ctx.fillRect(x0, y, segW + 1, h);
+    }
+    ctx.strokeStyle = "#111827";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+    for (const rho of breaks) {
+      const u = rhoToNormalized(rho, logLegend.logLo, logLegend.logHi);
+      const xt = x + u * w;
+      ctx.fillStyle = "#111827";
+      ctx.font = "10px Arial,sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(formatRhoLabel(rho), xt, y + h + 12);
+    }
+  } else if (breaks) {
     const n = breaks.length;
     const segW = w / Math.max(1, n - 1);
     for (let i = 0; i < n - 1; i++) {

@@ -18,8 +18,11 @@ type Props = {
 };
 
 const PALETTES: { id: ResistivityPalette; label: string }[] = [
-  { id: "x2ipi", label: "x2ipi" },
+  { id: "x2ipi", label: "x2ipi / RES2DINV" },
   { id: "jet", label: "Jet" },
+  { id: "viridis", label: "Viridis" },
+  { id: "turbo", label: "Turbo" },
+  { id: "seismic", label: "Seismic" },
   { id: "rainbow", label: "Arco-íris" },
   { id: "default", label: "Padrão" },
   { id: "grayscale", label: "Cinzento" },

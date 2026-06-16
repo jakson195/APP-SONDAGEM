@@ -1,15 +1,35 @@
 import type { TopographyPoint } from "./topography-types";
-import { sanitizeModelLog10 } from "./model-visual-scale";
+import { cloneFloat64Array, sanitizeModelLog10 } from "./model-visual-scale";
+import {
+  physicsIrlsInnerIterations,
+  resolvePhysicsInvertMethod,
+} from "./invert-method-resolve";
+import { RES2DINV_INVERT_PARAMS } from "./res2dinv-preset";
 import type {
   Dipolo2DInvertMethodId,
   Dipolo2DInvertParams,
   Dipolo2DInvertResult,
+  Dipolo2DIterationRecord,
   Dipolo2DReading,
 } from "./types";
 
-export type InvertEngineId = "proxy" | "physics";
+/** @deprecated Proxy removido — apenas ResIPy R2. */
+export type InvertEngineId = "physics";
 
 export type PhysicsForwardModelId = "fdm" | "fem";
+
+export type PhysicsInvertEngineId = "legacy" | "pygimli" | "simpeg" | "resipy";
+
+export type Res2dinvPhysicsOptions = {
+  /** Motor Python: apenas resipy (R2). */
+  physicsBackend?: PhysicsInvertEngineId;
+  /** @deprecated use physicsBackend === "legacy" */
+  useLegacyEngine?: boolean;
+  /** Jacobiana por diferenças finitas (só legacy). */
+  jacobianFd?: boolean;
+  /** λ adaptativo por χ²/RMS (só legacy). */
+  adaptiveLambda?: boolean;
+};
 
 type PhysicsResponse = {
   ok: boolean;
@@ -32,6 +52,7 @@ type PhysicsResponse = {
   excluded_indices?: number[];
   data_weights?: number[];
   message?: string;
+  progress_log?: string[];
   forward_model?: PhysicsForwardModelId;
   chi2_reduced?: number;
   chi2_target?: number;
@@ -40,20 +61,62 @@ type PhysicsResponse = {
   z_cover_m?: number[];
 };
 
+function isFastResipyInvert(p: Dipolo2DInvertParams): boolean {
+  return p.maxIter <= 6;
+}
+
 function physicsMeshSize(
   p: Dipolo2DInvertParams,
   forwardModel: PhysicsForwardModelId = "fdm",
+  fast = true,
 ): Pick<Dipolo2DInvertParams, "nx" | "nz"> {
   if (forwardModel === "fem") {
     return {
-      nx: Math.min(Math.max(p.nx, 24), 36),
-      nz: Math.min(Math.max(p.nz, 16), 24),
+      nx: Math.min(Math.max(p.nx, 16), 28),
+      nz: Math.min(Math.max(p.nz, 10), 16),
+    };
+  }
+  if (fast) {
+    return {
+      nx: Math.min(Math.max(p.nx, 12), 20),
+      nz: Math.min(Math.max(p.nz, 6), 12),
     };
   }
   return {
-    nx: Math.min(Math.max(p.nx, 24), 40),
-    nz: Math.min(Math.max(p.nz, 14), 22),
+    nx: Math.min(Math.max(p.nx, 14), 28),
+    nz: Math.min(Math.max(p.nz, 8), 16),
   };
+}
+
+function normalizeIterationHistory(
+  raw: Array<Record<string, unknown>> | undefined,
+): Dipolo2DIterationRecord[] {
+  if (!raw?.length) return [];
+  return raw.map((row, i) => ({
+    iter: Number(row.iter ?? i),
+    rmsLog10: Number(row.rms_log10 ?? row.rmsLog10 ?? 0),
+    rmsPercent:
+      row.rms_percent != null
+        ? Number(row.rms_percent)
+        : row.rmsPercent != null
+          ? Number(row.rmsPercent)
+          : undefined,
+    lambda: Number(row.lambda_reg ?? row.lambda ?? 0),
+    phi: Number(row.phi ?? 0),
+    roughnessL2: Number(row.roughness_l2 ?? row.roughnessL2 ?? 0),
+    relativeGain:
+      row.relative_gain != null
+        ? Number(row.relative_gain)
+        : row.relativeGain != null
+          ? Number(row.relativeGain)
+          : null,
+    chi2Reduced:
+      row.chi2_reduced != null
+        ? Number(row.chi2_reduced)
+        : row.chi2Reduced != null
+          ? Number(row.chi2Reduced)
+          : undefined,
+  }));
 }
 
 function toPhysicsPayload(
@@ -63,12 +126,18 @@ function toPhysicsPayload(
   topography: TopographyPoint[] | undefined,
   qcByRow: Map<number, { qualityScore: number; isSpike: boolean }> | undefined,
   forwardModel: PhysicsForwardModelId = "fdm",
+  options?: Res2dinvPhysicsOptions,
 ) {
-  const mesh = physicsMeshSize(params, forwardModel);
+  const fastInvert = isFastResipyInvert(params);
+  const mesh = physicsMeshSize(params, forwardModel, fastInvert);
   const maxIter =
     forwardModel === "fem"
-      ? Math.min(Math.max(params.maxIter, 12), 24)
-      : Math.min(Math.max(params.maxIter, 12), 28);
+      ? Math.min(Math.max(params.maxIter, 8), 24)
+      : Math.max(3, Math.min(params.maxIter, fastInvert ? 8 : 28));
+  const backend: PhysicsInvertEngineId = options?.physicsBackend ?? "resipy";
+  const jacobianFd = options?.jacobianFd !== false;
+  const adaptiveLambda = options?.adaptiveLambda !== false;
+  const effectiveMethod = method;
   return {
     readings: readings.map((r, i) => ({
       station_m: r.stationM,
@@ -92,32 +161,55 @@ function toPhysicsPayload(
       nx: mesh.nx,
       nz: mesh.nz,
       factor_depth: params.factorDepth,
+      model_depth_factor: params.modelDepthFactor ?? 1.0,
+      model_depth_range: params.modelDepthRange ?? 1.05,
       lambda_reg: params.lambda,
-      lambda_x: params.lambdaX ?? 0.1,
-      lambda_z: params.lambdaZ ?? 0.4,
+      lambda_x: params.lambdaX ?? RES2DINV_INVERT_PARAMS.lambdaX,
+      lambda_z: params.lambdaZ ?? RES2DINV_INVERT_PARAMS.lambdaZ,
       lambda_min: params.lambdaMin,
       lambda_decay: params.lambdaDecay,
       max_iter: maxIter,
       huber_c: params.huberC,
       min_improvement: params.minImprovement,
-      target_rms_log10: 0.035,
+      target_rms_log10: 0.05,
+      target_rms_percent: 12,
       hybrid_alpha: params.hybridAlpha ?? 0.65,
       auto_exclude_outliers: false,
       outlier_score_threshold: 35,
-      use_adaptive_mesh: false,
-      apply_coverage_mask: false,
-      use_line_search: method !== "gauss_newton",
+      use_adaptive_mesh: forwardModel === "fem",
+      use_line_search: true,
       trust_region_alpha: 0.35,
       geometric_z_layers: true,
-      min_iter_before_stop: 4,
-      reg_normalize_mesh: true,
-      irls_inner_iters: 2,
-      jacobian_mode: "fd" as const,
+      min_iter_before_stop: fastInvert ? 2 : 6,
+      reg_normalize_mesh: false,
+      irls_inner_iters: physicsIrlsInnerIterations(effectiveMethod),
+      jacobian_mode:
+        forwardModel === "fem" || jacobianFd ? ("fd" as const) : ("adjoint" as const),
+      adaptive_lambda: adaptiveLambda,
       forward_model: forwardModel,
       chi2_tolerance: 0.05,
+      rho_min_ohm_m: params.rhoMinOhmM ?? 0.1,
+      rho_max_ohm_m: params.rhoMaxOhmM ?? 10_000,
+      mesh_type: params.meshType ?? "trian",
+      mesh_cl_factor: params.meshClFactor ?? (fastInvert ? 5 : 2),
+      mesh_refine: fastInvert ? 0 : (params.meshRefine ?? 0),
+      mesh_fmd_m: params.meshFmdM ?? null,
+      tolerance: params.tolerance ?? 0.02,
+      a_wgt: params.aWgt ?? 0.03,
+      b_wgt: params.bWgt ?? 0,
+      filter_reciprocal: params.filterReciprocal !== false,
+      filter_negative: params.filterNegative !== false,
+      filter_duplicates: params.filterDuplicates !== false,
+      filter_pct_error: params.filterPctError ?? 15,
+      crop_corners: params.cropCorners === true,
+      doi_estimate: params.doiEstimate === true,
+      apply_coverage_mask: params.cropCorners === true,
+      contour_smooth_passes: params.contourSmoothPasses ?? 0,
+      contour_smooth_sigma: 0.8,
+      fast_invert: fastInvert,
     },
-    method,
-    invert_engine: "pygimli",
+    method: effectiveMethod,
+    invert_engine: backend,
     topography: topography?.map((t) => ({
       station_m: t.stationM,
       elevation_m: t.elevationM,
@@ -156,7 +248,7 @@ function mapPhysicsResponse(data: PhysicsResponse): Dipolo2DInvertResult | null 
   }
   const nx = data.nx ?? 0;
   const nz = data.nz ?? 0;
-  const raw = Float64Array.from(data.m_log10);
+  const raw = cloneFloat64Array(data.m_log10);
   if (nx < 1 || nz < 1 || raw.length !== nx * nz) {
     console.error(
       "[physics-invert] modelo inconsistente:",
@@ -172,10 +264,10 @@ function mapPhysicsResponse(data: PhysicsResponse): Dipolo2DInvertResult | null 
   }
   return {
     mLog10,
-    xEdgesM: Float64Array.from(data.x_edges_m),
-    zEdgesM: Float64Array.from(data.z_edges_m),
-    yObsLog10: Float64Array.from(data.y_obs_log10),
-    ySynLog10: Float64Array.from(data.y_syn_log10),
+    xEdgesM: cloneFloat64Array(data.x_edges_m),
+    zEdgesM: cloneFloat64Array(data.z_edges_m),
+    yObsLog10: cloneFloat64Array(data.y_obs_log10),
+    ySynLog10: cloneFloat64Array(data.y_syn_log10),
     rmsLog10: data.rms_log10 ?? 0,
     rmsPercent: data.rms_percent,
     roughnessL2: data.roughness_l2 ?? 0,
@@ -183,10 +275,12 @@ function mapPhysicsResponse(data: PhysicsResponse): Dipolo2DInvertResult | null 
       data.iterations ?? 0,
       data.iteration_history?.length ?? 0,
     ),
-    iterationHistory: data.iteration_history ?? [],
+    iterationHistory: normalizeIterationHistory(
+      data.iteration_history as Array<Record<string, unknown>> | undefined,
+    ),
     nx,
     nz,
-    methodId: data.method ?? "gauss_newton",
+    methodId: data.method ?? "blocky_l1",
     methodLabel: data.method_label ?? "FDM físico",
     engine: "physics",
     physicsMessage: data.message
@@ -194,6 +288,7 @@ function mapPhysicsResponse(data: PhysicsResponse): Dipolo2DInvertResult | null 
       : data.engine
         ? `[${data.engine}]`
         : undefined,
+    progressLog: data.progress_log,
     excludedReadingIndices: data.excluded_indices,
     forwardModel: data.forward_model,
     chi2Reduced: data.chi2_reduced,
@@ -240,6 +335,7 @@ export async function invertDipolo2DPhysics(
   topography?: TopographyPoint[],
   qcByRow?: Map<number, { qualityScore: number; isSpike: boolean }>,
   forwardModel: PhysicsForwardModelId = "fdm",
+  res2dinvOptions?: Res2dinvPhysicsOptions,
 ): Promise<Dipolo2DInvertResult | null> {
   const active = readings.filter((r) => !r.excluded && r.rhoApparentOhmM > 0);
   if (active.length < 4) return null;
@@ -252,10 +348,15 @@ export async function invertDipolo2DPhysics(
     topography,
     qcByRow,
     forwardModel,
+    res2dinvOptions ?? { physicsBackend: "resipy" },
   );
   let body = JSON.stringify(payload);
   const signal = AbortSignal.timeout(1_200_000);
   const urls: { url: string; credentials: RequestCredentials }[] = [
+    {
+      url: `${PYTHON_HEALTH_URL}/invert`,
+      credentials: "omit",
+    },
     {
       url: `${PYTHON_HEALTH_URL}/api/v1/geophysics/invert/2d`,
       credentials: "omit",
@@ -316,6 +417,7 @@ export async function invertDipolo2DPhysics(
       topography,
       qcByRow,
       forwardModel,
+      res2dinvOptions ?? { physicsBackend: "resipy" },
     );
     body = JSON.stringify(payload);
     for (const { url, credentials } of urls) {

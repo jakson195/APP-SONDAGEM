@@ -15,6 +15,7 @@ from services.inversion.invert_2d import run_invert_2d
 from services.inversion.pygimli_invert import is_pygimli_available
 from services.inversion.mesh import build_mesh, idx
 from services.inversion.fdm_forward import forward_log10_raw
+from services.inversion.model_units import rho_ohm_to_m_ln
 
 
 def build_two_layer(mesh, rho_top: float, rho_bot: float, z_frac: float = 0.45):
@@ -23,7 +24,7 @@ def build_two_layer(mesh, rho_top: float, rho_bot: float, z_frac: float = 0.45):
     for i in range(mesh.nx):
         for j in range(mesh.nz):
             rho = rho_top if mesh.z_centers[j] < z_cut else rho_bot
-            m[idx(i, j, mesh.nz)] = np.log10(rho)
+            m[idx(i, j, mesh.nz)] = rho_ohm_to_m_ln(rho)
     return m
 
 
@@ -54,8 +55,9 @@ def run_case(method: str, lam: float, max_iter: int = 8) -> bool:
         nx=16,
         nz=10,
         lambda_reg=lam,
-        lambda_x=0.01,
-        lambda_z=0.05,
+        lambda_x=0.001,
+        lambda_z=0.004,
+        reg_normalize_mesh=False,
         max_iter=max_iter,
         forward_model="fdm",
         jacobian_mode="fd",
@@ -63,7 +65,6 @@ def run_case(method: str, lam: float, max_iter: int = 8) -> bool:
         apply_coverage_mask=False,
         auto_exclude_outliers=False,
         irls_inner_iters=2,
-        reg_normalize_mesh=True,
         min_iter_before_stop=2,
         trust_region_alpha=0.35,
     )

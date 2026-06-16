@@ -1,4 +1,5 @@
 import type { RegistroDiarioBr } from "./types";
+import { fetchUrlText } from "@/lib/http/fetch-server";
 
 const ANA_WS =
   "https://telemetriaws1.ana.gov.br/ServiceANA.asmx/HidroSerieHistorica";
@@ -13,72 +14,135 @@ export type AnaSerieRequest = {
   nivelConsistencia?: "1" | "2";
 };
 
-function parseXmlSerie(xml: string, codigo: string): RegistroDiarioBr[] {
+function parseSerieHistoricaBlock(
+  block: string,
+  codigo: string,
+): RegistroDiarioBr[] {
   const out: RegistroDiarioBr[] = [];
-  const blocks = xml.match(/<Table[^>]*>[\s\S]*?<\/Table>/gi) ?? [];
+  const dataHora = block.match(/<DataHora[^>]*>([^<]+)/i)?.[1]?.trim();
+  if (!dataHora) return out;
+
+  const ymd = dataHora.slice(0, 10);
+  const [yearStr, monthStr] = ymd.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return out;
+
+  for (let day = 1; day <= 31; day++) {
+    const tag = `Chuva${String(day).padStart(2, "0")}`;
+    const raw = block.match(new RegExp(`<${tag}[^>]*>([^<]*)`, "i"))?.[1];
+    if (raw == null || raw.trim() === "") continue;
+    const mm = Number(raw.replace(",", "."));
+    if (!Number.isFinite(mm)) continue;
+    const data = `${yearStr}-${monthStr}-${String(day).padStart(2, "0")}`;
+    if (new Date(`${data}T12:00:00`).getMonth() + 1 !== month) continue;
+    out.push({
+      codigo,
+      data,
+      precipitacaoMm: Math.max(0, mm),
+    });
+  }
+
+  if (out.length) return out;
+
+  const chuva =
+    block.match(/<Chuva[^>]*>([^<]+)/i)?.[1] ??
+    block.match(/<Maxima[^>]*>([^<]+)/i)?.[1] ??
+    block.match(/<Total[^>]*>([^<]+)/i)?.[1];
+  if (chuva) {
+    const mm = Number(chuva.replace(",", "."));
+    if (Number.isFinite(mm)) {
+      out.push({
+        codigo,
+        data: ymd,
+        precipitacaoMm: Math.max(0, mm),
+      });
+    }
+  }
+  return out;
+}
+
+function parseXmlSerie(xml: string, codigo: string): RegistroDiarioBr[] {
+  const errMsg = xml.match(/<Error[^>]*>([^<]+)/i)?.[1]?.trim();
+  const blocks =
+    xml.match(/<SerieHistorica[\s\S]*?<\/SerieHistorica>/gi) ??
+    xml.match(/<Table[^>]*>[\s\S]*?<\/Table>/gi) ??
+    [];
+
+  const out: RegistroDiarioBr[] = [];
   for (const block of blocks) {
+    if (/<ErrorTable/i.test(block)) continue;
+    if (/<SerieHistorica/i.test(block)) {
+      out.push(...parseSerieHistoricaBlock(block, codigo));
+      continue;
+    }
     const data =
       block.match(/<DataHora[^>]*>([^<]+)/i)?.[1] ??
       block.match(/<Data_Medicao[^>]*>([^<]+)/i)?.[1];
     const chuva =
       block.match(/<Chuva[^>]*>([^<]+)/i)?.[1] ??
       block.match(/<Valor[^>]*>([^<]+)/i)?.[1];
-    const cota = block.match(/<Cota[^>]*>([^<]+)/i)?.[1];
-    const vazao = block.match(/<Vazao[^>]*>([^<]+)/i)?.[1];
     if (!data) continue;
-    const d = data.trim().slice(0, 10);
     const precip = Number((chuva ?? "0").replace(",", "."));
     out.push({
       codigo,
-      data: d,
+      data: data.trim().slice(0, 10),
       precipitacaoMm: Number.isFinite(precip) ? Math.max(0, precip) : 0,
-      cotaM: cota ? Number(cota.replace(",", ".")) : undefined,
-      vazaoM3s: vazao ? Number(vazao.replace(",", ".")) : undefined,
     });
   }
-  if (out.length) return out.sort((a, b) => a.data.localeCompare(b.data));
 
-  const dateRe = /(\d{4}-\d{2}-\d{2})/g;
-  const valRe = />([\d.,]+)</g;
-  const dates = [...xml.matchAll(dateRe)].map((m) => m[1]);
-  if (dates.length < 2) return out;
-  return [];
+  if (!out.length && errMsg) return out;
+  return out.sort((a, b) => a.data.localeCompare(b.data));
 }
 
-/** Consulta série histórica ANA (TelemetriaWS). Requer rede; pode exigir credenciais em produção. */
+/** Consulta série histórica ANA (TelemetriaWS). */
 export async function fetchAnaSerieHistorica(
   req: AnaSerieRequest,
 ): Promise<{ registros: RegistroDiarioBr[]; raw?: string; aviso?: string }> {
-  const params = new URLSearchParams({
-    codEstacao: req.codEstacao.padStart(8, "0").slice(-8),
+  const cod = req.codEstacao.padStart(8, "0").slice(-8);
+  const baseParams = {
+    codEstacao: cod,
     dataInicio: req.dataInicio,
     dataFim: req.dataFim,
     tipoDados: req.tipoDados ?? "2",
-    nivelConsistencia: req.nivelConsistencia ?? "2",
-  });
+  };
 
-  const url = `${ANA_WS}?${params}`;
-  const res = await fetch(url, {
-    headers: { Accept: "application/xml, text/xml, */*" },
-    next: { revalidate: 3600 },
-  });
+  const niveis: ("1" | "2")[] =
+    req.nivelConsistencia != null ? [req.nivelConsistencia] : ["2", "1"];
 
-  if (!res.ok) {
-    return {
-      registros: [],
-      aviso: `ANA TelemetriaWS HTTP ${res.status}. Importe CSV do HidroWeb ou configure credenciais.`,
-    };
+  for (const nivel of niveis) {
+    const params = new URLSearchParams({ ...baseParams, nivelConsistencia: nivel });
+    const url = `${ANA_WS}?${params}`;
+
+    try {
+      const { ok, status, text } = await fetchUrlText(url);
+      if (!ok) {
+        continue;
+      }
+
+      const errMsg = text.match(/<Error[^>]*>([^<]+)/i)?.[1]?.trim();
+      const registros = parseXmlSerie(text, req.codEstacao);
+      if (registros.length) {
+        return { registros };
+      }
+      if (errMsg) {
+        return {
+          registros: [],
+          aviso: `ANA: ${errMsg} Tente outro período ou importe CSV do HidroWeb.`,
+        };
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "rede";
+      return {
+        registros: [],
+        aviso: `ANA TelemetriaWS indisponível (${msg}). Importe CSV do HidroWeb.`,
+      };
+    }
   }
 
-  const text = await res.text();
-  const registros = parseXmlSerie(text, req.codEstacao);
-  if (!registros.length) {
-    return {
-      registros: [],
-      raw: text.slice(0, 500),
-      aviso:
-        "Resposta ANA sem registros parseáveis. Use importação CSV do portal HidroWeb (www.snirh.gov.br).",
-    };
-  }
-  return { registros };
+  return {
+    registros: [],
+    aviso:
+      "ANA sem registros no período. Reduza o intervalo ou importe CSV do HidroWeb (snirh.gov.br).",
+  };
 }

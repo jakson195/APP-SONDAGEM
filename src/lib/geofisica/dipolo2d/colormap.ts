@@ -2,6 +2,9 @@ export type ResistivityPalette =
   | "default"
   | "rainbow"
   | "jet"
+  | "viridis"
+  | "turbo"
+  | "seismic"
   | "grayscale"
   | "x2ipi";
 
@@ -85,6 +88,36 @@ function rainbowColor(t: number): [number, number, number] {
   }
 }
 
+function viridisColor(t: number): [number, number, number] {
+  const x = clamp01(t);
+  const r = Math.round(255 * (0.267 + 0.005 * x + 0.322 * x * x + 0.406 * x * x * x));
+  const g = Math.round(255 * (0.004 + 0.99 * x - 0.357 * x * x));
+  const b = Math.round(255 * (0.329 + 0.671 * x - 0.865 * x * x + 0.865 * x * x * x));
+  return [r, g, b];
+}
+
+function turboColor(t: number): [number, number, number] {
+  const x = clamp01(t);
+  const r = Math.round(255 * (0.19 + 2.3 * x - 2.1 * x * x));
+  const g = Math.round(255 * (0.02 + 1.8 * x - 1.2 * x * x + 0.4 * x * x * x));
+  const b = Math.round(255 * (0.53 - 1.6 * x + 1.1 * x * x));
+  return [
+    Math.max(0, Math.min(255, r)),
+    Math.max(0, Math.min(255, g)),
+    Math.max(0, Math.min(255, b)),
+  ];
+}
+
+function seismicColor(t: number): [number, number, number] {
+  const x = clamp01(t);
+  if (x < 0.5) {
+    const u = x * 2;
+    return [(u * 80) | 0, (u * 80) | 0, (180 + u * 75) | 0];
+  }
+  const u = (x - 0.5) * 2;
+  return [(200 + u * 55) | 0, (80 - u * 80) | 0, (80 - u * 80) | 0];
+}
+
 function defaultColor(t: number): [number, number, number] {
   const x = clamp01(t);
   if (x < 0.25) {
@@ -112,6 +145,12 @@ export function paletteColor(
       return rainbowColor(t);
     case "jet":
       return jetColor(t);
+    case "viridis":
+      return viridisColor(t);
+    case "turbo":
+      return turboColor(t);
+    case "seismic":
+      return seismicColor(t);
     case "grayscale": {
       const g = (clamp01(t) * 255) | 0;
       return [g, g, g];

@@ -4,10 +4,21 @@ import math
 from dataclasses import dataclass
 
 import numpy as np
+
+from services.array_utils import writable
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
 
 from .mesh import Mesh2D, idx
+from .model_units import (
+    LN10,
+    clip_m_ln,
+    conductivity_from_m_ln,
+    log10_rho_to_m_ln,
+    mean_resistivity_ohm,
+    m_ln_array_to_log10_rho,
+    rho_ohm_to_m_ln,
+)
 
 
 @dataclass
@@ -83,7 +94,7 @@ def estimate_fdm_k_2d_calibration(
     Mediana de ρ_ref / ρa_bruto por leitura.
     """
     rho_ref = max(float(rho_ref_ohm), 1e-3)
-    m_uni = np.full(mesh.nx * mesh.nz, np.log10(rho_ref), dtype=float)
+    m_uni = np.full(mesh.nx * mesh.nz, rho_ohm_to_m_ln(rho_ref), dtype=float)
     ratios: list[float] = []
     for r in reading_dicts:
         station = float(r["station_m"])
@@ -111,7 +122,7 @@ def estimate_fdm_k_2d_calibration(
     if not ratios:
         return 1.0
     # Média (não mediana) — algumas estações têm ΔV pequeno e ratio alto.
-    return float(np.clip(float(np.mean(ratios)), 0.1, 80.0))
+    return float(np.clip(float(np.median(ratios)), 0.15, 35.0))
 
 
 def electrode_layout(station_m: float, n: int, a_m: float) -> ElectrodeLayout:
@@ -152,7 +163,7 @@ def _nearest_node(mesh: Mesh2D, x: float, z: float = 0.0) -> tuple[int, int] | N
 
 def _surface_phi_profile(mesh: Mesh2D, phi: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Potencial na camada superficial por coluna (para interpolação em M/N)."""
-    xs = np.asarray(mesh.x_centers, dtype=float)
+    xs = writable(mesh.x_centers)
     vals = np.zeros(mesh.nx, dtype=float)
     for i in range(mesh.nx):
         j = _surface_layer_index(mesh, i)
@@ -161,19 +172,13 @@ def _surface_phi_profile(mesh: Mesh2D, phi: np.ndarray) -> tuple[np.ndarray, np.
 
 
 def _conductivity_from_log10(m_log10: np.ndarray, mesh: Mesh2D) -> np.ndarray:
-    """m = log₁₀(ρ) em Ω·m → condutividade σ = 1/ρ = 10^(−m) S/m."""
-    sigma = np.zeros((mesh.nx, mesh.nz), dtype=float)
-    for i in range(mesh.nx):
-        for j in range(mesh.nz):
-            if mesh.active[i, j]:
-                sigma[i, j] = 10.0 ** (-float(m_log10[idx(i, j, mesh.nz)]))
-            else:
-                sigma[i, j] = 1e-8
-    return sigma
-
-
-def _resistivity_from_log10(m_log10: np.ndarray, mesh: Mesh2D, i: int, j: int) -> float:
-    return 10.0 ** float(m_log10[idx(i, j, mesh.nz)])
+    """Compat: interpreta m como ln(ρ) se |m|>6, senão legado log₁₀(ρ)."""
+    m = writable(m_log10)
+    sample = float(m[0]) if m.size else 0.0
+    if abs(sample) > 6.0:
+        return conductivity_from_m_ln(m, mesh)
+    m_ln = m * LN10
+    return conductivity_from_m_ln(m_ln, mesh)
 
 
 def _build_system(sigma: np.ndarray, mesh: Mesh2D) -> tuple[sparse.csr_matrix, np.ndarray]:
@@ -276,14 +281,8 @@ def _inject_source(rhs: np.ndarray, mesh: Mesh2D, x_pos: float, current: float) 
 
 
 def _mean_active_resistivity(m_log10: np.ndarray, mesh: Mesh2D) -> float:
-    """ρ média (Ω·m) das células activas; m = log₁₀(ρ)."""
-    vals = [
-        10.0 ** float(m_log10[idx(i, j, mesh.nz)])
-        for i in range(mesh.nx)
-        for j in range(mesh.nz)
-        if mesh.active[i, j]
-    ]
-    return float(np.mean(vals)) if vals else 1.0
+    """ρ média (Ω·m); m = ln(ρ)."""
+    return mean_resistivity_ohm(m_log10, mesh)
 
 
 def _homogeneous_rho_raw(
@@ -293,8 +292,8 @@ def _homogeneous_rho_raw(
     rho_ref: float = 50.0,
 ) -> float:
     """ρa bruto (FDM 2D) em meio uniforme — calibração SOLODATA K + escala ρ."""
-    m_uni = np.full(mesh.nx * mesh.nz, np.log10(max(rho_ref, 1e-6)), dtype=float)
-    sigma = _conductivity_from_log10(m_uni, mesh)
+    m_uni = np.full(mesh.nx * mesh.nz, rho_ohm_to_m_ln(max(rho_ref, 1e-6)), dtype=float)
+    sigma = conductivity_from_m_ln(m_uni, mesh)
     mat, rhs = _build_system(sigma, mesh)
     i_a = max(current_ma, 1e-3) / 1000.0
     _inject_source(rhs, mesh, layout.a_x, +i_a)
@@ -345,8 +344,8 @@ def forward_reading_log10_raw(
     a_m: float,
     current_ma: float = 50.0,
 ) -> float:
-    """log₁₀(ρa) só com K·ΔV/I — para inversão com escala fixa."""
-    sigma = _conductivity_from_log10(m_log10, mesh)
+    """log₁₀(ρa); m = ln(ρ) nas células."""
+    sigma = conductivity_from_m_ln(writable(m_log10), mesh)
     mat, rhs = _build_system(sigma, mesh)
     layout = electrode_layout(station_m, n, a_m)
     i_a = _current_amperes(current_ma)
@@ -355,7 +354,7 @@ def forward_reading_log10_raw(
     try:
         phi = spsolve(mat, rhs)
     except Exception:
-        return float(np.mean(m_log10))
+        return float(np.mean(m_log10)) / LN10
     v_m = _potential_at(mesh, phi, layout.m_x)
     v_n = _potential_at(mesh, phi, layout.n_x)
     delta_v = v_m - v_n
@@ -369,6 +368,7 @@ def forward_log10_raw(
     readings: list[dict],
 ) -> np.ndarray:
     """Forward em log₁₀ ρa sem factor dinâmico ρ_mean/ρ_ref."""
+    m_log10 = writable(m_log10)
     out = np.zeros(len(readings), dtype=float)
     for k, r in enumerate(readings):
         i_ma = r.get("i_ma")
@@ -424,6 +424,7 @@ def forward_log10(
     mesh: Mesh2D,
     readings: list[dict],
 ) -> np.ndarray:
+    m_log10 = writable(m_log10)
     out = np.zeros(len(readings), dtype=float)
     for k, r in enumerate(readings):
         i_ma = r.get("i_ma")

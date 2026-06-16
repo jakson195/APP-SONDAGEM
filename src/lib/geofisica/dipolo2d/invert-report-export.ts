@@ -23,6 +23,12 @@ export function buildInvertReportTxt(
   lines.push("");
   lines.push("[PARAMETROS]");
   lines.push(`factor_depth\t${params.factorDepth}`);
+  if (params.modelDepthFactor != null) {
+    lines.push(`model_depth_factor\t${params.modelDepthFactor}`);
+  }
+  if (params.modelDepthRange != null) {
+    lines.push(`model_depth_range\t${params.modelDepthRange}`);
+  }
   lines.push(`sigma_x_m\t${params.sigmaXM}`);
   lines.push(`sigma_z_m\t${params.sigmaZM}`);
   lines.push(`lambda_ini\t${params.lambda}`);

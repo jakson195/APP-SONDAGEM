@@ -1,11 +1,15 @@
-# Motor pyGIMLi (padrão) vs legacy FDM
+# Motores de inversão: pyGIMLi, SimPEG, legacy
 
 ## Arquitectura
 
 | Motor | Ficheiro | Quando |
 |-------|----------|--------|
-| **pyGIMLi** (padrão) | `pygimli_invert.py` | Emula RES2DINV (GN + L2/L1) |
-| **legacy FDM/FEM** | `legacy_fdm_invert.py` | `invert_engine=legacy` ou FEM ou pyGIMLi indisponível |
+| **pyGIMLi** (padrão) | `pygimli_invert.py` | `invert_engine=pygimli` — ERT 2D estilo RES2DINV |
+| **ResIPy/R2** (opcional) | `resipy_invert.py` | `invert_engine=resipy` — R2 (Binley); fallback pyGIMLi |
+| **SimPEG** (opcional) | `simpeg_invert.py` | `invert_engine=simpeg` — fallback pyGIMLi → legacy |
+| **legacy FDM/FEM** | `legacy_fdm_invert.py` | `invert_engine=legacy`, FEM, ou bibliotecas ausentes |
+
+Contrato JSON partilhado: `invert_common.py` (`m_log10`, `x_edges_m`, `y_obs_log10`, …) — a UI Next.js não muda.
 
 Dispatcher: `invert_2d.py` → `run_invert_2d()`.
 
@@ -25,8 +29,18 @@ Opcional: `pip install -r requirements-pygimli.txt`
 
 ```bash
 GEOPHYS_INVERT_ENGINE=pygimli   # padrão
+GEOPHYS_INVERT_ENGINE=resipy    # ResIPy/R2 (se instalado)
+GEOPHYS_INVERT_ENGINE=simpeg    # SimPEG (se instalado)
 GEOPHYS_INVERT_ENGINE=legacy    # só motor interno
 ```
+
+## Instalação SimPEG (opcional)
+
+```bash
+pip install -r requirements-simpeg.txt
+```
+
+Na UI dipolo-dipolo: selector **Motor → SimPEG**.
 
 ## Mapeamento UI → pyGIMLi
 

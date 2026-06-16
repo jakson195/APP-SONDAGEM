@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { drawModelSection } from "@/lib/geofisica/dipolo2d/dipolo-pseudo-draw";
-import { invertDipolo2D } from "@/lib/geofisica/dipolo2d/invert-methods-2d";
+import { invertDipolo2DPhysics } from "@/lib/geofisica/dipolo2d/physics-invert-2d";
+import { resolvePhysicsInvertMethod } from "@/lib/geofisica/dipolo2d/invert-method-resolve";
 import type { ResistivityColorScale } from "@/lib/geofisica/dipolo2d/colormap";
 import {
   DIPOLO2D_INVERT_METHODS,
@@ -61,7 +62,8 @@ function MethodThumb({
         maskMode,
         colorLevels: 18,
         displaySmoothPasses: 0,
-        logContrast: "res2dinv",
+        logContrast: "log_percentile",
+        invertEngine: "physics",
       },
     );
   }, [row.result, params, colorScale, maskMode, activeReadings, row.id]);
@@ -130,17 +132,60 @@ export function DipoloInvertCompare({
   selectedMethod: Dipolo2DInvertMethodId;
   onSelectMethod: (id: Dipolo2DInvertMethodId) => void;
 }) {
-  const rows = useMemo((): InvertMethodCompareRow[] => {
+  const [results, setResults] = useState<
+    Partial<Record<Dipolo2DInvertMethodId, Dipolo2DInvertResult | null>>
+  >({});
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
     if (activeReadings.length < 4) {
-      return DIPOLO2D_INVERT_METHODS.map((m) => ({
-        id: m.id,
-        label: m.label,
-        short: m.short,
-        result: null,
-      }));
+      setResults({});
+      setBusy(false);
+      return;
     }
+
+    let cancelled = false;
+    setBusy(true);
+
+    void (async () => {
+      const next: Partial<
+        Record<Dipolo2DInvertMethodId, Dipolo2DInvertResult | null>
+      > = {};
+
+      await Promise.all(
+        DIPOLO2D_INVERT_METHODS.map(async (m) => {
+          try {
+            const physicsMethod = resolvePhysicsInvertMethod(m.id);
+            const result = await invertDipolo2DPhysics(
+              activeReadings,
+              params,
+              physicsMethod,
+              undefined,
+              undefined,
+              "fdm",
+              { physicsBackend: "resipy" },
+            );
+            if (!cancelled) next[m.id] = result;
+          } catch {
+            if (!cancelled) next[m.id] = null;
+          }
+        }),
+      );
+
+      if (!cancelled) {
+        setResults(next);
+        setBusy(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeReadings, params]);
+
+  const rows = useMemo((): InvertMethodCompareRow[] => {
     return DIPOLO2D_INVERT_METHODS.map((m) => {
-      const result = invertDipolo2D(activeReadings, params, m.id);
+      const result = activeReadings.length < 4 ? null : (results[m.id] ?? null);
       return {
         id: m.id,
         label: result?.methodLabel ?? m.label,
@@ -148,7 +193,7 @@ export function DipoloInvertCompare({
         result,
       };
     });
-  }, [activeReadings, params]);
+  }, [activeReadings.length, results]);
 
   const ranked = useMemo(() => {
     return rows
@@ -168,7 +213,9 @@ export function DipoloInvertCompare({
           Comparar métodos no mesmo perfil
         </p>
         <p className="text-xs text-[var(--muted)]">
-          Clique num painel ou no rádio — o modelo principal atualiza na hora.
+          {busy
+            ? "A calcular inversões RES2DINV (ResIPy R2)…"
+            : "Clique num painel ou no rádio — o modelo principal atualiza na hora."}
         </p>
       </div>
 
@@ -187,55 +234,14 @@ export function DipoloInvertCompare({
         ))}
       </div>
 
-      {ranked.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)]">
-          <table className="w-full min-w-[32rem] text-left text-xs">
-            <thead>
-              <tr className="border-b border-[var(--border)] text-[var(--muted)]">
-                <th className="px-2 py-1.5 font-medium">#</th>
-                <th className="px-2 py-1.5 font-medium">Método</th>
-                <th className="px-2 py-1.5 font-medium">RMS log₁₀</th>
-                <th className="px-2 py-1.5 font-medium">Rugosidade</th>
-                <th className="px-2 py-1.5 font-medium">Iter.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ranked.map((row, i) => (
-                <tr
-                  key={row.id}
-                  className={`border-b border-[var(--border)] last:border-0 ${
-                    selectedMethod === row.id ? "bg-teal-600/10" : ""
-                  }`}
-                >
-                  <td className="px-2 py-1.5 font-mono">{i + 1}</td>
-                  <td className="px-2 py-1.5">
-                    <button
-                      type="button"
-                      className="font-medium text-teal-800 hover:underline dark:text-teal-300"
-                      onClick={() => onSelectMethod(row.id)}
-                    >
-                      {row.label}
-                    </button>
-                    {row.result.rmsLog10 === bestRms && (
-                      <span className="ml-1 text-[10px] text-teal-700 dark:text-teal-400">
-                        (melhor RMS)
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-2 py-1.5 font-mono">
-                    {row.result.rmsLog10.toFixed(4)}
-                  </td>
-                  <td className="px-2 py-1.5 font-mono">
-                    {row.result.roughnessL2.toFixed(4)}
-                  </td>
-                  <td className="px-2 py-1.5 font-mono">
-                    {row.result.iterations}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {ranked.length > 0 && bestRms != null && (
+        <p className="text-xs text-[var(--muted)]">
+          Melhor RMS log₁₀:{" "}
+          <span className="font-mono font-medium text-teal-700 dark:text-teal-300">
+            {bestRms.toFixed(4)}
+          </span>{" "}
+          ({ranked[0].short})
+        </p>
       )}
     </div>
   );

@@ -7,10 +7,13 @@ export function isAnmLeilaoViewerPath(): boolean {
 
 function isDataGeoAnmProxy(): boolean {
   if (typeof window === "undefined") return false;
-  const { port, pathname } = window.location;
+  const { hostname, port, pathname } = window.location;
   if (!pathname.includes("/anm-leilao-viewer")) return false;
   if (port === "5175") return false;
-  return port === "3000" || port === "" || port === "3002";
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return port !== "5175";
+  }
+  return true;
 }
 
 export function getAnmLeilaoApiBase(): string {

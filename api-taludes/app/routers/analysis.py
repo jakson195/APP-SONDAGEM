@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.config import settings
-from app.routers.surveys import _load_index
+from app.routers.surveys import _load_index, _prepare_survey_file, _survey_path, _sync_index_raster_paths
 from app.services.pipeline import run_analysis
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
@@ -25,29 +25,27 @@ class CompareBody(BaseModel):
     enable_segmentation: bool = True
 
 
-def _survey_path(project_id: str, survey_id: str, kind: str = "ortho") -> Path | None:
-    data = _load_index()
-    for s in data.get("surveys", []):
-        if s.get("id") == survey_id and s.get("project_id") == project_id:
-            if s.get("kind") == kind or kind == "ortho":
-                return settings.upload_dir / s["path"]
-    for s in data.get("surveys", []):
-        if s.get("id") == survey_id and s.get("project_id") == project_id:
-            return settings.upload_dir / s["path"]
-    return None
-
-
 @router.post("/compare")
 def compare_surveys(body: CompareBody):
-    ortho_t0 = _survey_path(body.project_id, body.survey_t0_id, "ortho")
-    ortho_t1 = _survey_path(body.project_id, body.survey_t1_id, "ortho")
-    if not ortho_t0 or not ortho_t0.exists():
+    _sync_index_raster_paths(_load_index())
+
+    ortho_t0_raw = _survey_path(body.project_id, body.survey_t0_id, "ortho")
+    ortho_t1_raw = _survey_path(body.project_id, body.survey_t1_id, "ortho")
+    if not ortho_t0_raw or not ortho_t0_raw.exists():
         raise HTTPException(404, "Ortofoto T0 não encontrada")
-    if not ortho_t1 or not ortho_t1.exists():
+    if not ortho_t1_raw or not ortho_t1_raw.exists():
         raise HTTPException(404, "Ortofoto T1 não encontrada")
 
-    dsm_t0 = _survey_path(body.project_id, body.dsm_t0_id, "dsm") if body.dsm_t0_id else None
-    dsm_t1 = _survey_path(body.project_id, body.dsm_t1_id, "dsm") if body.dsm_t1_id else None
+    try:
+        ortho_t0 = _prepare_survey_file(ortho_t0_raw)
+        ortho_t1 = _prepare_survey_file(ortho_t1_raw)
+    except RuntimeError as exc:
+        raise HTTPException(501, str(exc)) from exc
+
+    dsm_t0_raw = _survey_path(body.project_id, body.dsm_t0_id, "dsm") if body.dsm_t0_id else None
+    dsm_t1_raw = _survey_path(body.project_id, body.dsm_t1_id, "dsm") if body.dsm_t1_id else None
+    dsm_t0 = _prepare_survey_file(dsm_t0_raw) if dsm_t0_raw and dsm_t0_raw.exists() else None
+    dsm_t1 = _prepare_survey_file(dsm_t1_raw) if dsm_t1_raw and dsm_t1_raw.exists() else None
 
     try:
         result = run_analysis(

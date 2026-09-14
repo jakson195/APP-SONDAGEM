@@ -10,12 +10,27 @@ from rasterio.enums import Resampling
 from rasterio.transform import Affine
 from rasterio.warp import reproject, transform_bounds
 
+from app.services.ecw_convert import resolve_raster_path
+
+
+def _open_raster(path: Path):
+    resolved = resolve_raster_path(path)
+    try:
+        return rasterio.open(resolved)
+    except rasterio.errors.RasterioIOError as exc:
+        if path.suffix.lower() == ".ecw":
+            raise RuntimeError(
+                "Não foi possível abrir o ficheiro ECW. "
+                "Verifique se Node.js (npx) ou GDAL com driver ECW está disponível no servidor."
+            ) from exc
+        raise
+
 
 def read_rgb_downsampled(
     path: Path,
     max_side: int,
 ) -> tuple[np.ndarray, Affine, rasterio.crs.CRS, int, int]:
-    with rasterio.open(path) as src:
+    with _open_raster(path) as src:
         scale = min(1.0, max_side / max(src.height, src.width))
         out_h = max(1, int(round(src.height * scale)))
         out_w = max(1, int(round(src.width * scale)))
@@ -50,7 +65,7 @@ def reproject_to_reference(
     bands: int = 1,
 ) -> np.ndarray:
     out = np.zeros((out_h, out_w), dtype=np.float32) if bands == 1 else np.zeros((out_h, out_w, bands), dtype=np.float32)
-    with rasterio.open(path) as src:
+    with _open_raster(path) as src:
         if bands == 1:
             reproject(
                 source=rasterio.band(src, 1),

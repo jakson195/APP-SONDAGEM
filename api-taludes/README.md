@@ -1,6 +1,6 @@
 # API Taludes — Monitoramento temporal de taludes
 
-FastAPI + OpenCV + Rasterio + GDAL (via rasterio).
+FastAPI + OpenCV + Rasterio + GDAL (via rasterio). Suporta **GeoTIFF** e **ECW**. ECW é convertido automaticamente via `npx ecw2tiff` quando o driver GDAL/ECW não existe.
 
 ## Instalação
 
@@ -29,7 +29,7 @@ Documentação: http://localhost:8010/docs
 
 ## Endpoints
 
-- `POST /surveys/upload` — GeoTIFF ortofoto ou DSM
+- `POST /surveys/upload` — ortofoto ou DSM (GeoTIFF `.tif` / ECW `.ecw`)
 - `GET /surveys` — listar levantamentos
 - `POST /analysis/compare` — pipeline completo
 - `GET /analysis/jobs/{job_id}` — resultado

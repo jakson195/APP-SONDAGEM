@@ -65,3 +65,20 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
   return NextResponse.json(item);
 }
+
+export async function DELETE(_req: Request, ctx: Ctx) {
+  const { id: idStr } = await ctx.params;
+  const id = Number(idStr);
+
+  if (!Number.isFinite(id)) {
+    return NextResponse.json({ error: "id inválido" }, { status: 400 });
+  }
+
+  const existing = await prisma.sPT.findUnique({ where: { id } });
+  if (!existing) {
+    return NextResponse.json({ error: "Registo SPT não encontrado" }, { status: 404 });
+  }
+
+  await prisma.sPT.delete({ where: { id } });
+  return NextResponse.json({ ok: true, id });
+}

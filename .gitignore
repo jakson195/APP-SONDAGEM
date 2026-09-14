@@ -5,3 +5,11 @@ node_modules/
 hidrogeo-brasil/data/cache/
 hidrogeo-brasil/backend/data/cache/
 api-core/node_modules/
+
+.env
+.env.*
+!.env.example
+**/__pycache__/
+*.py[cod]
+api-taludes/data/
+
